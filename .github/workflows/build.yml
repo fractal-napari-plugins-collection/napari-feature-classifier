@@ -1,0 +1,38 @@
+name: build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    container: exactlab/python:${{ matrix.python-version }}-ubuntu-18.04
+    strategy:
+      max-parallel: 1
+      matrix:
+        python-version: [3.7]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      run: |
+        apt update
+        apt install -y software-properties-common
+        apt install -y fontconfig libgles2-mesa libgles2-mesa-dev
+        add-apt-repository ppa:deadsnakes/ppa
+        apt update
+        apt install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-dev python3-pip
+        python${{ matrix.python-version }} -m pip install pip setuptools wheel --upgrade
+        if [ ! -e /usr/bin/python ]; then ln -sf python${{ matrix.python-version }} /usr/bin/python ; fi
+        if [ ! -e /usr/bin/pip ]; then ln -s /usr/local/bin/pip${{ matrix.python-version }} /usr/bin/pip ; fi
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    - name: Run static analyses
+      run: |
+        # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
+        python -m pylint -f parseable src --disable=bad-continuation,fixme  # disable bad-continuation checks due https://github.com/PyCQA/pylint/issues/289
+        pycodestyle --max-line-length=120 src
+    - name: Run tests
+      run: |
+        coverage run --source=src ./setup.py test
+        # stop the build if the test coverage is under 80%
+        # coverage report --fail-under=80
