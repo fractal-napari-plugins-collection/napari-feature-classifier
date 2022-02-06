@@ -1,39 +1,42 @@
 # napari-feature-classifier
 
-[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-feature-classifier.svg?color=green)](https://pypi.org/project/napari-feature-classifier)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-feature-classifier.svg?color=green)](https://python.org)
-[![tests](https://github.com/jluethi/napari-feature-classifier/workflows/tests/badge.svg)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/actions)
-[![codecov](https://codecov.io/gh/fractal-napari-plugins-collection/napari-feature-classifier/branch/main/graph/badge.svg)](https://codecov.io/gh/fractal-napari-plugins-collection/napari_feature_classifier)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-feature-classifier)](https://napari-hub.org/plugins/napari-feature-classifier)
+[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/LICENSE)
 
-An interactive classifier plugin to use with label images and feature measurements
-
-----------------------------------
-
-This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
-
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/cookiecutter-napari-plugin#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/plugins/stable/index.html
--->
+An interactive classifier plugin that allows the user to assign objects in a label image to multiple classes and train a classifier to learn those classes based on a feature dataframe.
 
 ## Installation
 
-You can install `napari-feature-classifier` via [pip]:
+Download the repository and manually install it (not on pypi / the napari plugin hub yet)
 
-    pip install napari-feature-classifier
+    git clone https://github.com/fractal-napari-plugins-collection/napari_feature_classifier
+    cd napari_feature_classifier
+    pip install .
 
+
+
+## Usage
+#### Initialize a classifier:
+- Start the classifier in napari by going to Plugins -> napari-feature-classifier -> Initialize a Classifier  
+- Provide a csv file that contains feature measurements and a columns with the integer labels corresponing to the label layer you are using.
+- Choose a name (or relative path from the current working directory) for the classifier
+- Select the features you want to use for the classifier (can't be changed later in the current implementation). Hold the command key to select multiple features
+
+#### Classify objects:
+- Make sure you have the label layer selected on which you want to classify
+- Select the current class with the radio buttons or by pressing 0, 1, 2, 3 or 4
+- Click on label objects in the viewer to assign them to the currently selected class
+- Once you have trained enough examples, click "Run Classifier" to run the classifier and have it make a prediction for all objects. Aim for at least a dozen annotations per class, as the classifier divides your annotations 80/20 in training and test sets. To get good performance readouts, aim for >30 annotations per class.
+
+#### Apply the classifier to additional images:
+- You can apply a classifier trained on one image to additional label images. Use Plugins -> napari-feature-classifier -> Load Classifier  
+- Select the classifier (.clf file with the name you gave above) and a dataframe containing the same features as the past images.
+- Click Load Classifier, proceed as above.
 
 
 
 ## Contributing
 
-Contributions are very welcome. Tests can be run with [tox], please ensure
-the coverage at least stays the same before you submit a pull request.
+Contributions are very welcome.
 
 ## License
 
