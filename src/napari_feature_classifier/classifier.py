@@ -142,7 +142,8 @@ class Classifier:
 
     def train(self, ignore_nans=True):
         # TODO: Select training data differently. 0 could be a valid training input
-        training_data = self.data[self.train_data["train"] > 0]
+        # Load only training features. The data df will also contain the prior predictions, which can lead to issues
+        training_data = self.data.loc[self.train_data["train"] > 0, self.training_features]
         training_results = self.train_data[self.train_data["train"] > 0]
 
         if ignore_nans:
@@ -191,6 +192,11 @@ class Classifier:
             return np.array(data['predict'])
         else:
             return self.clf.predict(data.loc[:, self.training_features])
+
+    def export_results_single_site(self, export_path):
+        # Optionally rerun training? (see predict)
+        results = self.predict(data, ignore_nans=True)
+        print('exporting to {}'.format(export_path))
 
     def feature_importance(self):
         return OrderedDict(
