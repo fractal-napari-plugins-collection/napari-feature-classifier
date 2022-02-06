@@ -26,8 +26,7 @@ def _init_classifier(widget):
     widget.label_column._default_choices = get_feature_choices
 
     @widget.DataFrame.changed.connect
-    def update_df_columns(event):
-        # event value will be the new path
+    def update_df_columns():
         # get_df will give you the cached df
         # ...reset_choices() calls the "get_feature_choices" function above
         # to keep them updated with the current dataframe
@@ -49,7 +48,7 @@ def _init_classifier(widget):
                 widget.feature_selection.value = widget.label_layer.value.properties['feature_selection']
 
     @widget.label_layer.changed.connect
-    def update_paths(event):
+    def update_paths():
         if 'DataFrame' in widget.label_layer.value.properties:
             widget.DataFrame.value = widget.label_layer.value.properties['DataFrame']
 
@@ -101,7 +100,7 @@ def _init_load_classifier(widget):
     #       As an option if no classifier_path is provided as a property
     # Inputs always update with properties when label layer is changed.
     @widget.label_layer.changed.connect
-    def update_paths(event):
+    def update_paths():
         if 'classifier_path' in widget.label_layer.value.properties:
             widget.classifier_path.value = widget.label_layer.value.properties['classifier_path']
         if 'DataFrame' in widget.label_layer.value.properties:
@@ -176,15 +175,16 @@ class ClassifierWidget:
         widget = self.create_selector_widget(self.label_layer)
 
         # If a widget already exists for the classifier with the same name, remove it
+        # TODO: Find a new way to do this
         # TODO: Is there a way to get rid of other class selection windows?
         # I don't have a pointer to them and they could have arbitrary names
-        try:
-            if self.clf.name in viewer.window._dock_widgets:
-                viewer.window.remove_dock_widget(viewer.window._dock_widgets[self.clf.name])
-        except:
-            # If the API for getting dock_widgets changes, just ignore this.
-            # This is optional functionality
-            pass
+        # try:
+        #     if self.clf.name in viewer.window._dock_widgets:
+        #         viewer.window.remove_dock_widget(viewer.window._dock_widgets[self.clf.name])
+        # except:
+        #     # If the API for getting dock_widgets changes, just ignore this.
+        #     # This is optional functionality
+        #     pass
 
         # add widget to napari
         viewer.window.add_dock_widget(widget, area='right', name=clf.name)
@@ -205,10 +205,8 @@ class ClassifierWidget:
             # Need to scale position that event.position returns by the label_layer scale.
             # If scale is (1, 1, 1), nothing changes
             # If scale is anything else, this makes the click still match the correct label
-            print(type(event.position))
             scaled_position = tuple(pos / scale for pos, scale in zip(event.position, label_layer.scale))
             label = label_layer.get_value(scaled_position)
-            #label = label_layer.get_value(event.position)
             if selector.value is None:
                 napari_warn('No class is selected. Select a class in the classifier widget.')
             # Check if background or foreground was clicked. If background was clicked, do nothing (background can't be assigned a class)
@@ -229,20 +227,20 @@ class ClassifierWidget:
                                   'classifier'.format(label))
 
         @selector.changed.connect
-        def change_choice(choice):
+        def change_choice():
             self.selection_layer.visible=True
             self.viewer.layers.selection.clear()
             self.viewer.layers.selection.add(self.label_layer)
 
-        @label_layer.bind_key('s')
+        @label_layer.bind_key('s', overwrite=True)
         @save_button.changed.connect
-        def save_classifier(event):
+        def save_classifier():
             show_info('Saving classifier')
             self.clf.save()
 
         @label_layer.bind_key('t')
         @run_button.changed.connect
-        def run_classifier(event):
+        def run_classifier():
             # TODO: Add Run mode? Fuzzy, Cross-validated, train/test split
             show_info('Running classifier')
             self.clf.train()
@@ -263,7 +261,7 @@ class ClassifierWidget:
             self.prediction_layer.visible = not current
 
         @label_layer.bind_key('v')
-        def toggle_selection(event):
+        def toggle_selection():
             # Toggling off the label layer would be inconvenient (can't click on it anymore)
             # => just toggle the opacity to 0
             opacity = label_layer.opacity
@@ -275,27 +273,27 @@ class ClassifierWidget:
         @label_layer.bind_key('0')
         def set_class_0(event):
             selector.value = choices[0]
-            change_choice(event)
+            change_choice()
 
         @label_layer.bind_key('1')
         def set_class_1(event):
             selector.value = choices[1]
-            change_choice(event)
+            change_choice()
 
         @label_layer.bind_key('2')
         def set_class_2(event):
             selector.value = choices[2]
-            change_choice(event)
+            change_choice()
 
         @label_layer.bind_key('3')
         def set_class_3(event):
             selector.value = choices[3]
-            change_choice(event)
+            change_choice()
 
         @label_layer.bind_key('4')
         def set_class_4(event):
             selector.value = choices[4]
-            change_choice(event)
+            change_choice()
 
         return container
 
