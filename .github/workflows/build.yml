@@ -25,7 +25,8 @@ jobs:
         if [ ! -e /usr/bin/pip ]; then ln -s /usr/local/bin/pip${{ matrix.python-version }} /usr/bin/pip ; fi
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install .[testing]
     - name: Run static analyses
       run: |
         # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
