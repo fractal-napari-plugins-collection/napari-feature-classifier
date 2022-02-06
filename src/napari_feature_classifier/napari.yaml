@@ -2,31 +2,14 @@ name: napari-feature-classifier
 display_name: napari feature classifier
 contributions:
   commands:
-    - id: napari-feature-classifier.make_qwidget
-      python_name: napari_feature_classifier._widget:ExampleQWidget
-      title: Make example QWidget
-    - id: napari-feature-classifier.make_magic_widget
-      python_name: napari_feature_classifier._widget:example_magic_widget
-      title: Make example magic widget
-    - id: napari-feature-classifier.make_func_widget
-      python_name: napari_feature_classifier._widget:example_function_widget
-      title: Make example function widget
-    - id: napari-feature-classifier.say_hi
-      title: Say hello, world!
-      python_name: napari_feature_classifier:show_hello_message
     - id: napari-feature-classifier.initialize_classifier
       python_name: napari_feature_classifier.classifier_widgets:initialize_classifier
       title: Initialize a Classifier
+    - id: napari-feature-classifier.load_classifier
+      python_name: napari_feature_classifier.classifier_widgets:load_classifier
+      title: Load a Classifier
   widgets:
-    - command: napari-feature-classifier.make_qwidget
-      display_name: Example QWidget
-    - command: napari-feature-classifier.make_magic_widget
-      display_name: Example Magic Widget
-    - command: napari-feature-classifier.make_func_widget
-      autogenerate: true
-      display_name: Example Function Widget
-    - command: napari-feature-classifier.say_hi  # note, same as command.id above
-      display_name: Hello World
-      autogenerate: true
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
+    - command: napari-feature-classifier.load_classifier
+      display_name: Load Classifier
