@@ -55,7 +55,10 @@ def _init_classifier(widget):
 
 @magic_factory(
         call_button="Initialize Classifier",
-        feature_selection = {"choices": [""]},
+        feature_selection={
+            "choices": [""],
+            "allow_multiple": True,
+        },
         label_column = {"choices": [""]},
         widget_init=_init_classifier,
         )
@@ -63,24 +66,14 @@ def initialize_classifier(viewer: Viewer,
                       label_layer: "napari.layers.Labels",
                       DataFrame: Path,
                       classifier_name = 'test',
-                      feature_selection='',
-                      additional_features='',
+                      feature_selection=[''],
                       label_column=''):
-    # TODO: Check whether features are associated with the Labels layer in the new napari convention (as a dataframe)
-
-    # TODO: Make feature selection a widget that allows multiple features to be selected, not just one
-    # Something like this in QListWidget: https://stackoverflow.com/questions/4008649/qlistwidget-and-multiple-selection
-    # See issue here: https://github.com/napari/magicgui/issues/229
-    training_features = [feature_selection]
+    # TODO: Check whether features are associated with the Labels layer in the new napari convention (as a dataframe). Use them if they are, otherwise load csv
 
     if not str(DataFrame).endswith('.csv'):
         napari_warn('The DataFrame path does not lead to a .csv file. This '\
                       'classifier requires the data to be save in a .csv '\
                       'file that is readable with pd.read_csv()')
-
-    # Workaround: provide a text box to enter additional features separated by comma, parse them as well
-    if additional_features:
-        training_features += [x.strip() for x in additional_features.split(',')]
 
     site_df = get_df(DataFrame)
     site_df['path']=DataFrame
@@ -90,7 +83,7 @@ def initialize_classifier(viewer: Viewer,
     if os.path.exists(classifier_name + '.clf'):
         # TODO: Add a warning if a classifier with this name already exists => shall it be overwritten? => Confirmation box
         napari_warn('A classifier with this name already exists and will be overwritten')
-    clf = Classifier(name=classifier_name, features=site_df, training_features=training_features, index_columns=index_columns)
+    clf = Classifier(name=classifier_name, features=site_df, training_features=feature_selection, index_columns=index_columns)
 
     ClassifierWidget(clf, label_layer, DataFrame, viewer)
 
@@ -174,8 +167,8 @@ class ClassifierWidget:
 
         widget = self.create_selector_widget(self.label_layer)
 
+        # TODO: Find a new way to do this. Currently triggers a deprecation warning for napari 0.5
         # If a widget already exists for the classifier with the same name, remove it
-        # TODO: Find a new way to do this
         # TODO: Is there a way to get rid of other class selection windows?
         # I don't have a pointer to them and they could have arbitrary names
         # try:
