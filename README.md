@@ -1,6 +1,6 @@
 # napari-feature-classifier
 
-[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/LICENSE)
+[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/blob/main/LICENSE)
 
 An interactive classifier plugin that allows the user to assign objects in a label image to multiple classes and train a classifier to learn those classes based on a feature dataframe.
 
