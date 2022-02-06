@@ -1,6 +1,6 @@
 # napari-feature-classifier
 
-[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/napari-feature-classifier.svg?color=green)](https://github.com/fractal-napari-plugins-collection/napari_feature_classifier/raw/main/LICENSE)
 
 An interactive classifier plugin that allows the user to assign objects in a label image to multiple classes and train a classifier to learn those classes based on a feature dataframe.
 
@@ -17,7 +17,7 @@ Download the repository and manually install it (not on pypi / the napari plugin
 ## Usage
 #### Initialize a classifier:
 - Start the classifier in napari by going to Plugins -> napari-feature-classifier -> Initialize a Classifier  
-- Provide a csv file that contains feature measurements and a columns with the integer labels corresponing to the label layer you are using.
+- Provide a csv file that contains feature measurements and a column with the integer labels corresponding to the label layer you are using.
 - Choose a name (or relative path from the current working directory) for the classifier
 - Select the features you want to use for the classifier (can't be changed later in the current implementation). Hold the command key to select multiple features
 
@@ -46,6 +46,9 @@ Distributed under the terms of the [BSD-3] license,
 ## Issues
 
 If you encounter any problems, please [file an issue] along with a detailed description.
+
+## Contributors
+[Joel Lüthi](https://github.com/jluethi) & [Max Hess](https://github.com/MaksHess)
 
 [napari]: https://github.com/napari/napari
 [Cookiecutter]: https://github.com/audreyr/cookiecutter
