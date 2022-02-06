@@ -1,0 +1,9 @@
+site_name: napari-feature-classifier
+site_description: An interactive classifier plugin to use with label images and feature measurements
+site_author: Joel Luethi
+
+theme: readthedocs
+
+
+pages:
+- Home: index.md
