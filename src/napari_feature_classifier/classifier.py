@@ -8,8 +8,8 @@ import numpy as np
 from pathlib import Path
 import pickle
 import os
-from .utils import napari_warn, napari_info
-
+import warnings
+from .utils import napari_info
 
 def make_identifier(df):
     str_id = df.apply(lambda x: "_".join(map(str, x)), axis=1)
@@ -52,6 +52,9 @@ class Classifier:
         self.predict_data = full_data[["predict"]]
         self.training_features = training_features
         self.data = full_data[self.training_features]
+        # TODO: Improve this flag. Currently user needs to set the flag to false when changing training data. How can I automatically change the flag whenever someone modifies self.train_data?
+        # Could try something like this, but worried about the overhead: https://stackoverflow.com/questions/6190468/how-to-trigger-function-on-value-change
+        self.is_trained = False # Flag of whether the classifier has been trained since features have changed last (new site added or train_data modified)
         # TODO: Check if data is numeric.
         # 1. Throw some exception for strings
         # 2. Handle nans: Inform the user.
@@ -70,9 +73,9 @@ class Classifier:
         )
 
         if in_test_set.sum() == 0:
-            napari_warn('Not enough training data. No training data was put in the test set and classifier will fail.')
+            warnings.warn('Not enough training data. No training data was put in the test set and classifier will fail.')
         if in_test_set.sum() == len(in_test_set):
-            napari_warn('Not enough training data. All your selections became test data and there is nothing to train the classifier on')
+            warnings.warn('Not enough training data. All your selections became test data and there is nothing to train the classifier on')
         return df.iloc[~in_test_set.values, :], df.iloc[in_test_set.values, :]
 
 
@@ -105,6 +108,7 @@ class Classifier:
             self.train_data = self.train_data.append(new_data[['train']])
             self.predict_data = self.predict_data.append(new_data[['predict']])
             self.data = self.data.append(new_data[training_features])
+        self.is_trained = False
 
 
     @staticmethod
@@ -143,6 +147,7 @@ class Classifier:
     def train(self, ignore_nans=True):
         # TODO: Select training data differently. 0 could be a valid training input
         # Load only training features. The data df will also contain the prior predictions, which can lead to issues
+        self.is_trained = True
         training_data = self.data.loc[self.train_data["train"] > 0, self.training_features]
         training_results = self.train_data[self.train_data["train"] > 0]
 
@@ -177,12 +182,12 @@ class Classifier:
                 f1
             )
         )
-        self.predict_data.loc[:] = self.predict(self.data).reshape(-1, 1)
+        self.predict_data.loc[:] = self.predict(self.data, ignore_nans=ignore_nans).reshape(-1, 1)
         return f1
 
     def predict(self, data, ignore_nans=True):
-        # TODO: Ensure that training was run (in case the classifier was saved with new data points but without retraining)
-        # Always rerunning training would be computationally inefficient. Maybe have a flag or send a warning?
+        if not self.is_trained:
+            self.train()
         if ignore_nans:
             # Does not throw an exception if data contains a NaN
             # Just returns NaN as a result for any cell containing NaNs
@@ -194,9 +199,12 @@ class Classifier:
             return self.clf.predict(data.loc[:, self.training_features])
 
     def export_results_single_site(self, export_path):
-        # Optionally rerun training? (see predict)
-        results = self.predict(data, ignore_nans=True)
-        print('exporting to {}'.format(export_path))
+        # Run the training & predictions on the current data if any new data was added or training was modified
+        if not self.is_trained:
+            self.train()
+        # Merge prediction data and training data
+        output_df = pd.merge(self.predict_data, self.train_data, on=self.index_columns)
+        output_df.to_csv(export_path)
 
     def feature_importance(self):
         return OrderedDict(

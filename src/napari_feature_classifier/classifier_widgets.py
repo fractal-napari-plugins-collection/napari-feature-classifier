@@ -7,8 +7,10 @@ import numpy as np
 import os
 from pathlib import Path
 from matplotlib.colors import ListedColormap
+from pathlib import Path
 from napari.utils.notifications import show_info
-from .utils import get_df, napari_warn, napari_info
+import warnings
+from .utils import get_df
 from .classifier import Classifier
 
 def _init_classifier(widget):
@@ -40,9 +42,6 @@ def _init_classifier(widget):
         elif 'index' in features:
             widget.label_column.value = 'index'
 
-        if 'additional_features' in widget.label_layer.value.properties:
-            widget.additional_features.value = widget.label_layer.value.properties['additional_features']
-
         if 'feature_selection' in widget.label_layer.value.properties:
             if widget.label_layer.value.properties['feature_selection'] in widget.feature_selection.choices:
                 widget.feature_selection.value = widget.label_layer.value.properties['feature_selection']
@@ -69,9 +68,8 @@ def initialize_classifier(viewer: Viewer,
                       feature_selection=[''],
                       label_column=''):
     # TODO: Check whether features are associated with the Labels layer in the new napari convention (as a dataframe). Use them if they are, otherwise load csv
-
     if not str(DataFrame).endswith('.csv'):
-        napari_warn('The DataFrame path does not lead to a .csv file. This '\
+        warnings.warn('The DataFrame path does not lead to a .csv file. This '\
                       'classifier requires the data to be save in a .csv '\
                       'file that is readable with pd.read_csv()')
 
@@ -82,10 +80,14 @@ def initialize_classifier(viewer: Viewer,
 
     if os.path.exists(classifier_name + '.clf'):
         # TODO: Add a warning if a classifier with this name already exists => shall it be overwritten? => Confirmation box
-        napari_warn('A classifier with this name already exists and will be overwritten')
+        warnings.warn('A classifier with this name already exists and will be overwritten')
     clf = Classifier(name=classifier_name, features=site_df, training_features=feature_selection, index_columns=index_columns)
 
-    ClassifierWidget(clf, label_layer, DataFrame, viewer)
+    # TODO: Check whether features were selected. Pop up a warning if no features were selected
+    if len(feature_selection) < 1:
+        warnings.warn('No features were selected for the classifier. Please select features before initializing the classifier')
+    else:
+        ClassifierWidget(clf, label_layer, DataFrame, viewer)
 
 
 def _init_load_classifier(widget):
@@ -110,15 +112,13 @@ def load_classifier(viewer: Viewer,
                     DataFrame: Path):
     # TODO: Add option to add new features to the classifier that were not added at initialization => unsure where to do this. Should it also be possible when initializing a classifier?
     # TODO: Add ability to see currently selected features (-> part of being able to change the features)
-    #classifier_name = classifier_path.stem
-
     if not str(DataFrame).endswith('.csv'):
-        napari_warn('The DataFrame path does not lead to a .csv file. This '\
+        warnings.warn('The DataFrame path does not lead to a .csv file. This '\
                       'classifier requires the data to be save in a .csv '\
                       'file that is readable with pd.read_csv()')
 
     if not str(classifier_path).endswith('.clf'):
-        napari_warn('The classifier_path does not lead to a .clf file. This '\
+        warnings.warn('The classifier_path does not lead to a .clf file. This '\
                       'plugin only works with classifiers created by its own '\
                       'classifier class that are saved as .clf files')
 
@@ -188,8 +188,9 @@ class ClassifierWidget:
         selector = widgets.RadioButtons(choices=choices, label='Selection Class:', value='Class 1')
         save_button = widgets.PushButton(value=True, text='Save Classifier')
         run_button = widgets.PushButton(value=True, text='Run Classifier')
-        container = widgets.Container(widgets=[selector, save_button, run_button])
-        # TODO: Add text field & button to save classifier output to disk for a given site
+        export_path = widgets.FileEdit(value=Path(os.getcwd()) / 'Classifier_output.csv', label="Export Name:")
+        export_button = widgets.PushButton(value=True, text='Export Classifier Result')
+        container = widgets.Container(widgets=[selector, run_button, save_button, export_path, export_button])
 
         @label_layer.mouse_drag_callbacks.append
         def toggle_label(obj, event):
@@ -201,7 +202,7 @@ class ClassifierWidget:
             scaled_position = tuple(pos / scale for pos, scale in zip(event.position, label_layer.scale))
             label = label_layer.get_value(scaled_position)
             if selector.value is None:
-                napari_warn('No class is selected. Select a class in the classifier widget.')
+                show_info('No class is selected. Select a class in the classifier widget.')
             # Check if background or foreground was clicked. If background was clicked, do nothing (background can't be assigned a class)
             elif label == 0:
                 pass
@@ -213,8 +214,9 @@ class ClassifierWidget:
                     # Assign a numeric value to make it easier (colormap currently only supports this mode)
                     self.clf.train_data.loc[(self.DataFrame, label)] = choices.index(selector.value)
                     self.update_label_colormap(self.selection_layer, label, choices.index(selector.value))
+                    self.clf.is_trained = False
                 else:
-                    napari_warn('The data that was provided to the classifier '\
+                    show_info('The data that was provided to the classifier '\
                                   'does not contain an object with index {}. '\
                                   'Thus, this object cannot be included in the ' \
                                   'classifier'.format(label))
@@ -231,10 +233,24 @@ class ClassifierWidget:
             show_info('Saving classifier')
             self.clf.save()
 
+        @export_button.changed.connect
+        def export_classifier():
+            # TODO: Check if file path ends in csv.
+            # If not, give a warning dialogue with the option to cancel or add a .csv
+            if not str(export_path.value).endswith('.csv'):
+                warnings.warn('The export path does not lead to a .csv file. This '\
+                              'export function will export in .csv format anyway')
+
+            # TODO: Check if file already exists
+            # If it does, warning dialog with option to overwrite (default) or cancel
+
+            show_info('Exporting classifier results')
+            self.clf.export_results_single_site(export_path.value)
+
         @label_layer.bind_key('t')
         @run_button.changed.connect
         def run_classifier():
-            # TODO: Add Run mode? Fuzzy, Cross-validated, train/test split
+            # TODO: Add Run mode? Fuzzy (i.e. trained on everything), Cross-validated, train/test split
             show_info('Running classifier')
             self.clf.train()
             self.create_label_colormap(self.prediction_layer, self.clf.predict_data, 'predict')
