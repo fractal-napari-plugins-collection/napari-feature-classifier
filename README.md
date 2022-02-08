@@ -8,8 +8,8 @@ An interactive classifier plugin that allows the user to assign objects in a lab
 
 Download the repository and manually install it (not on pypi / the napari plugin hub yet)
 
-    git clone https://github.com/fractal-napari-plugins-collection/napari_feature_classifier
-    cd napari_feature_classifier
+    git clone https://github.com/fractal-napari-plugins-collection/napari-feature-classifier
+    cd napari-feature-classifier
     pip install .
 
 
