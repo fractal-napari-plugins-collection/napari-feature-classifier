@@ -1,14 +1,25 @@
-# Util functions for plugins
-from functools import lru_cache
-import pandas as pd
+"""Utils function for the classifier"""
 from enum import Enum
+from functools import lru_cache
+
+# import warnings
+import pandas as pd
 from napari.utils.notifications import show_info
+
 # from napari._qt.dialogs.qt_notification import NapariQtNotification
 # from napari._qt.qt_event_loop import _ipython_has_eventloop
-import warnings
+
 
 @lru_cache(maxsize=16)
 def get_df(path):
+    """
+    Pandas csv reader function with caching
+
+    Parameters
+    ----------
+    path: str or Path
+        Path to the csv file to be loaded
+    """
     return pd.read_csv(path)
 
 
@@ -17,54 +28,34 @@ def get_df(path):
 #     warnings.warn(message)
 #     show_info(message)
 #     print('test')
-#     # TODO: This currently triggers an exception. Find a new way to ensure the warning is also shown in the napari interface
+#     # TODO: This currently triggers an exception.
+#     # Find a new way to ensure the warning is also shown in the napari
+#     # interface
 #     if _ipython_has_eventloop():
 #         pass
 #         # NapariQtNotification(message, 'WARNING').show()
 #
 def napari_info(message):
-    show_info(message)
+    """
+    Info message wrapper.
+    Ensures info is shown in napari (when napari is run from the command line)
+    or printed (when napari is run from a jupyter notebook)
+    If napari show_info can't be called (e.g. napari isn't running),
+    it's skipped
+
+    message
+    ----------
+    path: str
+        Message to be shown to the user
+    """
+    try:
+        show_info(message)
+    except:
+        pass
     print(message)
-    # TODO: This currently triggers an exception. Find a new way to ensure the warning is also shown in the napari interface
-    # if _ipython_has_eventloop():
-    #     NapariQtNotification(message, 'INFO').show()
 
 
-class ColormapChoices(Enum):
-    viridis='viridis'
-    plasma='plasma'
-    inferno='inferno'
-    magma='magma'
-    cividis='cividis'
-    Greys='Greys'
-    Purples='Purples'
-    Blues='Blues'
-    Greens='Greens'
-    Oranges='Oranges'
-    Reds='Reds'
-    YlOrBr='YlOrBr'
-    YlOrRd='YlOrRd'
-    OrRd='OrRd'
-    PuRd='PuRd'
-    RdPu='RdPu'
-    BuPu='BuPu'
-    GnBu='GnBu'
-    PuBu='PuBu'
-    YlGnBu='YlGnBu'
-    PuBuGn='PuBuGn'
-    BuGn='BuGn'
-    YlGn='YlGn'
-    PiYG='PiYG'
-    PRGn='PRGn'
-    BrBG='BrBG'
-    PuOr='PuOr'
-    RdGy='RdGy'
-    RdBu='RdBu'
-    RdYlBu='RdYlBu'
-    RdYlGn='RdYlGn'
-    Spectral='Spectral'
-    coolwarm='coolwarm'
-    bwr='bwr'
-    seismic='seismic'
-    turbo='turbo'
-    jet='jet'
+#     # TODO: This currently triggers an exception.
+#     # Find a new way to ensure the warning is also shown in the napari
+#     # interface    # if _ipython_has_eventloop():
+#     NapariQtNotification(message, 'INFO').show()

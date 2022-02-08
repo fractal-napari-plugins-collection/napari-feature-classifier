@@ -32,6 +32,10 @@ Download the repository and manually install it (not on pypi / the napari plugin
 - Select the classifier (.clf file with the name you gave above) and a dataframe containing the same features as the past images.
 - Click Load Classifier, proceed as above.
 
+#### Export classifier results
+- To export the training data and the results of the classifier, define an Export Name (full path to an output file or just a filename ending in .csv) where the results of the classifier shall be saved
+- Click "Export Classifier Result"
+- The results of the classifier are save in a csv file. The first two columns are index columns: path describes the Feature Path used (and allows you to understand which image / feature dataframe a result is from) and label is an integer of the label object within that image. The predict column contains predictions of the classifier for all objects (except those that contained NaNs in their feature data) and the train column contains the annotations you made (0 for unclassified objects, 1, 2, 3 or 4 for the classes)
 
 
 ## Contributing
