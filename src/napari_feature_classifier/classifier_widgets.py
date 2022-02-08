@@ -69,7 +69,12 @@ def _init_classifier(widget):
 
     @widget.label_layer.changed.connect
     def update_paths():
+        """
+        Handles changing label_layer inputs
 
+        If a user provides a custom property called "feature_path" for
+        the label layer, set the feature_path to that property
+        """
         if "feature_path" in widget.label_layer.value.properties:
             widget.feature_path.value = widget.label_layer.value.properties["feature_path"]
 
@@ -95,6 +100,28 @@ def initialize_classifier(
     feature_selection=[""],
     label_column="",
 ):
+    """
+    Launches classifier initialization dockwidget
+
+    Parameters
+    ----------
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+    label_layer: napari.layers.Labels
+        The napari label layer on which objects shall be classified
+    feature_path: pathlib.Path
+        Path to the .csv file that contains the measurements used for
+        quantification and a column of label integers
+    classifier_name: str
+        Name as which the classifier will be saved. If the default test is
+        chosen, the classifier will be saved as test.clf in the current working
+        directory
+    feature_selection: list
+        List of features that can be selected to classify the objects
+    label_column: str
+        Column name of the column in the feature_path csv file containing the
+        label values
+    """
     # TODO: Check whether features are associated with the Labels layer in the
     # new napari convention (as a dataframe). Use them if they are,
     # otherwise load csv
@@ -151,7 +178,7 @@ def _init_load_classifier(widget):
 @magic_factory(
     call_button="Load Classifier",
     label_layer={"label": "Label Layer:"},
-    classifier_name={"label": "Classifier Name:"},
+    classifier_path={"label": "Classifier Name:"},
     feature_path={"label": "Feature Path:"},
     widget_init=_init_load_classifier
 )
@@ -161,6 +188,24 @@ def load_classifier(
     classifier_path: Path,
     feature_path: Path,
 ):
+    """
+    Launches classifier loading dockwidget
+
+    Loads an existing classifier from a .clf file with the set options for
+    feature_selection
+
+    Parameters
+    ----------
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+    label_layer: napari.layers.Labels
+        The napari label layer on which objects shall be classified
+    classifier_path: pathlib.Path
+        Path to an existing classifier .clf file
+    feature_path: pathlib.Path
+        Path to the .csv file that contains the measurements used for
+        quantification and a column of label integers
+    """
     # TODO: Add option to add new features to the classifier that were not
     # added at initialization => unsure where to do this. Should it also be
     # possible when initializing a classifier?

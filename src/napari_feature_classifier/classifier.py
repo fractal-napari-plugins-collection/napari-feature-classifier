@@ -140,12 +140,12 @@ class Classifier:
             # Inform user about cells being removed and what features contain NaNs
             na_features = nan_values.sum()
             features_with_na = na_features[na_features > 0]
-            print(
+            napari_info(
                 "{} cells were discarded during {} because they contain NaNs".format(
                     (~non_nan_indices).sum(), message
                 )
             )
-            print(
+            napari_info(
                 "The most NaNs were in {} feature. It contains {} NaNs".format(
                     features_with_na.idxmax(), features_with_na.max()
                 )
@@ -153,7 +153,7 @@ class Classifier:
             if len(features_with_na) > 1:
                 other_features = list(features_with_na.index)
                 other_features.remove(features_with_na.idxmax())
-                print(
+                napari_info(
                     "{} other features also contained NaNs. Those are: {}".format(
                         len(features_with_na) - 1, other_features
                     )

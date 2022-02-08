@@ -1,5 +1,4 @@
 """Utils function for the classifier"""
-from enum import Enum
 from functools import lru_cache
 
 # import warnings
@@ -50,7 +49,7 @@ def napari_info(message):
     """
     try:
         show_info(message)
-    except:
+    except: # pylint: disable=bare-except
         pass
     print(message)
 
