@@ -38,11 +38,12 @@ def rename_classifier(classifier_path, new_name, delete_old_version=False):
 
 class Classifier:
     def __init__(
-        self, name, features, training_features, method="rfc", index_columns=None
+        self, name, features, training_features, method="rfc", directory=Path('.'), index_columns=None,
     ):
-        # TODO: Think about chainging the not classified class to NaN instead of 0
+        # TODO: Think about changing the not classified class to NaN instead of 0
         # (when manually using the classifier, a user may provide 0s as training input when predicting some binary result)
         self.name = name
+        self.directory=directory
         if method == "rfc":
             self.clf = RandomForestClassifier()
         elif method == "lrc":
@@ -201,7 +202,8 @@ class Classifier:
         napari_info(
             "F1 score on test set: {} \n"
             "Annotations split into {} training and {} test samples. \n"
-            "Training set contains {}. \n Test set contains {}.".format(
+            "Training set contains {}. \n"
+            "Test set contains {}.".format(
                 f1,
                 len(X_train),
                 len(X_test),
@@ -290,7 +292,9 @@ class Classifier:
         new_name: str
             New name of the classifier. With or without .clf ending
         directory: pathlib.Path
-            Path where the classifier will be saved. Optional, defaults to saving in the working directory
+            Path where the classifier will be saved. Optional, defaults to
+            saving in the directory that is set in the self.directory variable,
+            which itself defaults to the working directory
         """
         if new_name is not None:
             if new_name.endswith('.clf'):
@@ -298,8 +302,16 @@ class Classifier:
             self.name = new_name
         s = pickle.dumps(self)
         if directory is not None:
-            with open(directory / (self.name + ".clf"), "wb") as f:
+            self.directory = directory
+        try:
+            with open(self.directory / (self.name + ".clf"), "wb") as f:
                 f.write(s)
-        else:
-            with open(self.name + ".clf", "wb") as f:
+        # Handle edge case with old classifiers that didn't have a directory
+        # attribute
+        except AttributeError:
+            if directory is not None:
+                self.directory = directory
+            else:
+                self.directory = Path('.')
+            with open(self.directory / (self.name + ".clf"), "wb") as f:
                 f.write(s)

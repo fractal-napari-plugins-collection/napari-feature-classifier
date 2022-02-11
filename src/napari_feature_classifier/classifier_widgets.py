@@ -83,7 +83,7 @@ def _init_classifier(widget):
 @magic_factory(
     call_button="Initialize Classifier",
     label_layer={"label": "Label Layer:"},
-    feature_path={"label": "Feature Path:"},
+    feature_path={"label": "Feature Path:", 'filter': '*.csv'},
     classifier_name={"label": "Classifier Name:"},
     feature_selection={
         "choices": [""],
@@ -180,8 +180,8 @@ def _init_load_classifier(widget):
 @magic_factory(
     call_button="Load Classifier",
     label_layer={"label": "Label Layer:"},
-    classifier_path={"label": "Classifier Name:"},
-    feature_path={"label": "Feature Path:"},
+    classifier_path={"label": "Classifier Name:", 'filter': '*.clf'},
+    feature_path={"label": "Feature Path:", 'filter': '*.csv'},
     widget_init=_init_load_classifier
 )
 def load_classifier(
@@ -328,7 +328,8 @@ class ClassifierWidget:
         export_path = widgets.FileEdit(
             value=Path(os.getcwd()) / "Classifier_output.csv",
             label="Export Name:",
-            mode='w'
+            mode='w',
+            filter='*.csv'
         )
         export_button = widgets.PushButton(value=True, text="Export Classifier Result")
         container = widgets.Container(
