@@ -190,19 +190,51 @@ class Classifier:
 
         assert np.all(X_train.index == y_train.index)
         assert np.all(X_test.index == y_test.index)
-        napari_info(
-            "Annotations split into {} training and {} test samples...".format(
-                len(X_train), len(X_test)
-            )
-        )
+
         self.clf.fit(X_train, y_train["train"])
 
         f1 = f1_score(y_test, self.clf.predict(X_test), average="macro")
-        napari_info("F1 score on test set: {}".format(f1))
+        #napari_info("F1 score on test set: {}".format(f1))
+        napari_info(
+            "F1 score on test set: {} \n"
+            "Annotations split into {} training and {} test samples. \n"
+            "Training set contains {}. \n Test set contains {}.".format(
+                f1,
+                len(X_train),
+                len(X_test),
+                self.get_count_per_class(y_train['train']),
+                self.get_count_per_class(y_test['train']),
+            )
+        )
         self.predict_data.loc[:] = self.predict(
             self.data, ignore_nans=ignore_nans
         ).reshape(-1, 1)
         return f1
+
+    @staticmethod
+    def get_count_per_class(train_col, background_class = 0):
+        """
+        Generates a formated string for the number of samples per class, ignoring .
+
+        Parameters
+        ----------
+        train_col: pandas.core.series.Series
+            The pandas column containing the training data
+        background_class:
+            index of the background class that is not included in the count
+
+        Returns
+        -------
+        str
+            Formatted string containing the counts per class
+        """
+        output_str = ''
+        classes = sorted(train_col.unique())
+        counts = train_col.value_counts()
+        for cl in classes:
+            if cl != background_class:
+                output_str += '{} objects for class {}, '.format(counts[cl], cl)
+        return output_str[:-2]
 
     def predict(self, data, ignore_nans=True):
         if not self.is_trained:
