@@ -291,7 +291,8 @@ class ClassifierWidget:
 
         widget = self.create_selector_widget(self.label_layer)
 
-        # TODO: Find a new way to do this. Currently triggers a deprecation
+        # TODO: Find a new way to do remove widget of another existing
+        # classifier. Currently triggers a deprecation
         # warning for napari 0.5
         # If a widget already exists for the classifier with the same name,
         # remove it
@@ -345,7 +346,7 @@ class ClassifierWidget:
                 )
             # Check if background or foreground was clicked. If background was
             # clicked, do nothing (background can't be assigned a class)
-            elif label == 0:
+            elif label == 0 or label is None:
                 pass
             else:
                 # Check if the label exists in the current dataframe.
