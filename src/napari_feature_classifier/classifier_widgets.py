@@ -318,7 +318,7 @@ class ClassifierWidget:
         )
         save_button = widgets.PushButton(value=True, text="Save Classifier")
         run_button = widgets.PushButton(value=True, text="Run Classifier")
-        export_path = widgets.FileEdit(
+        export_path = widgets.LineEdit(
             value=Path(os.getcwd()) / "Classifier_output.csv", label="Export Name:"
         )
         export_button = widgets.PushButton(value=True, text="Export Classifier Result")
