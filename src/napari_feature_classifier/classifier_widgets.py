@@ -10,6 +10,7 @@ from napari import Viewer
 from magicgui import widgets
 from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
+from qtpy.QtWidgets import QWidget, QMessageBox
 from .utils import get_df
 from .classifier import Classifier
 
@@ -138,11 +139,14 @@ def initialize_classifier(
     site_df = site_df.set_index(list(index_columns))
 
     if os.path.exists(classifier_name + ".clf"):
-        # TODO: Add a warning if a classifier with this name already exists =>
-        # shall it be overwritten? => Confirmation box
-        warnings.warn(
-            "A classifier with this name already exists and will be overwritten"
-        )
+        msgBox = QMessageBox()
+        msgBox.setText("A classifier with the name {} already exists in your working directory. This will overwrite it.".format(classifier_name + ".clf"))
+        msgBox.setWindowTitle("Overwrite Classifier?")
+        msgBox.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        returnValue = msgBox.exec()
+        if returnValue == QMessageBox.Cancel:
+            return
+
     clf = Classifier(
         name=classifier_name,
         features=site_df,
@@ -150,8 +154,6 @@ def initialize_classifier(
         index_columns=index_columns,
     )
 
-    # TODO: Check whether features were selected. Pop up a warning if no
-    # features were selected
     if len(feature_selection) < 1:
         warnings.warn(
             "No features were selected for the classifier. Please select '\
@@ -316,14 +318,21 @@ class ClassifierWidget:
         selector = widgets.RadioButtons(
             choices=choices, label="Selection Class:", value="Class 1"
         )
+        save_path = widgets.FileEdit(
+            value=Path(os.getcwd()) / (self.clf.name + ".clf"),
+            label="Save Classifier As:",
+            mode='w'
+        )
         save_button = widgets.PushButton(value=True, text="Save Classifier")
         run_button = widgets.PushButton(value=True, text="Run Classifier")
-        export_path = widgets.LineEdit(
-            value=Path(os.getcwd()) / "Classifier_output.csv", label="Export Name:"
+        export_path = widgets.FileEdit(
+            value=Path(os.getcwd()) / "Classifier_output.csv",
+            label="Export Name:",
+            mode='w'
         )
         export_button = widgets.PushButton(value=True, text="Export Classifier Result")
         container = widgets.Container(
-            widgets=[selector, run_button, save_button, export_path, export_button]
+            widgets=[selector, run_button, save_path, save_button, export_path, export_button]
         )
 
         @label_layer.mouse_drag_callbacks.append
@@ -380,8 +389,11 @@ class ClassifierWidget:
         @label_layer.bind_key("s", overwrite=True)
         @save_button.changed.connect
         def save_classifier():
+            # Handle name changes
+            classifier_name = Path(save_path.value).name
+            directory = Path(save_path.value).parent
             show_info("Saving classifier")
-            self.clf.save()
+            self.clf.save(new_name = classifier_name, directory=directory)
 
         @export_button.changed.connect
         def export_classifier():
@@ -393,8 +405,15 @@ class ClassifierWidget:
                     "export function will export in .csv format anyway"
                 )
 
-            # TODO: Check if file already exists
-            # If it does, warning dialog with option to overwrite (default) or cancel
+            # Check if file already exists
+            if True:
+                msgBox = QMessageBox()
+                msgBox.setText("A csv export with the name {} already exists. This will overwrite it.".format(Path(export_path.value).name))
+                msgBox.setWindowTitle("Overwrite Export?")
+                msgBox.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+                returnValue = msgBox.exec()
+                if returnValue == QMessageBox.Cancel:
+                    return
 
             show_info("Exporting classifier results")
             self.clf.export_results_single_site(export_path.value)
@@ -406,7 +425,6 @@ class ClassifierWidget:
             if len(self.clf.train_data['train'].unique()) > 1:
                 # TODO: Add Run mode? Fuzzy (i.e. trained on everything),
                 # Cross-validated, train/test split
-                show_info("Running classifier")
                 self.clf.train()
                 self.create_label_colormap(
                     self.prediction_layer, self.clf.predict_data, "predict"

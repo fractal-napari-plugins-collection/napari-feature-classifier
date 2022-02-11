@@ -281,9 +281,25 @@ class Classifier:
     def most_important(self, n=5):
         return list(self.feature_importance().keys())[:n]
 
-    def save(self, new_name=None):
+    def save(self, new_name=None, directory=None):
+        """
+        Saves and optionally renames the classifier
+
+        Parameters
+        ----------
+        new_name: str
+            New name of the classifier. With or without .clf ending
+        directory: pathlib.Path
+            Path where the classifier will be saved. Optional, defaults to saving in the working directory
+        """
         if new_name is not None:
+            if new_name.endswith('.clf'):
+                new_name = new_name[:-4]
             self.name = new_name
         s = pickle.dumps(self)
-        with open(self.name + ".clf", "wb") as f:
-            f.write(s)
+        if directory is not None:
+            with open(directory / (self.name + ".clf"), "wb") as f:
+                f.write(s)
+        else:
+            with open(self.name + ".clf", "wb") as f:
+                f.write(s)
