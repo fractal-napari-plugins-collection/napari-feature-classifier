@@ -398,7 +398,7 @@ class ClassifierWidget:
             show_info("Exporting classifier results")
             self.clf.export_results_single_site(export_path.value)
 
-        @label_layer.bind_key("t")
+        @label_layer.bind_key("t", overwrite=True)
         @run_button.changed.connect
         def run_classifier(key: str):
             # TODO: Add Run mode? Fuzzy (i.e. trained on everything),
@@ -414,17 +414,17 @@ class ClassifierWidget:
             # TODO: Report classifier performance to the user?
             # => Get the print into the napari notification engine
 
-        @label_layer.bind_key("o")
+        @label_layer.bind_key("o", overwrite=True)
         def toggle_selection(layer):
             current = self.selection_layer.visible
             self.selection_layer.visible = not current
 
-        @label_layer.bind_key("p")
+        @label_layer.bind_key("p", overwrite=True)
         def toggle_selection(layer):
             current = self.prediction_layer.visible
             self.prediction_layer.visible = not current
 
-        @label_layer.bind_key("v")
+        @label_layer.bind_key("v", overwrite=True)
         def toggle_selection():
             # Toggling off the label layer would be inconvenient
             # (can't click on it anymore)
@@ -435,27 +435,27 @@ class ClassifierWidget:
             else:
                 label_layer.opacity = 0.8
 
-        @label_layer.bind_key("0")
+        @label_layer.bind_key("0", overwrite=True)
         def set_class_0(event):
             selector.value = choices[0]
             change_choice()
 
-        @label_layer.bind_key("1")
+        @label_layer.bind_key("1", overwrite=True)
         def set_class_1(event):
             selector.value = choices[1]
             change_choice()
 
-        @label_layer.bind_key("2")
+        @label_layer.bind_key("2", overwrite=True)
         def set_class_2(event):
             selector.value = choices[2]
             change_choice()
 
-        @label_layer.bind_key("3")
+        @label_layer.bind_key("3", overwrite=True)
         def set_class_3(event):
             selector.value = choices[3]
             change_choice()
 
-        @label_layer.bind_key("4")
+        @label_layer.bind_key("4", overwrite=True)
         def set_class_4(event):
             selector.value = choices[4]
             change_choice()
