@@ -6,6 +6,7 @@ An interactive classifier plugin that allows the user to assign objects in a lab
 
 ## Installation
 
+This plugin is written for the new napari npe2 plugin engine. Thus, it requires napari >= 0.4.13
 Download the repository and manually install it (not on pypi / the napari plugin hub yet)
 
     git clone https://github.com/fractal-napari-plugins-collection/napari-feature-classifier
@@ -18,7 +19,7 @@ Download the repository and manually install it (not on pypi / the napari plugin
 #### Initialize a classifier:
 - Start the classifier in napari by going to Plugins -> napari-feature-classifier -> Initialize a Classifier  
 - Provide a csv file that contains feature measurements and a column with the integer labels corresponding to the label layer you are using.
-- Choose a name (or relative path from the current working directory) for the classifier
+- Choose a name (or relative path from the current working directory) for the classifier. The classifier is always saved in the current working directory (or the relative path to it you chose as its name. Renaming a classifier isn't currently possible (you can rename the file, but if you save it again, it will be saved as its original name)
 - Select the features you want to use for the classifier (can't be changed later in the current implementation). Hold the command key to select multiple features
 
 #### Classify objects:
