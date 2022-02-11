@@ -115,9 +115,12 @@ class Classifier:
         else:
             new_data["train"] = 0
             new_data["predict"] = 0
-            self.train_data = self.train_data.append(new_data[["train"]])
-            self.predict_data = self.predict_data.append(new_data[["predict"]])
-            self.data = self.data.append(new_data[training_features])
+            # self.train_data = self.train_data.append(new_data[["train"]])
+            # self.predict_data = self.predict_data.append(new_data[["predict"]])
+            # self.data = self.data.append(new_data[training_features])
+            self.train_data = pd.concat([self.train_data, new_data[["train"]]])
+            self.predict_data = pd.concat([self.predict_data, new_data[["predict"]]])
+            self.data = pd.concat([self.data, new_data[training_features]])
         self.is_trained = False
 
     @staticmethod
