@@ -236,7 +236,7 @@ class Classifier:
         counts = train_col.value_counts()
         for cl in classes:
             if cl != background_class:
-                output_str += '{} objects for class {}, '.format(counts[cl], cl)
+                output_str += '{} annotations for class {}, '.format(counts[cl], cl)
         return output_str[:-2]
 
     def predict(self, data, ignore_nans=True):

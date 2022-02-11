@@ -402,18 +402,21 @@ class ClassifierWidget:
         @label_layer.bind_key("t", overwrite=True)
         @run_button.changed.connect
         def run_classifier(key: str):
-            # TODO: Add Run mode? Fuzzy (i.e. trained on everything),
-            # Cross-validated, train/test split
-            show_info("Running classifier")
-            self.clf.train()
-            self.create_label_colormap(
-                self.prediction_layer, self.clf.predict_data, "predict"
-            )
-            self.clf.save()
-            self.selection_layer.visible = False
-            self.prediction_layer.visible = True
-            # TODO: Report classifier performance to the user?
-            # => Get the print into the napari notification engine
+            # Check if the classifer contains any training data
+            if len(self.clf.train_data['train'].unique()) > 1:
+                # TODO: Add Run mode? Fuzzy (i.e. trained on everything),
+                # Cross-validated, train/test split
+                show_info("Running classifier")
+                self.clf.train()
+                self.create_label_colormap(
+                    self.prediction_layer, self.clf.predict_data, "predict"
+                )
+                self.clf.save()
+                self.selection_layer.visible = False
+                self.prediction_layer.visible = True
+            else:
+                warnings.warn("You need to include some annotations to run "
+                              "the classifier")
 
         @label_layer.bind_key("o", overwrite=True)
         def toggle_selection(layer):
