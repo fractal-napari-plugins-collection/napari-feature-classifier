@@ -56,7 +56,7 @@ class Classifier:
         Could also use "lrc" for a logistic regression classifier
     directory: pathlib.Path
         Directory where the classifier is saved
-    index_columns: list?
+    index_columns: list or tuple
         Columns that are used to index the dataframe
 
     Attributes
@@ -67,7 +67,7 @@ class Classifier:
         Directory where the classifier is saved
     clf: sklearn classifier class
         sklearn classifier that is used
-    index_columns: list?
+    index_columns: list or tuple
         Columns that are used to index the dataframe
     train_data: pd.DataFrame
         Dataframe containing a "train" column to save annotations by the user
