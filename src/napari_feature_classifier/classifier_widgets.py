@@ -448,7 +448,11 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
         def change_choice():
             self.selection_layer.visible = True
             self.viewer.layers.selection.clear()
-            self.viewer.layers.selection.add(self.label_layer)
+            # This doesn't work during testing
+            try:
+                self.viewer.layers.selection.add(self.label_layer)
+            except ValueError:
+                pass
 
         @label_layer.bind_key("s", overwrite=True)
         @save_button.changed.connect
