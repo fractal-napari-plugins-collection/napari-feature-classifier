@@ -31,7 +31,7 @@ jobs:
     - name: Run static analyses
       run: |
         # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
-        python -m pylint -f parseable src --disable=bad-continuation,fixme  # disable bad-continuation checks due https://github.com/PyCQA/pylint/issues/289
+        python -m pylint --fail-under=8 -f parseable src --disable=bad-continuation,fixme  # disable bad-continuation checks due https://github.com/PyCQA/pylint/issues/289
         pycodestyle --max-line-length=120 src
     - name: Run tests
       run: |
