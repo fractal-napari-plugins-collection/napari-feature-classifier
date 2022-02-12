@@ -1,5 +1,5 @@
 import numpy as np
-from napari_feature_classifier import (
+from napari_feature_classifier.classifier_widgets import (
     initialize_classifier,
     load_classifier,
     ClassifierWidget,
