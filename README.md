@@ -9,46 +9,58 @@
 
 An interactive classifier plugin that allows the user to assign objects in a label image to multiple classes and train a classifier to learn those classes based on a feature dataframe.
 
-## Installation
-
-This plugin is written for the new napari npe2 plugin engine. Thus, it requires napari >= 0.4.13
-Download the repository and manually install it (not on pypi / the napari plugin hub yet)
-
-    git clone https://github.com/fractal-napari-plugins-collection/napari-feature-classifier
-    cd napari-feature-classifier
-    pip install .
-
-
 
 ## Usage
+<p align="center"><img src="https://user-images.githubusercontent.com/18033446/153727595-60380204-f299-485f-b762-d2030b75e7d3.gif" /></p>
+To use the napari-feature-classifier, you need to have a label image and a csv file containing measurements that correspond to the object in the label image. The csv file needs to contain a column with integer values corresponding to the label values in the label image.
+These interactive classification workflows are well suited to visually define cell types, find mitotic cells in images, do quality control by automatically detecting missegmented cells and other tasks where a user can easily assign objects to groups.
+
 #### Initialize a classifier:
-- Start the classifier in napari by going to Plugins -> napari-feature-classifier -> Initialize a Classifier  
+- Start the classifier in napari by going to `Plugins -> napari-feature-classifier -> Initialize a Classifier`  
 - Provide a csv file that contains feature measurements and a column with the integer labels corresponding to the label layer you are using.
-- Choose a name (or relative path from the current working directory) for the classifier. The classifier is always saved in the current working directory (or the relative path to it you chose as its name. Renaming a classifier isn't currently possible (you can rename the file, but if you save it again, it will be saved as its original name)
-- Select the features you want to use for the classifier (can't be changed later in the current implementation). Hold the command key to select multiple features
+- Choose a name (or relative path from the current working directory) for the classifier. The classifier is initially saved in the current working directory (you can change this later on).
+- Select the features you want to use for the classifier (you need to do the feature selection before initializing. The feature selection can't be changed after initialization anymore). Hold the command key to select multiple features.
+<img width="1831" alt="Initialize Classifier" src="https://user-images.githubusercontent.com/18033446/153727784-d7b7d44b-a7b1-479f-a4af-34e0e280c8d6.png">
+
 
 #### Classify objects:
 - Make sure you have the label layer selected on which you want to classify
 - Select the current class with the radio buttons or by pressing 0, 1, 2, 3 or 4
 - Click on label objects in the viewer to assign them to the currently selected class
-- Once you have trained enough examples, click "Run Classifier" to run the classifier and have it make a prediction for all objects. Aim for at least a dozen annotations per class, as the classifier divides your annotations 80/20 in training and test sets. To get good performance readouts, aim for >30 annotations per class.
+- While you need to have the label layer active to select, sometimes you want to focus on the intensity images. You can press `v` (or manually change the opacity of the label layer) to focus on the intensity images.
+- Once you have trained enough examples, click "Run Classifier" (or press `t`) to run the classifier and have it make a prediction for all objects. Aim for at least a dozen annotations per class, as the classifier divides your annotations 80/20 in training and test sets. To get good performance readouts, aim for >30 annotations per class.
+- Once you get predictions, correct mistakes the classifier made and retrain it to improve its performance.
+- You can save the classifier under a different name (to move it to a new folder or to have a slightly different version of the classifier - but careful, it autosaves whenever you run it). Define the new output location and then click `Save Classifier` (you need to click the Save Classifier button. Just defining the new output path does not save it yet)
+<img width="1831" alt="trainClassifier" src="https://user-images.githubusercontent.com/18033446/153727960-daae2955-4368-4081-88da-1a1cdbda6e69.png">
+
 
 #### Apply the classifier to additional images:
-- You can apply a classifier trained on one image to additional label images. Use Plugins -> napari-feature-classifier -> Load Classifier  
-- Select the classifier (.clf file with the name you gave above) and a dataframe containing the same features as the past images.
+- You can apply a classifier trained on one image to additional label images. Use `Plugins -> napari-feature-classifier -> Load Classifier`  
+- Select the classifier (.clf file with the name you gave above) and a csv file containing the same features as the past images.
 - Click Load Classifier, proceed as above.
+<img width="1831" alt="LoadClassifier" src="https://user-images.githubusercontent.com/18033446/153728100-dd60918d-c9a4-4de8-8f0e-8fd8c6a51700.png">
+
 
 #### Export classifier results
 - To export the training data and the results of the classifier, define an Export Name (full path to an output file or just a filename ending in .csv) where the results of the classifier shall be saved
-- Click "Export Classifier Result"
+- Click `Export Classifier Result` (Just selecting a filename is not enough, you need to click the export button)
 - The results of the classifier are save in a csv file. The first two columns are index columns: path describes the Feature Path used (and allows you to understand which image / feature dataframe a result is from) and label is an integer of the label object within that image. The predict column contains predictions of the classifier for all objects (except those that contained NaNs in their feature data) and the train column contains the annotations you made (0 for unclassified objects, 1, 2, 3 or 4 for the classes)
+![DataStructure](https://user-images.githubusercontent.com/18033446/153728461-d685987d-e1a9-46ff-834b-073008252ccb.png)
 
 
-There is a dummy example in the examples folder:
-- Install jupyter-lab (pip install jupyterlab)
-- Open the notebook in jupyter lab
-- Follow the instructions to generate a dummy dataframe and a dummy label image
+There is a simple workflow for the classifier in the examples folder:
+- Install jupyter-lab (`pip install jupyterlab`)
+- Open the notebook in jupyter lab (Type `jupyter-lab` in the terminal when you are in the examples folder)
+- Follow the instructions to generate an example dataframe and an example label image
 - Use the classifier in napari with this simplified data
+
+## Installation
+
+This plugin is written for the new napari npe2 plugin engine. Thus, it requires napari >= 0.4.13.
+Activate your environment where you have napari installed (or install napari using `pip install "napari[all]"`), then install the classifier plugin:
+
+    pip install napari-feature-classifier
+    
 
 ## Contributing
 
