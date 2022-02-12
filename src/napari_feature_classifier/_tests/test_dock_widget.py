@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import os
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.classifier_widgets import (
     initialize_classifier,
@@ -35,9 +36,10 @@ lbl_img_np[0, 35:40, 35:40] = 16
 # capsys is a pytest fixture that captures stdout and stderr output streams
 def test_classifier_widget(make_napari_viewer, capsys):
     # make viewer and add an image layer using our fixture
+    print(os.getcwd())
     viewer = make_napari_viewer()
     label_layer = viewer.add_labels(lbl_img_np)
-
+    print(os.getcwd())
     # Load test data
     test_df_path = Path('test_df.csv')
     test_features_df = pd.read_csv(test_df_path)
@@ -70,9 +72,9 @@ def test_classifier_initialization_widget(make_napari_viewer, capsys):
     test_df_path = Path('test_df.csv')
 
     # this time, our widget will be a MagicFactory or FunctionGui instance
-    my_widget = initialize_classifier(viewer,
-                                      label_layer,
-                                      test_df_path,
+    my_widget = initialize_classifier(viewer=viewer,
+                                      label_layer=label_layer,
+                                      feature_path=test_df_path,
                                       classifier_name='test',
                                       feature_selection=['feature1', 'feature2'],
                                       label_column='label'
@@ -97,10 +99,10 @@ def test_classifier_loading_widget(make_napari_viewer, capsys):
     test_df_path = Path('test_df.csv')
 
     # this time, our widget will be a MagicFactory or FunctionGui instance
-    my_widget = load_classifier(viewer,
-                                label_layer,
-                                test_classifier_path,
-                                test_df_path)
+    my_widget = load_classifier(viewer=viewer,
+                                label_layer=label_layer,
+                                classifier_path=test_classifier_path,
+                                feature_path=test_df_path)
 
     # if we "call" this object, it'll execute our function
     my_widget(viewer.layers[0]) # pylint: disable-msg=E1102
