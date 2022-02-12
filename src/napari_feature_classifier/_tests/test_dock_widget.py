@@ -1,3 +1,4 @@
+""" Tests for 3 core dock widgets to see if their initialization generates errors"""
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -10,7 +11,7 @@ from napari_feature_classifier.classifier_widgets import (
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
-def test_Classifier_widget(make_napari_viewer, capsys):
+def test_classifier_widget(make_napari_viewer, capsys):
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
     test_label_img = np.random.random((100, 100))
@@ -52,13 +53,13 @@ def test_classifier_initialization_widget(make_napari_viewer, capsys):
     my_widget = initialize_classifier(viewer,
                                       label_layer,
                                       test_df_path,
-                                      classifier_name='test'
+                                      classifier_name='test',
                                       feature_selection=['feature1', 'feature2'],
                                       label_column='label'
                                       )
 
     # if we "call" this object, it'll execute our function
-    my_widget(viewer.layers[0])
+    my_widget(viewer.layers[0]) # pylint: disable-msg=E1102
 
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()
@@ -83,7 +84,7 @@ def test_classifier_loading_widget(make_napari_viewer, capsys):
                                 test_df_path)
 
     # if we "call" this object, it'll execute our function
-    my_widget(viewer.layers[0])
+    my_widget(viewer.layers[0]) # pylint: disable-msg=E1102
 
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()
