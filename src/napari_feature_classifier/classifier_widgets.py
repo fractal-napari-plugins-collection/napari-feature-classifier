@@ -4,11 +4,10 @@ import os
 from pathlib import Path
 import pickle
 from napari import Viewer  # pylint: disable-msg=E0611
-from napari.utils.notifications import show_info
 from magicgui import magic_factory, widgets
 from matplotlib.colors import ListedColormap
 from qtpy.QtWidgets import QMessageBox  # pylint: disable-msg=E0611
-from .utils import get_df
+from .utils import get_df, napari_info
 from .classifier import Classifier
 
 
@@ -414,7 +413,7 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
             )
             label = label_layer.get_value(scaled_position)
             if selector.value is None:
-                show_info(
+                napari_info(
                     "No class is selected. Select a class in the classifier widget."
                 )
             # Check if background or foreground was clicked. If background was
@@ -437,7 +436,7 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
                     )
                     self.clf.is_trained = False
                 else:
-                    show_info(
+                    napari_info(
                         "The data that was provided to the classifier "
                         f"does not contain an object with index {label}. "
                         "Thus, this object cannot be included in the "
@@ -460,7 +459,7 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
             # Handle name changes
             classifier_name = Path(save_path.value).name
             directory = Path(save_path.value).parent
-            show_info("Saving classifier")
+            napari_info("Saving classifier")
             self.clf.save(new_name=classifier_name, directory=directory)
 
         @export_button.changed.connect
@@ -485,9 +484,8 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
                 answer = msg_box.exec()
                 if answer == QMessageBox.Cancel:
                     return
-
-            show_info("Exporting classifier results")
-            self.clf.export_results_single_site(export_path.value)
+            napari_info("Exporting classifier results")
+            self.clf.export_results(export_path.value)
 
         @label_layer.bind_key("t", overwrite=True)
         @run_button.changed.connect
@@ -519,7 +517,7 @@ class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
             self.prediction_layer.visible = not current
 
         @label_layer.bind_key("v", overwrite=True)
-        def toggle_selection():
+        def toggle_selection(layer):
             # Toggling off the label layer would be inconvenient
             # (can't click on it anymore)
             # => just toggle the opacity to 0

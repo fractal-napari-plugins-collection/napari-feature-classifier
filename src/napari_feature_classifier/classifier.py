@@ -316,7 +316,7 @@ class Classifier:
         else:
             return self.clf.predict(data.loc[:, self.training_features])
 
-    def export_results_single_site(self, export_path):
+    def export_results(self, export_path):
         # Run the training & predictions on the current data if any new data
         # was added or training was modified
         if not self.is_trained:
