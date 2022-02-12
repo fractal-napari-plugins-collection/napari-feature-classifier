@@ -1,5 +1,9 @@
-from napari_feature_classifier import ExampleQWidget, example_magic_widget
 import numpy as np
+from napari_feature_classifier import (
+    initialize_classifier,
+    load_classifier,
+    ClassifierWidget,
+)
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
@@ -9,7 +13,7 @@ def test_example_q_widget(make_napari_viewer, capsys):
     viewer.add_image(np.random.random((100, 100)))
 
     # create our widget, passing in the viewer
-    my_widget = ExampleQWidget(viewer)
+    my_widget = ClassifierWidget(viewer)
 
     # call our widget method
     my_widget._on_click()
@@ -21,10 +25,10 @@ def test_example_q_widget(make_napari_viewer, capsys):
 
 def test_example_magic_widget(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
-    layer = viewer.add_image(np.random.random((100, 100)))
+    layer = viewer.add_labels(np.random.random((100, 100)))
 
     # this time, our widget will be a MagicFactory or FunctionGui instance
-    my_widget = example_magic_widget()
+    my_widget = initialize_classifier()
 
     # if we "call" this object, it'll execute our function
     my_widget(viewer.layers[0])

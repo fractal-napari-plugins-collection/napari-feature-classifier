@@ -3,14 +3,11 @@ import warnings
 import os
 from pathlib import Path
 import pickle
-import numpy as np
-import pandas as pd
-from magicgui import magic_factory
-from napari import Viewer
-from magicgui import widgets
-from matplotlib.colors import ListedColormap
+from napari import Viewer  # pylint: disable-msg=E0611
 from napari.utils.notifications import show_info
-from qtpy.QtWidgets import QWidget, QMessageBox
+from magicgui import magic_factory, widgets
+from matplotlib.colors import ListedColormap
+from qtpy.QtWidgets import QMessageBox  # pylint: disable-msg=E0611
 from .utils import get_df
 from .classifier import Classifier
 
@@ -23,19 +20,21 @@ def _init_classifier(widget):
     ----------
     widget: napari widget
     """
+
     def get_feature_choices(*args):
         """
         Function loading the column names of the widget dataframe
         """
         try:
-            df = get_df(widget.feature_path.value)
-            return list(df.columns)
+            dataframe = get_df(widget.feature_path.value)
+            return list(dataframe.columns)
         except IOError:
             return [""]
 
     # set feature and label_column "default choices"
     # to be a function that gets the column names of the
     # currently loaded dataframe
+    # pylint: disable-msg=W0212
     widget.feature_selection._default_choices = get_feature_choices
     widget.label_column._default_choices = get_feature_choices
 
@@ -77,18 +76,22 @@ def _init_classifier(widget):
         the label layer, set the feature_path to that property
         """
         if "feature_path" in widget.label_layer.value.properties:
-            widget.feature_path.value = widget.label_layer.value.properties["feature_path"]
+            widget.feature_path.value = widget.label_layer.value.properties[
+                "feature_path"
+            ]
 
 
+# pylint: disable-msg=R0913
+# pylint: disable-msg=W0102
 @magic_factory(
     call_button="Initialize Classifier",
     label_layer={"label": "Label Layer:"},
-    feature_path={"label": "Feature Path:", 'filter': '*.csv'},
+    feature_path={"label": "Feature Path:", "filter": "*.csv"},
     classifier_name={"label": "Classifier Name:"},
     feature_selection={
         "choices": [""],
         "allow_multiple": True,
-        "label": "Feature Selection:"
+        "label": "Feature Selection:",
     },
     label_column={"choices": [""], "label": "Label Column:"},
     widget_init=_init_classifier,
@@ -139,12 +142,15 @@ def initialize_classifier(
     site_df = site_df.set_index(list(index_columns))
 
     if os.path.exists(classifier_name + ".clf"):
-        msgBox = QMessageBox()
-        msgBox.setText("A classifier with the name {} already exists in your working directory. This will overwrite it.".format(classifier_name + ".clf"))
-        msgBox.setWindowTitle("Overwrite Classifier?")
-        msgBox.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-        returnValue = msgBox.exec()
-        if returnValue == QMessageBox.Cancel:
+        msg_box = QMessageBox()
+        msg_box.setText(
+            f"A classifier with the name {classifier_name}.clf already exists "
+            "in your working directory. This will overwrite it."
+        )
+        msg_box.setWindowTitle("Overwrite Classifier?")
+        msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        answer = msg_box.exec()
+        if answer == QMessageBox.Cancel:
             return
 
     clf = Classifier(
@@ -174,15 +180,17 @@ def _init_load_classifier(widget):
                 "classifier_path"
             ]
         if "feature_path" in widget.label_layer.value.properties:
-            widget.feature_path.value = widget.label_layer.value.properties["feature_path"]
+            widget.feature_path.value = widget.label_layer.value.properties[
+                "feature_path"
+            ]
 
 
 @magic_factory(
     call_button="Load Classifier",
     label_layer={"label": "Label Layer:"},
-    classifier_path={"label": "Classifier Name:", 'filter': '*.clf'},
-    feature_path={"label": "Feature Path:", 'filter': '*.csv'},
-    widget_init=_init_load_classifier
+    classifier_path={"label": "Classifier Name:", "filter": "*.clf"},
+    feature_path={"label": "Feature Path:", "filter": "*.csv"},
+    widget_init=_init_load_classifier,
 )
 def load_classifier(
     viewer: Viewer,
@@ -227,7 +235,7 @@ def load_classifier(
             "classifier class that are saved as .clf files"
         )
 
-    with open(classifier_path, "rb") as f:
+    with open(classifier_path, "rb") as f:  # pylint: disable-msg=C0103
         clf = pickle.loads(f.read())
 
     training_features = clf.training_features
@@ -235,12 +243,11 @@ def load_classifier(
     site_df["path"] = feature_path
     index_columns = clf.index_columns
     # Catches if new data frame doesn't contain the index columns
-    assert all(
-        [index_column in site_df.columns for index_column in index_columns]
-    ), "These two columns are not available in the current dataframe: {}".format(
-        index_columns
+    assert all([index_column in site_df.columns for index_column in index_columns]), (
+        "These two columns are not available in the current "
+        f"dataframe: {index_columns}"
     )
-    site_df = site_df.set_index(list(index_columns))
+    site_df = site_df.set_index(list(index_columns))  # pylint: disable-msg=E1101
 
     clf.add_data(
         site_df, training_features=training_features, index_columns=index_columns
@@ -249,7 +256,48 @@ def load_classifier(
     ClassifierWidget(clf, label_layer, feature_path, viewer)
 
 
-class ClassifierWidget:
+class ClassifierWidget:  # pylint: disable-msg=R0902, R0914
+    """
+    The ClassifierWidget creates the napari layers necessary for the classifier
+    and handles the interaction with the classifier clf object
+
+    Paramters
+    ---------
+    clf: clf object
+        Classifier object containing the actual classifier data
+    label_layer: napari.layers.Labels
+        The napari label layer on which objects shall be classified
+    feature_path: pathlib.Path
+        Path to the .csv file that contains the measurements used for
+        quantification and a column of label integers
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+
+    Attributes
+    ----------
+    clf: clf object
+        Classifier object containing the actual classifier data
+    label_layer: napari.layers.Labels
+        The napari label layer on which objects shall be classified
+    feature_path: pathlib.Path
+        Path to the .csv file that contains the measurements used for
+        quantification and a column of label integers
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+    nb_classes: int
+        Number of classes that can be trained with the classifier
+    cmap: matplotlib.colors.ListedColormap
+        colormaps for the classes
+    prediction_layer: napari.layers.Labels
+        Automatically generated label layer on which predictions for each
+        object are shown.
+    selection_layer: napari.layers.Labels
+        Automatically generated label layer on which the annotations made by
+        the user are shown.
+    colordict: dict
+        Dictionary of colors for each index to map colors to label objects
+    """
+
     def __init__(self, clf, label_layer, feature_path, viewer):
         self.clf = clf
         self.clf.save()
@@ -271,9 +319,6 @@ class ClassifierWidget:
         )
 
         # Create a selection & prediction layer
-        # TODO: Handle state when those layers were already created. Replace
-        # them otherwise?
-        # https://napari.org/guides/stable/magicgui.html#updating-an-existing-layer
         if "prediction" in viewer.layers:
             viewer.layers.remove("prediction")
         if "selection" in viewer.layers:
@@ -293,13 +338,11 @@ class ClassifierWidget:
 
         widget = self.create_selector_widget(self.label_layer)
 
-        # TODO: Find a new way to do remove widget of another existing
+        # Should I remove the Classifier widget if a new classifier is
+        # initialized?
+        # If so, find a new way to do remove widget of another existing
         # classifier. Currently triggers a deprecation
         # warning for napari 0.5
-        # If a widget already exists for the classifier with the same name,
-        # remove it
-        # TODO: Is there a way to get rid of other class selection windows?
-        # I don't have a pointer to them and they could have arbitrary names
         # try:
         #     if self.clf.name in viewer.window._dock_widgets:
         #         viewer.window.remove_dock_widget(viewer.window._dock_widgets[self.clf.name])
@@ -311,7 +354,16 @@ class ClassifierWidget:
         # add widget to napari
         viewer.window.add_dock_widget(widget, area="right", name=clf.name)
 
-    def create_selector_widget(self, label_layer):
+    def create_selector_widget(self, label_layer):  # pylint: disable-msg=R0915
+        """
+        Creates the selector widget to choose a current class, save and export
+        the classifier
+
+        Parameters
+        ----------
+        label_layer: napari.layers.Labels
+            The napari label layer on which objects shall be classified
+        """
         # TODO: Generalize this. Instead of 0, 1, 2, 3, 4: Arbitrary class
         # numbers. Ability to add classes & name them?
         choices = ["Deselect", "Class 1", "Class 2", "Class 3", "Class 4"]
@@ -321,23 +373,34 @@ class ClassifierWidget:
         save_path = widgets.FileEdit(
             value=Path(os.getcwd()) / (self.clf.name + ".clf"),
             label="Save Classifier As:",
-            mode='w'
+            mode="w",
         )
         save_button = widgets.PushButton(value=True, text="Save Classifier")
         run_button = widgets.PushButton(value=True, text="Run Classifier")
         export_path = widgets.FileEdit(
             value=Path(os.getcwd()) / "Classifier_output.csv",
             label="Export Name:",
-            mode='w',
-            filter='*.csv'
+            mode="w",
+            filter="*.csv",
         )
         export_button = widgets.PushButton(value=True, text="Export Classifier Result")
         container = widgets.Container(
-            widgets=[selector, run_button, save_path, save_button, export_path, export_button]
+            widgets=[
+                selector,
+                run_button,
+                save_path,
+                save_button,
+                export_path,
+                export_button,
+            ]
         )
 
         @label_layer.mouse_drag_callbacks.append
-        def toggle_label(obj, event):
+        def toggle_label(obj, event):  # pylint: disable-msg=W0613
+            """
+            Handles user annotations by setting the corresponding classifier
+            variables and changing the
+            """
             # TODO: Add a warning when user clicks while the wrong layer is
             # selected?
             self.selection_layer.visible = True
@@ -376,9 +439,9 @@ class ClassifierWidget:
                 else:
                     show_info(
                         "The data that was provided to the classifier "
-                        "does not contain an object with index {}. "
+                        f"does not contain an object with index {label}. "
                         "Thus, this object cannot be included in the "
-                        "classifier".format(label)
+                        "classifier"
                     )
 
         @selector.changed.connect
@@ -394,7 +457,7 @@ class ClassifierWidget:
             classifier_name = Path(save_path.value).name
             directory = Path(save_path.value).parent
             show_info("Saving classifier")
-            self.clf.save(new_name = classifier_name, directory=directory)
+            self.clf.save(new_name=classifier_name, directory=directory)
 
         @export_button.changed.connect
         def export_classifier():
@@ -407,13 +470,16 @@ class ClassifierWidget:
                 )
 
             # Check if file already exists
-            if True:
-                msgBox = QMessageBox()
-                msgBox.setText("A csv export with the name {} already exists. This will overwrite it.".format(Path(export_path.value).name))
-                msgBox.setWindowTitle("Overwrite Export?")
-                msgBox.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-                returnValue = msgBox.exec()
-                if returnValue == QMessageBox.Cancel:
+            if os.path.exists(Path(export_path.value)):
+                msg_box = QMessageBox()
+                msg_box.setText(
+                    f"A csv export with the name {Path(export_path.value).name}"
+                    " already exists. This will overwrite it."
+                )
+                msg_box.setWindowTitle("Overwrite Export?")
+                msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+                answer = msg_box.exec()
+                if answer == QMessageBox.Cancel:
                     return
 
             show_info("Exporting classifier results")
@@ -421,9 +487,9 @@ class ClassifierWidget:
 
         @label_layer.bind_key("t", overwrite=True)
         @run_button.changed.connect
-        def run_classifier(key: str):
+        def run_classifier(key: str):  # pylint: disable-msg=W0613
             # Check if the classifer contains any training data
-            if len(self.clf.train_data['train'].unique()) > 1:
+            if len(self.clf.train_data["train"].unique()) > 1:
                 # TODO: Add Run mode? Fuzzy (i.e. trained on everything),
                 # Cross-validated, train/test split
                 self.clf.train()
@@ -434,16 +500,17 @@ class ClassifierWidget:
                 self.selection_layer.visible = False
                 self.prediction_layer.visible = True
             else:
-                warnings.warn("You need to include some annotations to run "
-                              "the classifier")
+                warnings.warn(
+                    "You need to include some annotations to run " "the classifier"
+                )
 
         @label_layer.bind_key("o", overwrite=True)
-        def toggle_selection(layer):
+        def toggle_selection_sel_layer(layer):  # pylint: disable-msg=W0613
             current = self.selection_layer.visible
             self.selection_layer.visible = not current
 
         @label_layer.bind_key("p", overwrite=True)
-        def toggle_selection(layer):
+        def toggle_selection_pred_layer(layer):  # pylint: disable-msg=W0613
             current = self.prediction_layer.visible
             self.prediction_layer.visible = not current
 
@@ -459,33 +526,48 @@ class ClassifierWidget:
                 label_layer.opacity = 0.8
 
         @label_layer.bind_key("0", overwrite=True)
-        def set_class_0(event):
+        def set_class_0(event):  # pylint: disable-msg=W0613
             selector.value = choices[0]
             change_choice()
 
         @label_layer.bind_key("1", overwrite=True)
-        def set_class_1(event):
+        def set_class_1(event):  # pylint: disable-msg=W0613
             selector.value = choices[1]
             change_choice()
 
         @label_layer.bind_key("2", overwrite=True)
-        def set_class_2(event):
+        def set_class_2(event):  # pylint: disable-msg=W0613
             selector.value = choices[2]
             change_choice()
 
         @label_layer.bind_key("3", overwrite=True)
-        def set_class_3(event):
+        def set_class_3(event):  # pylint: disable-msg=W0613
             selector.value = choices[3]
             change_choice()
 
         @label_layer.bind_key("4", overwrite=True)
-        def set_class_4(event):
+        def set_class_4(event):  # pylint: disable-msg=W0613
             selector.value = choices[4]
             change_choice()
 
         return container
 
     def update_label_colormap(self, curr_label_layer, label, new_class):
+        """
+        Updates the label colormap and sends the updated colormap to the label
+        layer
+
+        Parameters
+        ----------
+        curr_label_layer: napari.layers.Labels
+            A napari label layer for which an annotation colormap needs to be
+            applied
+        label: int
+            The label value that is being updated
+        new_class: int
+            The new class annotation that is being set
+        """
+
         # This is still kinda laggy on large dataset.
         # Is there a way to not send a whole new colormap, but just change
         # the colormap in one place?
@@ -500,8 +582,23 @@ class ClassifierWidget:
         # curr_label_layer.color[label] = self.cmap(new_class/self.nb_classes)
         # Doesn't do anything. Color doesn't update.
 
-    def create_label_colormap(self, curr_label_layer, df, feature):
-        site_df = df[df.index.isin([self.feature_path], level=0)]
+    def create_label_colormap(self, curr_label_layer, data_frame, feature):
+        """
+        Create a new colormap for a whole layer based on a dataframe with
+        annotations
+
+        Parameters
+        ----------
+        curr_label_layer: napari.layers.Labels
+            A napari label layer for which an annotation colormap needs to be
+            applied
+        data_frame: pd.DataFrame
+            Dataframe containing labels and label annotations
+        feature: str
+            Name of the dataframe column containing the annotations
+            (e.g. train or predict)
+        """
+        site_df = data_frame[data_frame.index.isin([self.feature_path], level=0)]
         site_df.index = site_df.index.droplevel()
         colors = self.cmap(site_df[feature] / self.nb_classes)
         colordict = dict(zip(site_df.index, colors))

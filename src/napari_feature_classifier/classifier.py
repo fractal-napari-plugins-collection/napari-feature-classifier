@@ -38,12 +38,18 @@ def rename_classifier(classifier_path, new_name, delete_old_version=False):
 
 class Classifier:
     def __init__(
-        self, name, features, training_features, method="rfc", directory=Path('.'), index_columns=None,
+        self,
+        name,
+        features,
+        training_features,
+        method="rfc",
+        directory=Path("."),
+        index_columns=None,
     ):
         # TODO: Think about changing the not classified class to NaN instead of 0
         # (when manually using the classifier, a user may provide 0s as training input when predicting some binary result)
         self.name = name
-        self.directory=directory
+        self.directory = directory
         if method == "rfc":
             self.clf = RandomForestClassifier()
         elif method == "lrc":
@@ -198,7 +204,7 @@ class Classifier:
         self.clf.fit(X_train, y_train["train"])
 
         f1 = f1_score(y_test, self.clf.predict(X_test), average="macro")
-        #napari_info("F1 score on test set: {}".format(f1))
+        # napari_info("F1 score on test set: {}".format(f1))
         napari_info(
             "F1 score on test set: {} \n"
             "Annotations split into {} training and {} test samples. \n"
@@ -207,8 +213,8 @@ class Classifier:
                 f1,
                 len(X_train),
                 len(X_test),
-                self.get_count_per_class(y_train['train']),
-                self.get_count_per_class(y_test['train']),
+                self.get_count_per_class(y_train["train"]),
+                self.get_count_per_class(y_test["train"]),
             )
         )
         self.predict_data.loc[:] = self.predict(
@@ -217,7 +223,7 @@ class Classifier:
         return f1
 
     @staticmethod
-    def get_count_per_class(train_col, background_class = 0):
+    def get_count_per_class(train_col, background_class=0):
         """
         Generates a formated string for the number of samples per class, ignoring .
 
@@ -233,12 +239,12 @@ class Classifier:
         str
             Formatted string containing the counts per class
         """
-        output_str = ''
+        output_str = ""
         classes = sorted(train_col.unique())
         counts = train_col.value_counts()
         for cl in classes:
             if cl != background_class:
-                output_str += '{} annotations for class {}, '.format(counts[cl], cl)
+                output_str += "{} annotations for class {}, ".format(counts[cl], cl)
         return output_str[:-2]
 
     def predict(self, data, ignore_nans=True):
@@ -297,7 +303,7 @@ class Classifier:
             which itself defaults to the working directory
         """
         if new_name is not None:
-            if new_name.endswith('.clf'):
+            if new_name.endswith(".clf"):
                 new_name = new_name[:-4]
             self.name = new_name
         s = pickle.dumps(self)
@@ -312,6 +318,6 @@ class Classifier:
             if directory is not None:
                 self.directory = directory
             else:
-                self.directory = Path('.')
+                self.directory = Path(".")
             with open(self.directory / (self.name + ".clf"), "wb") as f:
                 f.write(s)

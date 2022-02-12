@@ -23,17 +23,28 @@ def get_df(path):
 
 
 def in_notebook():
+    """
+    Checks whether the plugin is run from within a jupyter notebook
+
+    Returns
+    -------
+    boolean
+        True if it's running in a jupyter notebook
+    """
+
     # Check if I'm running in jupyter notebook, from here:
     # https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     try:
-        from IPython import get_ipython
-        if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+        from IPython import get_ipython  # pylint: disable-msg=C0415
+
+        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
             return False
     except ImportError:
         return False
     except AttributeError:
         return False
     return True
+
 
 #     # Check if it runs in napari
 #     # This currently triggers an exception.
@@ -47,7 +58,7 @@ def in_notebook():
 #     warnings.warn(message)
 #     show_info(message)
 #     print('test')
-#     # TODO: This currently triggers an exception.
+#     # This currently triggers an exception.
 #     # Find a new way to ensure the warning is also shown in the napari
 #     # interface
 #     if _ipython_has_eventloop():
@@ -69,10 +80,10 @@ def napari_info(message):
     """
     try:
         show_info(message)
-    except: # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except
         pass
     # TODO: Would be better to check if it's running in napari and print in all
     # other cases (e.g. if someone runs the classifier form a script).
     # But can't make that work at the moment
-    if(in_notebook()):
+    if in_notebook():
         print(message)
