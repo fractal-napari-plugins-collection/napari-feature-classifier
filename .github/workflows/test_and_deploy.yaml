@@ -53,6 +53,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install setuptools tox tox-gh-actions pycodestyle pylint
+          python -m pip install .[testing]
       - name: Run static analyses
         run: |
           # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
