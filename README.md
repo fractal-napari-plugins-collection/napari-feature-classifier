@@ -44,6 +44,12 @@ Download the repository and manually install it (not on pypi / the napari plugin
 - The results of the classifier are save in a csv file. The first two columns are index columns: path describes the Feature Path used (and allows you to understand which image / feature dataframe a result is from) and label is an integer of the label object within that image. The predict column contains predictions of the classifier for all objects (except those that contained NaNs in their feature data) and the train column contains the annotations you made (0 for unclassified objects, 1, 2, 3 or 4 for the classes)
 
 
+There is a dummy example in the examples folder:
+- Install jupyter-lab (pip install jupyterlab)
+- Open the notebook in jupyter lab
+- Follow the instructions to generate a dummy dataframe and a dummy label image
+- Use the classifier in napari with this simplified data
+
 ## Contributing
 
 Contributions are very welcome.
