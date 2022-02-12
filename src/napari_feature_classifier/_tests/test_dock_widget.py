@@ -2,6 +2,7 @@
 import numpy as np
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.classifier_widgets import (
     initialize_classifier,
@@ -9,13 +10,33 @@ from napari_feature_classifier.classifier_widgets import (
     ClassifierWidget,
 )
 
+# Define a simple test label image for all widgets
+shape = (1, 50, 50)
+lbl_img_np = np.zeros(shape).astype('uint16')
+lbl_img_np[0, 5:10, 5:10] = 1
+lbl_img_np[0, 15:20, 5:10] = 2
+lbl_img_np[0, 25:30, 5:10] = 3
+lbl_img_np[0, 5:10, 15:20] = 4
+lbl_img_np[0, 15:20, 15:20] = 5
+lbl_img_np[0, 25:30, 15:20] = 6
+lbl_img_np[0, 35:40, 15:20] = 7
+lbl_img_np[0, 35:40, 25:30] = 8
+lbl_img_np[0, 5:10, 35:40] = 9
+lbl_img_np[0, 25:30, 25:30] = 10
+lbl_img_np[0, 25:30, 35:40] = 11
+lbl_img_np[0, 5:10, 25:30] = 12
+lbl_img_np[0, 15:20, 25:30] = 13
+lbl_img_np[0, 15:20, 35:40] = 14
+lbl_img_np[0, 35:40, 5:10] = 15
+lbl_img_np[0, 35:40, 35:40] = 16
+
+
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
 def test_classifier_widget(make_napari_viewer, capsys):
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
-    test_label_img = np.random.random((100, 100))
-    label_layer = viewer.add_labels(test_label_img)
+    label_layer = viewer.add_labels(lbl_img_np)
 
     # Load test data
     test_df_path = Path('test_df.csv')
@@ -45,8 +66,7 @@ def test_classifier_widget(make_napari_viewer, capsys):
 
 def test_classifier_initialization_widget(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
-    test_label_img = np.random.random((100, 100))
-    label_layer = viewer.add_labels(test_label_img)
+    label_layer = viewer.add_labels(lbl_img_np)
     test_df_path = Path('test_df.csv')
 
     # this time, our widget will be a MagicFactory or FunctionGui instance
@@ -72,8 +92,7 @@ def test_classifier_initialization_widget(make_napari_viewer, capsys):
 
 def test_classifier_loading_widget(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
-    test_label_img = np.random.random((100, 100))
-    label_layer = viewer.add_labels(test_label_img)
+    label_layer = viewer.add_labels(lbl_img_np)
     test_classifier_path = Path('test_classifier.clf')
     test_df_path = Path('test_df.csv')
 
