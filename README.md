@@ -61,6 +61,9 @@ Activate your environment where you have napari installed (or install napari usi
 
     pip install napari-feature-classifier
     
+## Similar napari plugins
+If you're looking for other classification approaches, [apoc](https://github.com/haesleinhuepf/apoc) by [Robert Haase](https://github.com/haesleinhuepf) has a pixel classifier in napari and an object classification workflow:  
+[napari-accelerated-pixel-and-object-classification (APOC)](https://github.com/haesleinhuepf/napari-accelerated-pixel-and-object-classification)
 
 ## Contributing
 
