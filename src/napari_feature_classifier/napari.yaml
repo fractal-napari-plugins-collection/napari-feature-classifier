@@ -11,6 +11,9 @@ contributions:
     - id: napari-feature-classifier.annotator_widget_v2
       python_name: napari_feature_classifier.annotator_widget_v2:initialize_annotator
       title: Annotator
+    - id: napari-feature-classifier.annotator_widget
+      python_name: napari_feature_classifier.annotator_widget:initialize_annotator
+      title: AnnotatorOld
   widgets:
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
@@ -18,3 +21,5 @@ contributions:
       display_name: Load Classifier
     - command: napari-feature-classifier.annotator_widget_v2
       display_name: Annotator
+    - command: napari-feature-classifier.annotator_widget
+      display_name: AnnotatorOld
