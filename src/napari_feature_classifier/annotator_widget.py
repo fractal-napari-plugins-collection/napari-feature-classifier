@@ -19,22 +19,22 @@ from src.napari_feature_classifier.utils import napari_info
 
 
 def main():
-    # img = np.random.randint(255, size=(100, 100))
-    # lbl = np.zeros_like(img)
-    # lbl[10:20, 10:20] = 1
-    # lbl[40:50, 40:50] = 2
-    # lbl[30:40, 80:90] = 4
-    fn = Path(r"Z:\hmax\Zebrafish\20211119_cyclerDATA_compressed\20211119_ABpanelTestset_3pair_3.5h_1_s6.h5")
-    with h5py.File(fn) as f:
-        lbl = f['lbl_nuc'][...]
-        img = f['ch_03/0'][...]
+    img = np.random.randint(255, size=(100, 100))
+    lbl = np.zeros_like(img)
+    lbl[10:20, 10:20] = 1
+    lbl[40:50, 40:50] = 2
+    lbl[30:40, 80:90] = 4
+    # fn = Path(r"Z:\hmax\Zebrafish\20211119_cyclerDATA_compressed\20211119_ABpanelTestset_3pair_3.5h_1_s6.h5")
+    # with h5py.File(fn) as f:
+    #     lbl = f['lbl_nuc'][...]
+    #     img = f['ch_03/0'][...]
 
     viewer = napari.Viewer()
-    viewer.add_image(name='img', data=img, scale=(1.0, 0.325, 0.325))
-    labels_layer = viewer.add_labels(name='lbl', data=lbl, scale=(1.0, 0.65, 0.65))
+    viewer.add_image(name='img', data=img)
+    labels_layer = viewer.add_labels(name='lbl', data=lbl)
 
     widget = AnnotatorWidget(labels_layer, viewer, n_classes=3,
-                             class_names=('M before division', 'M after division', 'S puncta', 'S high'), name=fn.stem)
+                             class_names=('M before division', 'M after division', 'S puncta', 'S high'))
 
     viewer.show(block=True)
 
@@ -48,7 +48,7 @@ class AnnotatorWidget:
                  viewer: napari.Viewer,
                  n_classes: int = 2,
                  class_names: Optional[Sequence[str]] = None,
-                 name: Optional[str] = None):
+                 ):
         self.label_layer = label_layer
         self.label_layer.editable = False
         self.viewer = viewer
@@ -67,10 +67,6 @@ class AnnotatorWidget:
         self.annotations = pd.Series(index=np.unique(label_layer.data)[1:], name='annotations', dtype=pd.Int64Dtype)
         self.annotations.index.name = 'Label'
 
-        if name is None:
-            self.name = self.label_layer.name
-        else:
-            self.name = name
 
         # Create annotation layer (overwriting existing ones).
         if "annotation" in viewer.layers:
