@@ -7,7 +7,13 @@ import napari
 from pathlib import Path
 
 
-# def main():
+def main():
+    import imageio
+
+    lbls = imageio.imread('sample_data/test_labels.tif')
+    viewer = napari.Viewer()
+    viewer.add_labels(lbls)
+    viewer.show(block=True)
 #     # print(initialize_annotator())
 #     viewer = napari.Viewer()
 #     # viewer.add_labels(np.zeros((10, 10), dtype=int))
@@ -158,5 +164,5 @@ def initialize_annotator(
 
 
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
