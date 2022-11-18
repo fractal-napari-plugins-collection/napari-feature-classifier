@@ -5,14 +5,17 @@ from magicgui import magic_factory, widgets, magicgui
 from napari_plugin_engine import napari_hook_implementation
 import napari
 from pathlib import Path
+from matplotlib.colors import ListedColormap
+import matplotlib
 
 
 def main():
     import imageio
 
-    lbls = imageio.imread('sample_data/test_labels.tif')
+    lbls = imageio.v2.imread('sample_data/test_labels.tif')
     viewer = napari.Viewer()
     viewer.add_labels(lbls)
+    viewer.add_labels(lbls, name='labels2')
     viewer.show(block=True)
 #     # print(initialize_annotator())
 #     viewer = napari.Viewer()
@@ -40,38 +43,72 @@ def _initialize_annotation_stuff(widget):
 
     @widget.label_layer.changed.connect
     def initialize_label_layer():
+        print('Initializing')
         if widget.label_layer.value is not None:
             # TODO: Check if annotator layer already exists and handle that
             # Create an annotator layer
-            widget.annotation_layer.value = widget.viewer.value.add_labels(widget.label_layer.value.data, name='annotations')
+            #widget.viewer.value.add_labels(widget.label_layer.value.data, name='annotations')
+            new_annotation_layer = widget.viewer.value.add_labels(widget.label_layer.value.data, name='annotations')
+
+            try:
+                widget.annotation_layer.value = new_annotation_layer
+
+            # TODO: Figure out why setting this layer is not a valid choice, even though the layer exists!!!!
+            # Doesn't trigger when annotation layer is not typed
+            except ValueError as e:
+                print('Stupid value error => Initialization issue:')
+                print(f'{e}')
+                print(widget.viewer.value.layers)
 
             # TODO: Check if annotator column already exists
             # Add an annotator column to the label_layer
             unique_labels = np.unique(widget.label_layer.value.data)[1:]
-            widget.label_layer.value.features['annotation'] = np.zeros(len(unique_labels))
-            widget.label_layer.value.features.index = unique_labels
+            widget.label_layer.value.features['annotation'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
+            print(widget.label_layer.value.features['annotation'].dtype)
+            #widget.label_layer.value.features['annotation'] = np.zeros(len(unique_labels))
 
-            print(widget.annotation_layer)
-            print(widget.annotation_layer.value)
+            # Attempt to use categoricals to have names => Too complicated
+            # TODO: Enforce that the classes contain a Clear option. Maybe remove clear option from valid options?
+            #categorical_raw = pd.Categorical([np.nan]*len(unique_labels), categories=widget.classes.choices, ordered=False)
+            #widget.label_layer.value.features['annotation'] = pd.Series(categorical_raw, index=unique_labels) #, dtype='category'
+            #widget.label_layer.value.features['annotation'] = np.zeros(len(unique_labels))
+            #widget.label_layer.value.features.index = unique_labels
+
+            # Set annotation colormap initially
+            widget.annotation_layer.value.color[None] = np.array([0, 0, 0, 0.001], dtype=np.float32)
+            widget.annotation_layer.value.color_mode = 'direct'
+            #new_annotation_layer.color = cmap(int(classes))
+
+    # Use Pandas categoricals?
+    # pd.Series(dtype='category')
     #widget.label_layer.value.features['annotation'] = pd.Series(dtype=pd.Int64Dtype)
-    # TODO: create layer
+    initialize_label_layer()
 
 
 # TODO: Make the annotation layer something the user cannot select
 @magic_factory(
-        classes={'widget_type': 'RadioButtons', 'choices': ['Clear', 'Class 1', 'Class 2']},
+        classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]},
         annotation_layer={'visible': False},
         widget_init=_initialize_annotation_stuff,
+        auto_call=True,
+        call_button=False,
     )
-def initialize_annotator(
+def start_annotator(
         viewer: napari.Viewer,
         label_layer: "napari.layers.Labels",
-        annotation_layer: "napari.layers.Labels",
-        classes: list[str],
+        #annotation_layer: "napari.layers.Labels",
+        annotation_layer,
+        classes: list[int],
         output_path: Optional[Path] = Path('.') / 'annotation.csv',
 ):
-    print()
+    cmap = ListedColormap([[0.0, 0.0, 0.0, 0.0]] + list(matplotlib.cm.get_cmap('Set1').colors))
+    # TODO: activate keybindings on init (currently only works after first auto_call, e.g. when a class is selected)
 
+    # print(viewer.layers)
+    # Doesn't trigger when annotation layer is not typed
+    # TODO: Report this initialization bug and get rid of this workaround
+    # if 'annotations' not in annotation_layer.name:
+    #     annotation_layer = viewer.layers['annotations']
 
     # TODO: All the connection to events
     @label_layer.mouse_drag_callbacks.append
@@ -80,7 +117,7 @@ def initialize_annotator(
         Handles user annotations by setting the corresponding classifier
         variables and changing the annotation label layer
         """
-        annotation_layer.value.visible=True
+        annotation_layer.visible=True
         # Need to scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
@@ -90,18 +127,28 @@ def initialize_annotator(
             pos / scale for pos, scale in zip(event.position, label_layer.scale)
         )
         label = label_layer.get_value(scaled_position)
-        # if selector.value is None:
-        #     napari_info(
-        #         "No class is selected. Select a class in the classifier widget."
-        #     )
-        #     return
+        if classes is None:
+            print(
+                "No class is selected. Select a class in the classifier widget."
+            )
+            return
+
         # Check if background or foreground was clicked. If background was
         # clicked, do nothing (background can't be assigned a class)
-        print(classes.value)
-        print(label)
-        # if label == 0 or label is None:
-        #     napari_info("No label clicked.")
-        #     return
+        if label == 0 or label is None:
+            print("No label clicked.")
+            return
+
+        # TODO: Handle the "0" case => np.Nan
+        if classes == 0:
+            label_layer.features.loc[label, "annotation"] = np.NaN
+        else:
+            label_layer.features.loc[label, "annotation"] = int(classes)        
+
+        # TODO: Need to have colormaps initialized before using them here
+        annotation_layer.color[label] = cmap(int(classes))
+        annotation_layer.color_mode = 'direct'
+
         # self.annotations[label] = choices.index(classes.value)
         # self.update_annotation_colormap(label, choices.index(selector.value))
 
