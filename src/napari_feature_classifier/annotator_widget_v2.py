@@ -64,7 +64,7 @@ def initialize_annotator(
         classes: list[str],
         output_path: Optional[Path] = Path('.') / 'annotation.csv',
 ):
-    pass
+    print()
 
 
     # TODO: All the connection to events
@@ -72,30 +72,32 @@ def initialize_annotator(
     def toggle_label(_, event):  # pylint: disable-msg=W0613
         """
         Handles user annotations by setting the corresponding classifier
-        variables and changing the
+        variables and changing the annotation label layer
         """
-        self.annotation_layer.visible = True
+        annotation_layer.value.visible=True
         # Need to scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
         # If scale is anything else, this makes the click still match the
         # correct label
         scaled_position = tuple(
-            pos / scale for pos, scale in zip(event.position, self.label_layer.scale)
+            pos / scale for pos, scale in zip(event.position, label_layer.scale)
         )
-        label = self.label_layer.get_value(scaled_position)
-        if selector.value is None:
-            napari_info(
-                "No class is selected. Select a class in the classifier widget."
-            )
-            return
+        label = label_layer.get_value(scaled_position)
+        # if selector.value is None:
+        #     napari_info(
+        #         "No class is selected. Select a class in the classifier widget."
+        #     )
+        #     return
         # Check if background or foreground was clicked. If background was
         # clicked, do nothing (background can't be assigned a class)
-        if label == 0 or label is None:
-            napari_info("No label clicked.")
-            return
-        self.annotations[label] = choices.index(selector.value)
-        self.update_annotation_colormap(label, choices.index(selector.value))
+        print(classes.value)
+        print(label)
+        # if label == 0 or label is None:
+        #     napari_info("No label clicked.")
+        #     return
+        # self.annotations[label] = choices.index(classes.value)
+        # self.update_annotation_colormap(label, choices.index(selector.value))
 
     # THIS SHOULD NOT BE NECESSARY ANYMORE. GET DIRECTLY FROM widget.classes?
     # @classes.changed.connect
