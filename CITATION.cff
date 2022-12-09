@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: If you use this plugin, please cite it using these metadata
+title: 'napari-feature-classifier: An interactive classifier plugin to use with label
+  images and feature measurements'
+url: https://github.com/fractal-napari-plugins-collection/napari-feature-classifier
+authors:
+- given-names: Joel
+  family-names: "L\xFCthi"
+- given-names: 'MaksHess  # We cannot split your name automatically bewteen ''given-names''
+    and ''family-names'', we apologize for that. Please do it manually'
+- given-names: 'Giuseppe Piero Brandino  # We cannot split your name automatically
+    bewteen ''given-names'' and ''family-names'', we apologize for that. Please do
+    it manually'
