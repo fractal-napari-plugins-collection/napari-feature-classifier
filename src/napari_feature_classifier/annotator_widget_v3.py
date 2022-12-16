@@ -10,6 +10,7 @@ import matplotlib
 
 from typing import Optional, cast
 from enum import Enum
+import math
 
 import napari
 import napari.layers
@@ -25,6 +26,7 @@ class ClassSelection(Enum):
     Class_1 = 1
     Class_2 = 2
     Class_3 = 3
+    Class_4 = 4
 
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
@@ -60,9 +62,7 @@ class LabelAnnotator(Container):
             return
         unique_labels = np.unique(label_layer.data)[1:]
         label_layer.features['annotations'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
-        self.reset_annotation_colormaps()
-        #self._annotations_layer = self._viewer.add_labels(self._lbl_combo.value.data) #, scale=self._lbl_combo.scale
-        
+        self.reset_annotation_colormaps()      
         
         @self._lbl_combo.value.mouse_drag_callbacks.append
         def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
@@ -85,6 +85,25 @@ class LabelAnnotator(Container):
             # Waiting for update on the napari 0.4.17 issue that breaks this option
             self.reset_annotation_colormaps()
 
+        @self._lbl_combo.value.bind_key("0", overwrite=True)
+        def set_class_0(event):
+            self._class_selector.value = ClassSelection(np.NaN)
+
+        @self._lbl_combo.value.bind_key("1", overwrite=True)
+        def set_class_0(event):
+            self._class_selector.value = ClassSelection(1)
+
+        @self._lbl_combo.value.bind_key("2", overwrite=True)
+        def set_class_0(event):
+            self._class_selector.value = ClassSelection(2)
+
+        @self._lbl_combo.value.bind_key("3", overwrite=True)
+        def set_class_0(event):
+            self._class_selector.value = ClassSelection(3)
+
+        @self._lbl_combo.value.bind_key("4", overwrite=True)
+        def set_class_0(event):
+            self._class_selector.value = ClassSelection(4)
 
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
@@ -127,7 +146,17 @@ class LabelAnnotator(Container):
         self._lbl_combo.value = self._viewer.layers.selection._current
 
     def _on_save_clicked(self):
-        self._lbl_combo.value.features['annotations'].to_csv(self._save_destination.value)
+        annotations = self._lbl_combo.value.features['annotations']
+        df = pd.DataFrame(annotations)
+        class_names = []
+        for annotation in annotations:
+            if math.isnan(annotation):
+                class_names.append(ClassSelection(np.NaN).name)
+            else:
+                class_names.append(ClassSelection(annotation).name)
+
+        df['annotation_names'] = class_names
+        df.to_csv(self._save_destination.value)
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
