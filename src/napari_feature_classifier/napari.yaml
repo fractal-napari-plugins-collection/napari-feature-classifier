@@ -11,10 +11,20 @@ contributions:
     - id: napari-feature-classifier.annotator_widget_v2
       python_name: napari_feature_classifier.annotator_widget_v2:start_annotator
       title: Annotator
+    - id: napari-feature-classifier.test_widget
+      python_name: napari_feature_classifier.test_widget:test_widget
+      title: Test Widget
+    - id: napari-feature-classifier.annotator_widget_v3
+      python_name: napari_feature_classifier.annotator_widget_v3:LabelAnnotator
+      title: Test Widget
   widgets:
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
     - command: napari-feature-classifier.load_classifier
       display_name: Load Classifier
+    - command: napari-feature-classifier.test_widget
+      display_name: Test Widget
     - command: napari-feature-classifier.annotator_widget_v2
-      display_name: Annotator
+      display_name: Annotator_v2
+    - command: napari-feature-classifier.annotator_widget_v3
+      display_name: Annotator_v3
