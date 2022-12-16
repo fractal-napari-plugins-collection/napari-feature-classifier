@@ -39,6 +39,7 @@ class LabelAnnotator(Container):
         self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection.Class_1, annotation=ClassSelection, widget_type=RadioButtons))
         #classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]}
         self._init_annotation(self._lbl_combo.value)
+        self._viewer.layers.selection.events.changed.connect(self._active_changed)
         super().__init__(widgets=[self._lbl_combo, self._class_selector])
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
@@ -79,6 +80,13 @@ class LabelAnnotator(Container):
         print('selecting layer...')
         self._viewer.layers.selection.clear()
         self._viewer.layers.selection.add(label_layer)
+        
+    def _active_changed(self, event):
+        print('selection changed...')
+        if self._viewer.layers.selection._current is None:
+            return
+        self._lbl_combo.value = self._viewer.layers.selection._current
+
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
