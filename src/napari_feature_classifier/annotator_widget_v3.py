@@ -34,6 +34,7 @@ class LabelAnnotator(Container):
         self._run_btn.clicked.connect(self._on_run_clicked)
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
         self._annotations_layer: Optional[napari.layers.Labels] = None
+        self._label_layer: Optional[napari.layers.Labels] = None
 
         # Class selection
         # self._class_selector = cast(RadioButtons, create_widget(value=0))
@@ -46,9 +47,53 @@ class LabelAnnotator(Container):
         print("Label layer changed", new_value)
         # set your internal annotation layer here.
 
+        # Update what the current label layer is
+        self._label_layer = new_value
+
     def _on_run_clicked(self):
         print("Run clicked")
         # whatever you wanted to happen on run
+
+    # @self._label_layer.mouse_drag_callbacks.append
+    # def toggle_label(_, event):  # pylint: disable-msg=W0613
+    #     """
+    #     Handles user annotations by setting the corresponding classifier
+    #     variables and changing the annotation label layer
+    #     """
+    #     annotation_layer.visible=True
+    #     # Need to scale position that event.position returns by the
+    #     # label_layer scale.
+    #     # If scale is (1, 1, 1), nothing changes
+    #     # If scale is anything else, this makes the click still match the
+    #     # correct label
+    #     scaled_position = tuple(
+    #         pos / scale for pos, scale in zip(event.position, label_layer.scale)
+    #     )
+    #     label = label_layer.get_value(scaled_position)
+    #     if classes is None:
+    #         print(
+    #             "No class is selected. Select a class in the classifier widget."
+    #         )
+    #         return
+
+    #     # Check if background or foreground was clicked. If background was
+    #     # clicked, do nothing (background can't be assigned a class)
+    #     if label == 0 or label is None:
+    #         print("No label clicked.")
+    #         return
+
+    #     # TODO: Handle the "0" case => np.Nan
+    #     if classes == 0:
+    #         label_layer.features.loc[label, "annotation"] = np.NaN
+    #     else:
+    #         label_layer.features.loc[label, "annotation"] = int(classes)        
+
+    #     # TODO: Need to have colormaps initialized before using them here
+    #     print(classes)
+    #     print(cmap(int(classes)))
+    #     # Problem: Figure out how colors are direct assigned in napari v0.4.17
+    #     annotation_layer.color[label] = cmap(int(classes))
+    #     annotation_layer.color_mode = 'direct'
 
 
 def main():
