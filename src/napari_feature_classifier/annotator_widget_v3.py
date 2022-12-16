@@ -1,4 +1,3 @@
-from typing import Optional
 import numpy as np
 import pandas as pd
 from magicgui import magic_factory, widgets, magicgui
@@ -7,8 +6,9 @@ import napari
 from pathlib import Path
 from matplotlib.colors import ListedColormap
 import matplotlib
+import warnings
 
-from typing import Optional, cast
+from typing import Optional, cast, Sequence
 from enum import Enum
 
 import napari
@@ -25,9 +25,23 @@ class ClassSelection(Enum):
     Class_1 = 1
     Class_2 = 2
     Class_3 = 3
+    Class_4 = 4
+    
+def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequence[str]] = None) -> Enum:
+    if n_classes is None and class_names is None:
+        raise ValueError("Provide either `n_classes` or a list of `class_names`")
+    if class_names is None:
+        class_names = [f'Class_{i+1}' for i in range(n_classes)]
+    if n_classes is None:
+        n_classes = len(class_names)
+    if n_classes != len(class_names):
+        warnings.warn(f"Value provided for `n_classes` ({n_classes}) does not match the length of `class_names` ({len(class_names)}). Setting n_classes to {len(class_names)}")
+        
+    DynamicClassSelection = Enum('DynamicClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
+    return DynamicClassSelection
 
 class LabelAnnotator(Container):
-    def __init__(self, viewer: napari.viewer.Viewer):
+    def __init__(self, viewer: napari.viewer.Viewer, class_selection=get_class_selection(class_names=['mito', 's', 'whatever'])):
         self._viewer = viewer
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
@@ -39,7 +53,7 @@ class LabelAnnotator(Container):
         )
 
         # Class selection
-        self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection.Class_1, annotation=ClassSelection, widget_type=RadioButtons))
+        self._class_selector = cast(RadioButtons, create_widget(value = class_selection[list(class_selection.__members__.keys())[1]], annotation=class_selection, widget_type=RadioButtons))
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
         self._save_destination = FileEdit(value='annotation.csv', mode='r')
@@ -128,6 +142,7 @@ class LabelAnnotator(Container):
 
     def _on_save_clicked(self):
         self._lbl_combo.value.features['annotations'].to_csv(self._save_destination.value)
+
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
