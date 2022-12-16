@@ -39,14 +39,16 @@ class LabelAnnotator(Container):
         self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection.Class_1, annotation=ClassSelection, widget_type=RadioButtons))
         #classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]}
         self._init_annotation(self._lbl_combo.value)
-        super().__init__(widgets=[self._lbl_combo, self._class_selector, self._run_btn])
+        super().__init__(widgets=[self._lbl_combo, self._class_selector])
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
+        self._select_layer(label_layer)
+        
         unique_labels = np.unique(label_layer.data)[1:]
         if 'annotations' in label_layer.features:
             return
         label_layer.features['annotations'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
-
+        
         @self._lbl_combo.value.mouse_drag_callbacks.append
         def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
             # Need to scale position that event.position returns by the
@@ -72,7 +74,11 @@ class LabelAnnotator(Container):
         print("Label layer changed", label_layer)
         self._init_annotation(label_layer)
         # set your internal annotation layer here.
-
+        
+    def _select_layer(self, label_layer: napari.layers.Labels):
+        print('selecting layer...')
+        self._viewer.layers.selection.clear()
+        self._viewer.layers.selection.add(label_layer)
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
@@ -120,7 +126,8 @@ def main():
     lbls = imageio.v2.imread('sample_data/test_labels.tif')
     viewer = napari.Viewer()
     viewer.add_labels(lbls)
-    viewer.add_labels(lbls, name='labels2')
+    viewer.add_labels(lbls, name='lbls2')
+    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer))
     viewer.show(block=True)
 #     # print(initialize_annotator())
 #     viewer = napari.Viewer()
