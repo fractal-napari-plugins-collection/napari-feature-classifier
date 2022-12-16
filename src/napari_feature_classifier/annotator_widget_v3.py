@@ -9,6 +9,7 @@ from matplotlib.colors import ListedColormap
 import matplotlib
 
 from typing import Optional, cast
+from enum import Enum
 
 import napari
 import napari.layers
@@ -18,6 +19,12 @@ from magicgui.widgets import Container, create_widget, PushButton, ComboBox, Rad
 
 # Annotator Widget:
 # Viewer is open with a label layer
+
+class ClassSelection(Enum):
+    NoClass = np.NaN
+    Class_1 = 1
+    Class_2 = 2
+    Class_3 = 3
 
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
@@ -29,10 +36,11 @@ class LabelAnnotator(Container):
         self._annotations_layer: Optional[napari.layers.Labels] = None
 
         # Class selection
-        self._class_selector = cast(RadioButtons, create_widget(value=int))
+        # self._class_selector = cast(RadioButtons, create_widget(value=0))
+        self._class_selector = cast(RadioButtons, create_widget(annotation=ClassSelection, widget_type=RadioButtons))
         #classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]}
 
-        super().__init__(widgets=[self._lbl_combo, self._run_btn])
+        super().__init__(widgets=[self._lbl_combo, self._class_selector, self._run_btn])
 
     def _on_label_layer_changed(self, new_value: napari.layers.Labels):
         print("Label layer changed", new_value)
