@@ -34,7 +34,8 @@ class LabelAnnotator(Container):
         self._annotations_layer = self._viewer.add_labels(
             self._lbl_combo.value.data, 
             scale=self._lbl_combo.value.scale,
-            name='Annotations'
+            name='Annotations',
+            # editable=False,
         )
 
         # Current label layer: self._lbl_combo.value
@@ -113,10 +114,12 @@ class LabelAnnotator(Container):
         
     def _active_changed(self, event):
         print('selection changed...')
-        if self._viewer.layers.selection._current is None:
+        current_layer = self._viewer.layers.selection._current
+        if type(current_layer) is napari.layers.Labels and current_layer.name != 'Annotations':
+            self._lbl_combo.value = self._viewer.layers.selection._current
+        else:
             return
-        self._lbl_combo.value = self._viewer.layers.selection._current
-
+        
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
