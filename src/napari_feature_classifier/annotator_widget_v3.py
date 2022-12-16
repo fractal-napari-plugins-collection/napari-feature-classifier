@@ -7,9 +7,12 @@ from pathlib import Path
 from matplotlib.colors import ListedColormap
 import matplotlib
 import warnings
+from functools import partial
+
 
 from typing import Optional, cast, Sequence
 from enum import Enum
+import math
 
 import napari
 import napari.layers
@@ -20,12 +23,6 @@ from magicgui.widgets import Container, create_widget, PushButton, ComboBox, Rad
 # Annotator Widget:
 # Viewer is open with a label layer
 
-class ClassSelection(Enum):
-    NoClass = np.NaN
-    Class_1 = 1
-    Class_2 = 2
-    Class_3 = 3
-    Class_4 = 4
     
 def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequence[str]] = None) -> Enum:
     if n_classes is None and class_names is None:
@@ -37,11 +34,11 @@ def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequ
     if n_classes != len(class_names):
         warnings.warn(f"Value provided for `n_classes` ({n_classes}) does not match the length of `class_names` ({len(class_names)}). Setting n_classes to {len(class_names)}")
         
-    DynamicClassSelection = Enum('DynamicClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
-    return DynamicClassSelection
+    ClassSelection = Enum('ClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
+    return ClassSelection
 
 class LabelAnnotator(Container):
-    def __init__(self, viewer: napari.viewer.Viewer, class_selection=get_class_selection(class_names=['mito', 's', 'whatever'])):
+    def __init__(self, viewer: napari.viewer.Viewer, ClassSelection=get_class_selection(n_classes=4)):
         self._viewer = viewer
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
@@ -53,7 +50,8 @@ class LabelAnnotator(Container):
         )
 
         # Class selection
-        self._class_selector = cast(RadioButtons, create_widget(value = class_selection[list(class_selection.__members__.keys())[1]], annotation=class_selection, widget_type=RadioButtons))
+        self.ClassSelection = ClassSelection
+        self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection[list(ClassSelection.__members__.keys())[1]], annotation=ClassSelection, widget_type=RadioButtons))
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
         self._save_destination = FileEdit(value='annotation.csv', mode='r')
@@ -74,9 +72,7 @@ class LabelAnnotator(Container):
             return
         unique_labels = np.unique(label_layer.data)[1:]
         label_layer.features['annotations'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
-        self.reset_annotation_colormaps()
-        #self._annotations_layer = self._viewer.add_labels(self._lbl_combo.value.data) #, scale=self._lbl_combo.scale
-        
+        self.reset_annotation_colormaps()      
         
         @self._lbl_combo.value.mouse_drag_callbacks.append
         def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
@@ -98,7 +94,21 @@ class LabelAnnotator(Container):
             # FIXME: Don't reset the whole colormap, just update a single color
             # Waiting for update on the napari 0.4.17 issue that breaks this option
             self.reset_annotation_colormaps()
-
+        
+        # FIXME: Make sure dynamic keybindings work.
+        def set_class_n(n: int):
+            self._class_selector.value = self.ClassSelection[list(self.ClassSelection.__members__)[n]]
+            
+        set_class = partial(set_class_n, 3)
+        set_class()
+        
+        # # keybindings for the available classes (0 = deselect)
+        for i in range(len(self.ClassSelection)):
+            set_class = partial(set_class_n, i)
+            set_class.__name__ = f'set_class_{i}'
+            self._lbl_combo.value.bind_key(str(i), set_class)
+        #     set_class = partial(set_class_n, n=i)
+        #     self.label_layer.bind_key(str(i), set_class)
 
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
@@ -141,7 +151,18 @@ class LabelAnnotator(Container):
         self._lbl_combo.value = self._viewer.layers.selection._current
 
     def _on_save_clicked(self):
-        self._lbl_combo.value.features['annotations'].to_csv(self._save_destination.value)
+        annotations = self._lbl_combo.value.features['annotations']
+        df = pd.DataFrame(annotations)
+        class_names = []
+        for annotation in annotations:
+            if math.isnan(annotation):
+                class_names.append(self.ClassSelection(np.NaN).name)
+            else:
+                class_names.append(self.ClassSelection(annotation).name)
+
+        df['annotation_names'] = class_names
+        df.to_csv(self._save_destination.value)
+
 
 
     #     """
