@@ -31,7 +31,11 @@ class LabelAnnotator(Container):
         self._viewer = viewer
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
-        self._annotations_layer: Optional[napari.layers.Labels] = None
+        self._annotations_layer = self._viewer.add_labels(
+            self._lbl_combo.value.data, 
+            scale=self._lbl_combo.value.scale,
+            name='Annotations'
+        )
 
         # Current label layer: self._lbl_combo.value
         # Class selection
@@ -45,10 +49,14 @@ class LabelAnnotator(Container):
     def _init_annotation(self, label_layer: napari.layers.Labels):
         self._select_layer(label_layer)
         
-        unique_labels = np.unique(label_layer.data)[1:]
         if 'annotations' in label_layer.features:
+            self.reset_annotation_colormaps()
             return
+        unique_labels = np.unique(label_layer.data)[1:]
         label_layer.features['annotations'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
+        self.reset_annotation_colormaps()
+        #self._annotations_layer = self._viewer.add_labels(self._lbl_combo.value.data) #, scale=self._lbl_combo.scale
+        
         
         @self._lbl_combo.value.mouse_drag_callbacks.append
         def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
@@ -65,16 +73,38 @@ class LabelAnnotator(Container):
                 print('No label clicked.')
                 return
 
-            label_layer.features['annotations'] .loc[label] = self._class_selector.value.value
-            print(label_layer.features['annotations'])
-            # print(label)
-            # print(scaled_position)
-            # print(self._class_selector.value)
+            label_layer.features['annotations'].loc[label] = self._class_selector.value.value
+
+            # FIXME: Don't reset the whole colormap, just update a single color
+            # Waiting for update on the napari 0.4.17 issue that breaks this option
+            self.reset_annotation_colormaps()
+
 
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
         self._init_annotation(label_layer)
         # set your internal annotation layer here.
+
+    def reset_annotation_colormaps(self):
+        """
+        Reset the colormap based on the annotations in 
+        label_layer.features['annotation'] and sends the updated colormap 
+        to the annotation label layer
+        """
+        cmap = ListedColormap(
+            [
+                (0.0, 0.0, 0.0, 0.0),
+                (1.0, 0.0, 0.0, 1.0),
+                (0.0, 1.0, 0.0, 1.0),
+                (0.0, 0.0, 1.0, 1.0),
+                (1.0, 0.0, 1.0, 1.0),
+            ]
+        )
+        colors = cmap(self._lbl_combo.value.features['annotations'] / 5) # self.nb_classes
+        colordict = dict(zip(self._lbl_combo.value.features.index, colors))
+        self._annotations_layer.color = colordict
+        self._annotations_layer.opacity=1.0
+        self._annotations_layer.color_mode = 'direct'
         
     def _select_layer(self, label_layer: napari.layers.Labels):
         print('selecting layer...')
@@ -137,29 +167,6 @@ def main():
     viewer.add_labels(lbls, name='lbls2')
     widget = viewer.window.add_dock_widget(LabelAnnotator(viewer))
     viewer.show(block=True)
-#     # print(initialize_annotator())
-#     viewer = napari.Viewer()
-#     # viewer.add_labels(np.zeros((10, 10), dtype=int))
-#     # napari_experimental_provide_dock_widget()
-#     viewer.add_labels(np.zeros((10, 10), dtype=np.uint16))
-#     # viewer.add_label
-#     # threshold_widget = threshold()
-#     viewer.window.add_dock_widget(initialize_annotator)
-#     viewer.show(block=True)
-#     # napari_experimental_provide_dock_widget()
-
-
-# @magicgui(auto_call=True, threshold={'max': 2 ** 16})
-# def threshold(
-#     data: 'napari.types.ImageData', threshold: int
-# ) -> 'napari.types.LabelsData':
-#     return (data > threshold).astype(int)
-#
-# @napari_hook_implementation
-# def napari_experimental_provide_dock_widget():
-#     return threshold
-
-
 
 
 if __name__ == '__main__':
