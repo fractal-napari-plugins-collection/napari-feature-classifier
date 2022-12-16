@@ -30,32 +30,50 @@ class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
-        self._run_btn = PushButton(label="Run")
-        self._run_btn.clicked.connect(self._on_run_clicked)
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
         self._annotations_layer: Optional[napari.layers.Labels] = None
-        self._label_layer: Optional[napari.layers.Labels] = None
 
+        # Current label layer: self._lbl_combo.value
         # Class selection
         # self._class_selector = cast(RadioButtons, create_widget(value=0))
-        self._class_selector = cast(RadioButtons, create_widget(annotation=ClassSelection, widget_type=RadioButtons))
+        self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection.Class_1, annotation=ClassSelection, widget_type=RadioButtons))
         #classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]}
-
+        self._init_annotation(self._lbl_combo.value)
         super().__init__(widgets=[self._lbl_combo, self._class_selector, self._run_btn])
 
-    def _on_label_layer_changed(self, new_value: napari.layers.Labels):
-        print("Label layer changed", new_value)
+    def _init_annotation(self, label_layer: napari.layers.Labels):
+        unique_labels = np.unique(label_layer.data)[1:]
+        if 'annotations' in label_layer.features:
+            return
+        label_layer.features['annotations'] = pd.Series([np.NaN]*len(unique_labels), index=unique_labels, dtype=int)
+
+        @self._lbl_combo.value.mouse_drag_callbacks.append
+        def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
+            # Need to scale position that event.position returns by the
+            # label_layer scale.
+            # If scale is (1, 1, 1), nothing changes
+            # If scale is anything else, this makes the click still match the
+            # correct label
+            scaled_position = tuple(
+                pos / scale for pos, scale in zip(event.position, labels_layer.scale)
+            )
+            label = labels_layer.get_value(scaled_position)
+            if label == 0:
+                print('No label clicked.')
+                return
+
+            label_layer.features['annotations'] .loc[label] = self._class_selector.value.value
+            print(label_layer.features['annotations'])
+            # print(label)
+            # print(scaled_position)
+            # print(self._class_selector.value)
+
+    def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
+        print("Label layer changed", label_layer)
+        self._init_annotation(label_layer)
         # set your internal annotation layer here.
 
-        # Update what the current label layer is
-        self._label_layer = new_value
 
-    def _on_run_clicked(self):
-        print("Run clicked")
-        # whatever you wanted to happen on run
-
-    # @self._label_layer.mouse_drag_callbacks.append
-    # def toggle_label(_, event):  # pylint: disable-msg=W0613
     #     """
     #     Handles user annotations by setting the corresponding classifier
     #     variables and changing the annotation label layer
