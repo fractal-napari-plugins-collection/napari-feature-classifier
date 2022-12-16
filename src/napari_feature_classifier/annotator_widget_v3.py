@@ -15,7 +15,7 @@ import napari
 import napari.layers
 import napari.viewer
 
-from magicgui.widgets import Container, create_widget, PushButton, ComboBox, RadioButtons
+from magicgui.widgets import Container, create_widget, PushButton, ComboBox, RadioButtons, FileEdit
 
 # Annotator Widget:
 # Viewer is open with a label layer
@@ -38,14 +38,19 @@ class LabelAnnotator(Container):
             # editable=False,
         )
 
-        # Current label layer: self._lbl_combo.value
         # Class selection
-        # self._class_selector = cast(RadioButtons, create_widget(value=0))
         self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection.Class_1, annotation=ClassSelection, widget_type=RadioButtons))
-        #classes={'widget_type': 'RadioButtons', 'choices': [0, 1, 2, 3, 4]}
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
-        super().__init__(widgets=[self._lbl_combo, self._class_selector])
+        self._save_destination = FileEdit(value='annotation.csv', mode='r')
+        self._save_annotation = PushButton(label="Save Annotations")
+        self._save_annotation.clicked.connect(self._on_save_clicked)
+        super().__init__(widgets=[
+            self._lbl_combo, 
+            self._class_selector, 
+            self._save_destination, 
+            self._save_annotation
+        ])
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
         self._select_layer(label_layer)
@@ -119,7 +124,10 @@ class LabelAnnotator(Container):
             self._lbl_combo.value = self._viewer.layers.selection._current
         else:
             return
-        
+        self._lbl_combo.value = self._viewer.layers.selection._current
+
+    def _on_save_clicked(self):
+        self._lbl_combo.value.features['annotations'].to_csv(self._save_destination.value)
 
     #     """
     #     Handles user annotations by setting the corresponding classifier
