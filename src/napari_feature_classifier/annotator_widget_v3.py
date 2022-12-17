@@ -1,15 +1,9 @@
 import numpy as np
 import pandas as pd
-from magicgui import magic_factory, widgets, magicgui
-from napari_plugin_engine import napari_hook_implementation
-import napari
 from pathlib import Path
 from matplotlib.colors import ListedColormap
-import matplotlib
 import warnings
 from functools import partial
-
-
 from typing import Optional, cast, Sequence
 from enum import Enum
 import math
@@ -27,7 +21,7 @@ def main():
     viewer = napari.Viewer()
     viewer.add_labels(lbls)
     viewer.add_labels(lbls, name='lbls2')
-    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer, get_class_selection(class_names=['early M', 'late M', 'early S', 'mid S', 'late S'])))
+    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer, get_class_selection(class_names=['early M', 'late M'])))
     viewer.show(block=True)
 
     
@@ -44,7 +38,8 @@ def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequ
     ClassSelection = Enum('ClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
     return ClassSelection
 
-
+#TODO: We might not wanna pass the ClassSelection enum but `n_classes` or `class_names` instead & call get_class_selection internally.
+#FIXME: Make sure there is no weird interactions with label layer (maybe disable the label-layer tools if a LabelAnnotator is open).
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer, ClassSelection=get_class_selection(n_classes=4)):
         self._viewer = viewer
@@ -119,6 +114,7 @@ class LabelAnnotator(Container):
         self._init_annotation(label_layer)
         # set your internal annotation layer here.
 
+    #FIXME: Currently only works for <4 classes.
     def reset_annotation_colormaps(self):
         """
         Reset the colormap based on the annotations in 
