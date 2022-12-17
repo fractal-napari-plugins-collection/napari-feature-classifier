@@ -20,8 +20,15 @@ import napari.viewer
 
 from magicgui.widgets import Container, create_widget, PushButton, ComboBox, RadioButtons, FileEdit
 
-# Annotator Widget:
-# Viewer is open with a label layer
+def main():
+    import imageio
+
+    lbls = imageio.v2.imread('sample_data/test_labels.tif')
+    viewer = napari.Viewer()
+    viewer.add_labels(lbls)
+    viewer.add_labels(lbls, name='lbls2')
+    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer, get_class_selection(class_names=['early M', 'late M', 'early S', 'mid S', 'late S'])))
+    viewer.show(block=True)
 
     
 def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequence[str]] = None) -> Enum:
@@ -36,6 +43,7 @@ def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequ
         
     ClassSelection = Enum('ClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
     return ClassSelection
+
 
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer, ClassSelection=get_class_selection(n_classes=4)):
@@ -95,16 +103,12 @@ class LabelAnnotator(Container):
             # Waiting for update on the napari 0.4.17 issue that breaks this option
             self.reset_annotation_colormaps()
         
-        # FIXME: Make sure dynamic keybindings work.
-        def set_class_n(n: int):
+        def set_class_n(layer, n: int):
             self._class_selector.value = self.ClassSelection[list(self.ClassSelection.__members__)[n]]
-            
-        set_class = partial(set_class_n, 3)
-        set_class()
         
         # # keybindings for the available classes (0 = deselect)
         for i in range(len(self.ClassSelection)):
-            set_class = partial(set_class_n, i)
+            set_class = partial(set_class_n, n=i)
             set_class.__name__ = f'set_class_{i}'
             self._lbl_combo.value.bind_key(str(i), set_class)
         #     set_class = partial(set_class_n, n=i)
@@ -163,57 +167,6 @@ class LabelAnnotator(Container):
         df['annotation_names'] = class_names
         df.to_csv(self._save_destination.value)
 
-
-
-    #     """
-    #     Handles user annotations by setting the corresponding classifier
-    #     variables and changing the annotation label layer
-    #     """
-    #     annotation_layer.visible=True
-    #     # Need to scale position that event.position returns by the
-    #     # label_layer scale.
-    #     # If scale is (1, 1, 1), nothing changes
-    #     # If scale is anything else, this makes the click still match the
-    #     # correct label
-    #     scaled_position = tuple(
-    #         pos / scale for pos, scale in zip(event.position, label_layer.scale)
-    #     )
-    #     label = label_layer.get_value(scaled_position)
-    #     if classes is None:
-    #         print(
-    #             "No class is selected. Select a class in the classifier widget."
-    #         )
-    #         return
-
-    #     # Check if background or foreground was clicked. If background was
-    #     # clicked, do nothing (background can't be assigned a class)
-    #     if label == 0 or label is None:
-    #         print("No label clicked.")
-    #         return
-
-    #     # TODO: Handle the "0" case => np.Nan
-    #     if classes == 0:
-    #         label_layer.features.loc[label, "annotation"] = np.NaN
-    #     else:
-    #         label_layer.features.loc[label, "annotation"] = int(classes)        
-
-    #     # TODO: Need to have colormaps initialized before using them here
-    #     print(classes)
-    #     print(cmap(int(classes)))
-    #     # Problem: Figure out how colors are direct assigned in napari v0.4.17
-    #     annotation_layer.color[label] = cmap(int(classes))
-    #     annotation_layer.color_mode = 'direct'
-
-
-def main():
-    import imageio
-
-    lbls = imageio.v2.imread('sample_data/test_labels.tif')
-    viewer = napari.Viewer()
-    viewer.add_labels(lbls)
-    viewer.add_labels(lbls, name='lbls2')
-    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer))
-    viewer.show(block=True)
 
 
 if __name__ == '__main__':
