@@ -21,7 +21,7 @@ def main():
     viewer = napari.Viewer()
     viewer.add_labels(lbls)
     viewer.add_labels(lbls, name='lbls2')
-    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer, get_class_selection(class_names=['early M', 'late M'])))
+    widget = viewer.window.add_dock_widget(LabelAnnotator(viewer, get_class_selection(class_names=['early M', 'late M', 'early S', 'mid S', 'late S'])))
     viewer.show(block=True)
 
     
@@ -38,28 +38,38 @@ def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequ
     ClassSelection = Enum('ClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
     return ClassSelection
 
-#TODO: We might not wanna pass the ClassSelection enum but `n_classes` or `class_names` instead & call get_class_selection internally.
-#FIXME: Make sure there is no weird interactions with label layer (maybe disable the label-layer tools if a LabelAnnotator is open).
+#TODO: We might not wanna pass the ClassSelection enum but `n_classes` or `class_names` instead & call get_class_selection internally.$
+#TODO: All label layers (at the creation of the widget) are set to ´editable = False´ to make sure there's no weird interactions with label-layer functionality. Should this apply
+#      to all label layers that are created while the plug-in extists and be reset when closing?
+#TODO: Make sure user feedback (like "no label clicked.") ends up in the right place (i. e. the viewer info-bar).
+#TODO: Remove the _lbl_combo box and only rely on layer selection in the viewer. Also double check that relevant callbacks are only called once or don't create performance bottlenecks.
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer, ClassSelection=get_class_selection(n_classes=4)):
         self._viewer = viewer
+       
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
         self._lbl_combo.changed.connect(self._on_label_layer_changed)
+        
         self._annotations_layer = self._viewer.add_labels(
             self._lbl_combo.value.data, 
             scale=self._lbl_combo.value.scale,
             name='Annotations',
-            # editable=False,
         )
-
+        
+        for layer in self._viewer.layers:
+            print(layer)
+            if isinstance(layer, napari.layers.Labels):
+                layer.editable = False
+ 
         # Class selection
         self.ClassSelection = ClassSelection
         self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection[list(ClassSelection.__members__.keys())[1]], annotation=ClassSelection, widget_type=RadioButtons))
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
-        self._save_destination = FileEdit(value='annotation.csv', mode='r')
+        self._save_destination = FileEdit(value=f'annotation.csv', mode='r')
         self._save_annotation = PushButton(label="Save Annotations")
         self._save_annotation.clicked.connect(self._on_save_clicked)
+        self._update_save_destination(self._lbl_combo.value)
         super().__init__(widgets=[
             self._lbl_combo, 
             self._class_selector, 
@@ -67,8 +77,10 @@ class LabelAnnotator(Container):
             self._save_annotation
         ])
 
+    #TODO: Can we do a better separation of concerns (i. e. initializing label_layer.features['annotation'] vs. setting up keybindings)?
     def _init_annotation(self, label_layer: napari.layers.Labels):
         self._select_layer(label_layer)
+        # print(self._save_destination)
         
         if 'annotations' in label_layer.features:
             self.reset_annotation_colormaps()
@@ -105,16 +117,20 @@ class LabelAnnotator(Container):
         for i in range(len(self.ClassSelection)):
             set_class = partial(set_class_n, n=i)
             set_class.__name__ = f'set_class_{i}'
-            self._lbl_combo.value.bind_key(str(i), set_class)
+            self._lbl_combo.value.bind_key(str(i), set_class, overwrite=True)
         #     set_class = partial(set_class_n, n=i)
         #     self.label_layer.bind_key(str(i), set_class)
+        
+    def _update_save_destination(self, label_layer: napari.layers.Labels):
+        self._save_destination.value = f'annotation_{label_layer.name}.csv'
 
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
         self._init_annotation(label_layer)
+        self._update_save_destination(label_layer)
         # set your internal annotation layer here.
 
-    #FIXME: Currently only works for <4 classes.
+    #FIXME: Currently only works for <4 classes. Add more colors and make sure the logic still works.
     def reset_annotation_colormaps(self):
         """
         Reset the colormap based on the annotations in 
