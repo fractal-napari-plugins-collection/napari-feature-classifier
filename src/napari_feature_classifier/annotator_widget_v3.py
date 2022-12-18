@@ -38,11 +38,11 @@ def get_class_selection(n_classes: Optional[int] = 4, class_names: Optional[Sequ
     ClassSelection = Enum('ClassSelection', {'NoClass': np.nan, **{c: i+1 for i, c in enumerate(class_names)}})
     return ClassSelection
 
-#TODO: We might not wanna pass the ClassSelection enum but `n_classes` or `class_names` instead & call get_class_selection internally.$
+#TODO: We might not wanna pass the ClassSelection enum but `n_classes` or `class_names` instead & call get_class_selection internally.
 #TODO: All label layers (at the creation of the widget) are set to ´editable = False´ to make sure there's no weird interactions with label-layer functionality. Should this apply
 #      to all label layers that are created while the plug-in extists and be reset when closing?
 #TODO: Make sure user feedback (like "no label clicked.") ends up in the right place (i. e. the viewer info-bar).
-#TODO: Remove the _lbl_combo box and only rely on layer selection in the viewer. Also double check that relevant callbacks are only called once or don't create performance bottlenecks.
+#TODO: Remove the _lbl_combo box and only rely on layer selection in the viewer. This could solve a second issue that changes of the label layer name don't end up in the _lbl_combo box.
 class LabelAnnotator(Container):
     def __init__(self, viewer: napari.viewer.Viewer, ClassSelection=get_class_selection(n_classes=4)):
         self._viewer = viewer
@@ -130,7 +130,7 @@ class LabelAnnotator(Container):
         self._update_save_destination(label_layer)
         # set your internal annotation layer here.
 
-    #FIXME: Currently only works for <4 classes. Add more colors and make sure the logic still works.
+    #FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
     def reset_annotation_colormaps(self):
         """
         Reset the colormap based on the annotations in 
@@ -164,8 +164,9 @@ class LabelAnnotator(Container):
             self._lbl_combo.value = self._viewer.layers.selection._current
         else:
             return
-        self._lbl_combo.value = self._viewer.layers.selection._current
+        # self._lbl_combo.value = self._viewer.layers.selection._current
 
+    #TODO: Add user feedback in the viewer after annotations are saved.
     def _on_save_clicked(self):
         annotations = self._lbl_combo.value.features['annotations']
         df = pd.DataFrame(annotations)
