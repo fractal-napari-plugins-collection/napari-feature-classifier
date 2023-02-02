@@ -127,16 +127,12 @@ class LabelAnnotator(Container):
 
     # TODO: Can we do a better separation of concerns (i. e. initializing label_layer.features['annotation'] vs. setting up keybindings)?
     def _init_annotation(self, label_layer: napari.layers.Labels):
+        if "annotations" not in label_layer.features:
+            unique_labels = np.unique(label_layer.data)[1:]
+            label_layer.features["annotations"] = pd.Series(
+                [np.NaN] * len(unique_labels), index=unique_labels, dtype=int
+            )
         self._select_layer(label_layer)
-        # print(self._save_destination)
-
-        if "annotations" in label_layer.features:
-            self.reset_annotation_colormaps()
-            return
-        unique_labels = np.unique(label_layer.data)[1:]
-        label_layer.features["annotations"] = pd.Series(
-            [np.NaN] * len(unique_labels), index=unique_labels, dtype=int
-        )
         self.reset_annotation_colormaps()
         self._update_annotation_layer_name(label_layer)
 
@@ -179,7 +175,9 @@ class LabelAnnotator(Container):
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
     def _update_annotation_layer_name(self, label_layer: napari.layers.Labels):
-        self._annotations_layer.name = f"'{label_layer.name}' annotations"
+        self._annotations_layer.name = (
+            "Annotations"  # f"'{label_layer.name}' annotations"
+        )
 
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
