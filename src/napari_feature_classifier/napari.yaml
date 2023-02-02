@@ -8,18 +8,13 @@ contributions:
     - id: napari-feature-classifier.load_classifier
       python_name: napari_feature_classifier.classifier_widgets:load_classifier
       title: Load a Classifier
-    - id: napari-feature-classifier.annotator_widget
-      python_name: napari_feature_classifier.annotator_widget:LabelAnnotator
-      title: Annotator
     - id: napari-feature-classifier.annotator_init_widget
       python_name: napari_feature_classifier.annotator_init_widget:InitializeLabelAnnotator
-      title: Init Annotator
+      title: Annotator
   widgets:
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
     - command: napari-feature-classifier.load_classifier
       display_name: Load Classifier
-    - command: napari-feature-classifier.annotator_widget
-      display_name: Annotator
     - command: napari-feature-classifier.annotator_init_widget
-      display_name: Init Annotator
+      display_name: Annotator

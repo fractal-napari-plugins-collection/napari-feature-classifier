@@ -2,10 +2,8 @@ import math
 import warnings
 from enum import Enum
 from functools import partial
-from pathlib import Path
 from typing import Optional, Sequence, cast
 
-import matplotlib
 import napari
 import napari.layers
 import napari.viewer
@@ -19,32 +17,9 @@ from magicgui.widgets import (
     RadioButtons,
     create_widget,
 )
+from matplotlib.cm import get_cmap
 from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
-
-
-def main():
-    import imageio
-
-    lbls = imageio.v2.imread("sample_data/test_labels.tif")
-    viewer = napari.Viewer()
-    viewer.add_labels(lbls)
-    viewer.add_labels(lbls, name="lbls2")
-    widget = viewer.window.add_dock_widget(
-        LabelAnnotator(
-            viewer,
-            get_class_selection(
-                class_names=[
-                    "early M",
-                    "late M",
-                    "early S",
-                    "mid S",
-                    "late S",
-                ]
-            ),
-        )
-    )
-    viewer.show(block=True)
 
 
 def get_class_selection(
@@ -186,9 +161,7 @@ class LabelAnnotator(Container):
         """
         Generates colormaps depending on the number of classes
         """
-        new_colors = np.array(
-            matplotlib.cm.get_cmap(matplotlib_colormap).colors
-        ).astype(np.float32)
+        new_colors = np.array(get_cmap(matplotlib_colormap).colors).astype(np.float32)
         cmap_np = np.zeros(
             shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
         )
@@ -234,7 +207,6 @@ class LabelAnnotator(Container):
             return
         # self._lbl_combo.value = self._viewer.layers.selection._current
 
-    # TODO: Add user feedback in the viewer after annotations are saved.
     def _on_save_clicked(self):
         annotations = self._lbl_combo.value.features["annotations"]
         df = pd.DataFrame(annotations)
@@ -247,7 +219,4 @@ class LabelAnnotator(Container):
 
         df["annotation_names"] = class_names
         df.to_csv(self._save_destination.value)
-
-
-if __name__ == "__main__":
-    main()
+        show_info(f'Annotations were saved at {self._save_destination.value}')
