@@ -100,16 +100,9 @@ class LabelAnnotator(Container):
 
         # Class selection
         self.ClassSelection = ClassSelection
-        self._class_selector = cast(
-            RadioButtons,
-            create_widget(
-                value=self.ClassSelection[
-                    list(self.ClassSelection.__members__.keys())[1]
-                ],
-                annotation=self.ClassSelection,
-                widget_type=RadioButtons,
-            ),
-        )
+        self.nb_classes = len(self.ClassSelection) - 1
+        self.cmap = self.get_colormap()
+        self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection[list(ClassSelection.__members__.keys())[1]], annotation=ClassSelection, widget_type=RadioButtons))
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
         self._save_destination = FileEdit(value=f"annotation.csv", mode="r")
@@ -158,10 +151,9 @@ class LabelAnnotator(Container):
                 label
             ] = self._class_selector.value.value
 
-            # FIXME: Joel => Don't reset the whole colormap, just update a single color
-            # Waiting for update on the napari 0.4.17 issue that breaks this option
-            self.reset_annotation_colormaps()
-
+            # Update only the single color value that changed
+            self.update_single_color(label)
+        
         def set_class_n(layer, n: int):
             self._class_selector.value = self.ClassSelection[
                 list(self.ClassSelection.__members__)[n]
@@ -184,14 +176,12 @@ class LabelAnnotator(Container):
         self._update_save_destination(label_layer)
         # set your internal annotation layer here.
 
-    # FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
-    # TODO: Let's increase the max number to 9 (=> keybinding) and check that max number classes is <=9
-    def reset_annotation_colormaps(self):
+    def get_colormap(self):
         """
-        Reset the colormap based on the annotations in
-        label_layer.features['annotation'] and sends the updated colormap
-        to the annotation label layer
+        Generates colormaps depending on the number of classes
         """
+        # TODO: Pick better colors
+        # TODO: Make it read the self.nb_classes and follow that
         cmap = ListedColormap(
             [
                 (0.0, 0.0, 0.0, 0.0),
@@ -199,16 +189,31 @@ class LabelAnnotator(Container):
                 (0.0, 1.0, 0.0, 1.0),
                 (0.0, 0.0, 1.0, 1.0),
                 (1.0, 0.0, 1.0, 1.0),
+                (1.0, 1.0, 0.0, 1.0),
             ]
         )
-        colors = cmap(
-            self._lbl_combo.value.features["annotations"] / 5
-        )  # self.nb_classes
+        return cmap
+
+    #FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
+    def reset_annotation_colormaps(self):
+        """
+        Reset the colormap based on the annotations in 
+        label_layer.features['annotation'] and sends the updated colormap 
+        to the annotation label layer
+        """
+        colors = self.cmap(self._lbl_combo.value.features['annotations'] / self.nb_classes) # self.nb_classes
         colordict = dict(zip(self._lbl_combo.value.features.index, colors))
         self._annotations_layer.color = colordict
-        self._annotations_layer.opacity = 1.0
-        self._annotations_layer.color_mode = "direct"
+        self._annotations_layer.opacity=1.0
+        self._annotations_layer.color_mode = 'direct'
 
+    def update_single_color(self, label):
+        color = self.cmap(self._lbl_combo.value.features['annotations'][label] / self.nb_classes) # self.nb_classes
+        self._annotations_layer.color[label] = color
+        self._annotations_layer.opacity=1.0
+        self._annotations_layer.color_mode = 'direct'
+
+    
     def _select_layer(self, label_layer: napari.layers.Labels):
         print("selecting layer...")
         self._viewer.layers.selection.clear()
