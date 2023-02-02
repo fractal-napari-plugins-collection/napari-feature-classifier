@@ -102,7 +102,14 @@ class LabelAnnotator(Container):
         self.ClassSelection = ClassSelection
         self.nb_classes = len(self.ClassSelection) - 1
         self.cmap = self.get_colormap()
-        self._class_selector = cast(RadioButtons, create_widget(value = ClassSelection[list(ClassSelection.__members__.keys())[1]], annotation=ClassSelection, widget_type=RadioButtons))
+        self._class_selector = cast(
+            RadioButtons,
+            create_widget(
+                value=ClassSelection[list(ClassSelection.__members__.keys())[1]],
+                annotation=ClassSelection,
+                widget_type=RadioButtons,
+            ),
+        )
         self._init_annotation(self._lbl_combo.value)
         self._viewer.layers.selection.events.changed.connect(self._active_changed)
         self._save_destination = FileEdit(value=f"annotation.csv", mode="r")
@@ -153,7 +160,7 @@ class LabelAnnotator(Container):
 
             # Update only the single color value that changed
             self.update_single_color(label)
-        
+
         def set_class_n(layer, n: int):
             self._class_selector.value = self.ClassSelection[
                 list(self.ClassSelection.__members__)[n]
@@ -194,26 +201,29 @@ class LabelAnnotator(Container):
         )
         return cmap
 
-    #FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
+    # FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
     def reset_annotation_colormaps(self):
         """
-        Reset the colormap based on the annotations in 
-        label_layer.features['annotation'] and sends the updated colormap 
+        Reset the colormap based on the annotations in
+        label_layer.features['annotation'] and sends the updated colormap
         to the annotation label layer
         """
-        colors = self.cmap(self._lbl_combo.value.features['annotations'] / self.nb_classes) # self.nb_classes
+        colors = self.cmap(
+            self._lbl_combo.value.features["annotations"] / self.nb_classes
+        )  # self.nb_classes
         colordict = dict(zip(self._lbl_combo.value.features.index, colors))
         self._annotations_layer.color = colordict
-        self._annotations_layer.opacity=1.0
-        self._annotations_layer.color_mode = 'direct'
+        self._annotations_layer.opacity = 1.0
+        self._annotations_layer.color_mode = "direct"
 
     def update_single_color(self, label):
-        color = self.cmap(self._lbl_combo.value.features['annotations'][label] / self.nb_classes) # self.nb_classes
+        color = self.cmap(
+            self._lbl_combo.value.features["annotations"][label] / self.nb_classes
+        )  # self.nb_classes
         self._annotations_layer.color[label] = color
-        self._annotations_layer.opacity=1.0
-        self._annotations_layer.color_mode = 'direct'
+        self._annotations_layer.opacity = 1.0
+        self._annotations_layer.color_mode = "direct"
 
-    
     def _select_layer(self, label_layer: napari.layers.Labels):
         print("selecting layer...")
         self._viewer.layers.selection.clear()
