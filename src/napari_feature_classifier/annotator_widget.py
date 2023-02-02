@@ -46,8 +46,8 @@ def get_class_selection(
     return ClassSelection
 
 
-# TODO: Init widget for specifying class names & number.
 # TODO: Think about what happens when the widget is closed
+# TODO: Make sure annotation layer can't be selected in the `self._lbl_combo`.
 class LabelAnnotator(Container):
     def __init__(
         self,
@@ -224,4 +224,4 @@ class LabelAnnotator(Container):
 
         df["annotation_names"] = class_names
         df.to_csv(self._save_destination.value)
-        show_info(f'Annotations were saved at {self._save_destination.value}')
+        show_info(f"Annotations were saved at {self._save_destination.value}")
