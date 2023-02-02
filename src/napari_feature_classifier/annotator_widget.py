@@ -197,12 +197,15 @@ class LabelAnnotator(Container):
         self._viewer.layers.selection.add(label_layer)
 
     def _active_changed(self, event):
-        current_layer = self._viewer.layers.selection._current
+        current_layer_proxy = self._viewer.layers.selection.active
+        if current_layer_proxy is None:
+            return
+
         if (
-            type(current_layer) is napari.layers.Labels
-            and current_layer.name != "Annotations"
+            current_layer_proxy.__class__ == napari.layers.Labels
+            and current_layer_proxy.name != "Annotations"
         ):
-            self._lbl_combo.value = self._viewer.layers.selection._current
+            self._lbl_combo.value = self._viewer.layers.selection.active
         else:
             return
         # self._lbl_combo.value = self._viewer.layers.selection._current
