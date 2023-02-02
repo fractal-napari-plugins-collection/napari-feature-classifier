@@ -104,6 +104,8 @@ class LabelAnnotator(Container):
                 index=unique_labels,
             )
         self._lbl_combo.value.opacity = 0.4
+        self._annotations_layer.data = label_layer.data
+        self._annotations_layer.scale = label_layer.scale
         self._select_layer(label_layer)
         self.reset_annotation_colormaps()
         self._update_annotation_layer_name(label_layer)
