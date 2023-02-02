@@ -138,6 +138,7 @@ class LabelAnnotator(Container):
             [np.NaN] * len(unique_labels), index=unique_labels, dtype=int
         )
         self.reset_annotation_colormaps()
+        self._update_annotation_layer_name(label_layer)
 
         @self._lbl_combo.value.mouse_drag_callbacks.append
         def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
@@ -177,10 +178,14 @@ class LabelAnnotator(Container):
     def _update_save_destination(self, label_layer: napari.layers.Labels):
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
+    def _update_annotation_layer_name(self, label_layer: napari.layers.Labels):
+        self._annotations_layer.name = f"'{label_layer.name}' annotations"
+
     def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
         print("Label layer changed", label_layer)
         self._init_annotation(label_layer)
         self._update_save_destination(label_layer)
+        self._update_annotation_layer_name(label_layer)
         # set your internal annotation layer here.
 
     def get_colormap(self):
