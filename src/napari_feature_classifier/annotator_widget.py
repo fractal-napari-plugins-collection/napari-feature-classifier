@@ -1,223 +1,253 @@
-"""Annotator widget code."""
-import os
+import math
 import warnings
+from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional, Sequence, cast
 
-import h5py
 import matplotlib
 import napari
+import napari.layers
+import napari.viewer
 import numpy as np
 import pandas as pd
-from magicgui import widgets
+from magicgui.widgets import (
+    ComboBox,
+    Container,
+    FileEdit,
+    PushButton,
+    RadioButtons,
+    create_widget,
+)
 from matplotlib.colors import ListedColormap
-from napari.layers.labels import Labels
-from qtpy.QtWidgets import QMessageBox  # pylint: disable-msg=E0611
-
-from src.napari_feature_classifier.utils import napari_info
+from napari.utils.notifications import show_info
 
 
 def main():
-    img = np.random.randint(255, size=(100, 100))
-    lbl = np.zeros_like(img)
-    lbl[10:20, 10:20] = 1
-    lbl[40:50, 40:50] = 2
-    lbl[30:40, 80:90] = 4
-    # fn = Path(r"Z:\hmax\Zebrafish\20211119_cyclerDATA_compressed\20211119_ABpanelTestset_3pair_3.5h_1_s6.h5")
-    # with h5py.File(fn) as f:
-    #     lbl = f['lbl_nuc'][...]
-    #     img = f['ch_03/0'][...]
+    import imageio
 
+    lbls = imageio.v2.imread("sample_data/test_labels.tif")
     viewer = napari.Viewer()
-    viewer.add_image(name='img', data=img)
-    labels_layer = viewer.add_labels(name='lbl', data=lbl)
-
-    widget = AnnotatorWidget(labels_layer, viewer, n_classes=3,
-                             class_names=('M before division', 'M after division', 'S puncta', 'S high'))
-
+    viewer.add_labels(lbls)
+    viewer.add_labels(lbls, name="lbls2")
+    widget = viewer.window.add_dock_widget(
+        LabelAnnotator(
+            viewer,
+            get_class_selection(
+                class_names=[
+                    "early M",
+                    "late M",
+                    "early S",
+                    "mid S",
+                    "late S",
+                ]
+            ),
+        )
+    )
     viewer.show(block=True)
 
 
-class AnnotatorWidget:
-    """Widget to assign labels in a labelimage to a class."""
-
-    #TODO: Don't pass viewer.
-    def __init__(self,
-                 label_layer: Labels,
-                 viewer: napari.Viewer,
-                 n_classes: int = 2,
-                 class_names: Optional[Sequence[str]] = None,
-                 ):
-        self.label_layer = label_layer
-        self.label_layer.editable = False
-        self.viewer = viewer
-        self.cmap = ListedColormap([[0.0, 0.0, 0.0, 0.0]] + list(matplotlib.cm.get_cmap('Set1').colors))
-
-        if class_names is None:
-            self.n_classes = n_classes
-            self.class_names = [f'Class {i + 1}' for i in range(n_classes)]
-        if class_names is not None:
-            if len(class_names) != n_classes and n_classes is not None:
-                napari_info(f"Value provided for `n_classes` ({n_classes}) does not match the length of \
-                            `class_names` ({len(class_names)}). Setting n_classes to {len(class_names)}")
-            self.n_classes = len(class_names)
-            self.class_names = list(class_names)
-
-        self.annotations = pd.Series(index=np.unique(label_layer.data)[1:], name='annotations', dtype=pd.Int64Dtype)
-        self.annotations.index.name = 'Label'
-
-
-        # Create annotation layer (overwriting existing ones).
-        if "annotation" in viewer.layers:
-            viewer.layers.remove("annotation")
-        self.annotation_layer = viewer.add_labels(
-            label_layer.data, name="annotation", opacity=1.0, scale=label_layer.scale, translate=label_layer.translate,
+def get_class_selection(
+    n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
+) -> Enum:
+    if n_classes is None and class_names is None:
+        raise ValueError("Provide either `n_classes` or a list of `class_names`")
+    if class_names is None:
+        class_names = [f"Class_{i+1}" for i in range(n_classes)]
+    if n_classes is None:
+        n_classes = len(class_names)
+    if n_classes != len(class_names):
+        warnings.warn(
+            f"Value provided for `n_classes` ({n_classes}) does not match the length of `class_names` ({len(class_names)}). Setting n_classes to {len(class_names)}"
         )
-        self.annotation_layer.color[None] = np.array([0, 0, 0, 0.001], dtype=np.float32)
-        self.annotation_layer.color_mode = 'direct'
-        self.annotation_layer.editable = False
+    assert len(class_names) == len(
+        set(class_names)
+    ), f"{class_names=} contains duplicate entries!"
 
-        widget = self.create_annotator_widget()
-        viewer.window.add_dock_widget(widget, area="right", name=f"Annotator: {self.name}")
+    ClassSelection = Enum(
+        "ClassSelection",
+        {"NoClass": np.nan, **{c: i + 1 for i, c in enumerate(class_names)}},
+    )
+    return ClassSelection
 
-    def create_annotator_widget(self):  # pylint: disable-msg=R0915
-        """
-        Creates the annotator widget to choose a current class and export annotations.
 
-        Parameters
-        ----------
-        label_layer: napari.layers.Labels
-            The napari label layer on which objects shall be classified
-        """
-        # TODO: Ability dynamically change the names (and number) of classes (instead of having to provide
-        #  them at initialization)?
-        choices = ["Deselect"] + self.class_names
-        selector = widgets.RadioButtons(
-            choices=choices, label="Selection Class:", value=choices[1]
+# TODO: Init widget for specifying class names & number.
+# TODO: Think about what happens when the widget is closed
+class LabelAnnotator(Container):
+    def __init__(
+        self,
+        viewer: napari.viewer.Viewer,
+        ClassSelection=get_class_selection(n_classes=4),
+    ):
+        self._viewer = viewer
+
+        self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
+        self._lbl_combo.changed.connect(self._on_label_layer_changed)
+
+        self._annotations_layer = self._viewer.add_labels(
+            self._lbl_combo.value.data,
+            scale=self._lbl_combo.value.scale,
+            name="Annotations",
         )
-        export_path = widgets.FileEdit(
-            value=Path.cwd() / f"{self.name}_annotations.csv",
-            label="Export Name:",
-            mode="w",
-            filter="*.csv",
+
+        for layer in self._viewer.layers:
+            if isinstance(layer, napari.layers.Labels):
+                layer.editable = False
+
+        # Class selection
+        self.ClassSelection = ClassSelection
+        self.nb_classes = len(self.ClassSelection) - 1
+        self.cmap = self.get_colormap()
+        self._class_selector = cast(
+            RadioButtons,
+            create_widget(
+                value=ClassSelection[list(ClassSelection.__members__.keys())[1]],
+                annotation=ClassSelection,
+                widget_type=RadioButtons,
+            ),
         )
-        export_button = widgets.PushButton(value=True, text="Export Annotations")
-        container = widgets.Container(
+        self._init_annotation(self._lbl_combo.value)
+        self._viewer.layers.selection.events.changed.connect(self._active_changed)
+        self._save_destination = FileEdit(value=f"annotation.csv", mode="r")
+        self._save_annotation = PushButton(label="Save Annotations")
+        self._save_annotation.clicked.connect(self._on_save_clicked)
+        self._update_save_destination(self._lbl_combo.value)
+        super().__init__(
             widgets=[
-                selector,
-                export_path,
-                export_button,
+                self._lbl_combo,
+                self._class_selector,
+                self._save_destination,
+                self._save_annotation,
             ]
         )
 
-        @self.label_layer.mouse_drag_callbacks.append
-        def toggle_label(_, event):  # pylint: disable-msg=W0613
-            """
-            Handles user annotations by setting the corresponding classifier
-            variables and changing the
-            """
-            self.annotation_layer.visible = True
+    def _init_annotation(self, label_layer: napari.layers.Labels):
+        if "annotations" not in label_layer.features:
+            unique_labels = np.unique(label_layer.data)[1:]
+            label_layer.features["annotations"] = pd.Series(
+                [np.NaN] * len(unique_labels),
+                index=unique_labels,
+            )
+        self._lbl_combo.value.opacity = 0.4
+        self._select_layer(label_layer)
+        self.reset_annotation_colormaps()
+        self._update_annotation_layer_name(label_layer)
+
+        @self._lbl_combo.value.mouse_drag_callbacks.append
+        def toggle_label(labels_layer, event):  # pylint: disable-msg=W0613
             # Need to scale position that event.position returns by the
             # label_layer scale.
             # If scale is (1, 1, 1), nothing changes
             # If scale is anything else, this makes the click still match the
             # correct label
             scaled_position = tuple(
-                pos / scale for pos, scale in zip(event.position, self.label_layer.scale)
+                pos / scale for pos, scale in zip(event.position, labels_layer.scale)
             )
-            label = self.label_layer.get_value(scaled_position)
-            if selector.value is None:
-                napari_info(
-                    "No class is selected. Select a class in the classifier widget."
-                )
+            label = labels_layer.get_value(scaled_position)
+            if label == 0 or not label:
+                show_info("No label clicked.")
                 return
-            # Check if background or foreground was clicked. If background was
-            # clicked, do nothing (background can't be assigned a class)
-            if label == 0 or label is None:
-                napari_info("No label clicked.")
-                return
-            self.annotations[label] = choices.index(selector.value)
-            self.update_annotation_colormap(label, choices.index(selector.value))
 
-        @selector.changed.connect
-        def change_choice():
-            self.annotation_layer.visible = True
-            self.viewer.layers.selection.clear()
-            # This doesn't work during testing
-            try:
-                self.viewer.layers.selection.add(self.label_layer)
-            except ValueError:
-                pass
+            label_layer.features["annotations"].loc[
+                label
+            ] = self._class_selector.value.value
 
-        @export_button.changed.connect
-        def export_annotations():
-            if not str(export_path.value).endswith(".csv"):
-                warnings.warn(
-                    "The export path does not lead to a .csv file. This "
-                    "export function will export in .csv format anyway"
-                )
+            # Update only the single color value that changed
+            self.update_single_color(label)
 
-            # Check if file already exists
-            if os.path.exists(Path(export_path.value)):
-                msg_box = QMessageBox()
-                msg_box.setText(
-                    f"A csv export with the name {Path(export_path.value).name}"
-                    " already exists. This will overwrite it."
-                )
-                msg_box.setWindowTitle("Overwrite Export?")
-                msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-                answer = msg_box.exec()
-                if answer == QMessageBox.Cancel:
-                    return
-            napari_info("Exporting classifier results")
+        def set_class_n(layer, n: int):
+            self._class_selector.value = self.ClassSelection[
+                list(self.ClassSelection.__members__)[n]
+            ]
 
-            self.annotations.to_csv(export_path.value)
-
-        @self.label_layer.bind_key("b", overwrite=True)
-        def toggle_selection_layer_visibility(layer):  # pylint: disable-msg=W0613
-            self.annotation_layer.visible = not self.annotation_layer.visible
-
-        @self.label_layer.bind_key("v", overwrite=True)
-        def toggle_label_layer_visibility(layer):
-            # Only set opacity to 0. Otherwise layer is not clickable anymore.
-            if self.label_layer.opacity > 0:
-                self.label_layer.opacity = 0.0
-            else:
-                self.label_layer.opacity = 0.8
-
-        def set_class_n(event, n):
-            selector.value = choices[n]
-            change_choice()
-
-        # keybindings for the available classes (0 = deselect)
-        for i in range(self.n_classes + 1):
+        # # keybindings for the available classes (0 = deselect)
+        for i in range(len(self.ClassSelection)):
             set_class = partial(set_class_n, n=i)
-            self.label_layer.bind_key(str(i), set_class)
+            set_class.__name__ = f"set_class_{i}"
+            self._lbl_combo.value.bind_key(str(i), set_class, overwrite=True)
+        #     set_class = partial(set_class_n, n=i)
+        #     self.label_layer.bind_key(str(i), set_class)
 
-        return container
+    def _update_save_destination(self, label_layer: napari.layers.Labels):
+        self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
-    def update_annotation_colormap(self, label, new_class):
+    def _update_annotation_layer_name(self, label_layer: napari.layers.Labels):
+        self._annotations_layer.name = (
+            "Annotations"  # f"'{label_layer.name}' annotations"
+        )
+
+    def _on_label_layer_changed(self, label_layer: napari.layers.Labels):
+        self._init_annotation(label_layer)
+        self._update_save_destination(label_layer)
+        self._update_annotation_layer_name(label_layer)
+        # set your internal annotation layer here.
+
+    def get_colormap(self, matplotlib_colormap="Set1"):
         """
-        Updates the label colormap and sends the updated colormap to the label
-        layer
-
-        Parameters
-        ----------
-        label: int
-            The label value that is being updated
-        new_class: int
-            The new class annotation that is being set
+        Generates colormaps depending on the number of classes
         """
-        if label == 0 or label is None:
-            return
-        if new_class == 0:
-            if label in self.annotation_layer.color.keys():
-                self.annotation_layer.color.pop(label)
+        new_colors = np.array(
+            matplotlib.cm.get_cmap(matplotlib_colormap).colors
+        ).astype(np.float32)
+        cmap_np = np.zeros(
+            shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
+        )
+        cmap_np[1:, :-1] = new_colors
+        cmap_np[1:, -1] = 1
+        cmap = ListedColormap(cmap_np)
+        return cmap
+
+    def reset_annotation_colormaps(self):
+        """
+        Reset the colormap based on the annotations in
+        label_layer.features['annotation'] and sends the updated colormap
+        to the annotation label layer
+        """
+        colors = self.cmap(
+            self._lbl_combo.value.features["annotations"] / len(self.cmap.colors)
+        )
+        colordict = dict(zip(self._lbl_combo.value.features.index, colors))
+        self._annotations_layer.color = colordict
+        self._annotations_layer.opacity = 1.0
+        self._annotations_layer.color_mode = "direct"
+
+    def update_single_color(self, label):
+        color = self.cmap(
+            self._lbl_combo.value.features["annotations"][label] / len(self.cmap.colors)
+        )
+        self._annotations_layer.color[label] = color
+        self._annotations_layer.opacity = 1.0
+        self._annotations_layer.color_mode = "direct"
+
+    def _select_layer(self, label_layer: napari.layers.Labels):
+        self._viewer.layers.selection.clear()
+        self._viewer.layers.selection.add(label_layer)
+
+    def _active_changed(self, event):
+        current_layer = self._viewer.layers.selection._current
+        if (
+            type(current_layer) is napari.layers.Labels
+            and current_layer.name != "Annotations"
+        ):
+            self._lbl_combo.value = self._viewer.layers.selection._current
         else:
-            self.annotation_layer.color[label] = self.cmap(new_class)
-        self.annotation_layer.color_mode = 'direct'
+            return
+        # self._lbl_combo.value = self._viewer.layers.selection._current
+
+    # TODO: Add user feedback in the viewer after annotations are saved.
+    def _on_save_clicked(self):
+        annotations = self._lbl_combo.value.features["annotations"]
+        df = pd.DataFrame(annotations)
+        class_names = []
+        for annotation in annotations:
+            if math.isnan(annotation):
+                class_names.append(self.ClassSelection(np.NaN).name)
+            else:
+                class_names.append(self.ClassSelection(annotation).name)
+
+        df["annotation_names"] = class_names
+        df.to_csv(self._save_destination.value)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
