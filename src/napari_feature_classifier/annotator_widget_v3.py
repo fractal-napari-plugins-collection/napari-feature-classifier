@@ -19,13 +19,14 @@ from magicgui.widgets import (
     create_widget,
 )
 from matplotlib.colors import ListedColormap
+import matplotlib
 
 
 def main():
     import imageio
 
     lbls = imageio.v2.imread(
-        r"C:\Users\hessm\Documents\Programming\Python\fractal-napari-plugins\napari-feature-classifier\src\napari_feature_classifier\sample_data\test_labels.tif"
+        "sample_data/test_labels.tif"
     )
     viewer = napari.Viewer()
     viewer.add_labels(lbls)
@@ -186,22 +187,15 @@ class LabelAnnotator(Container):
         self._update_annotation_layer_name(label_layer)
         # set your internal annotation layer here.
 
-    def get_colormap(self):
+    def get_colormap(self, matplotlib_colormap = 'Set1'):
         """
         Generates colormaps depending on the number of classes
         """
-        # TODO: Pick better colors
-        # TODO: Make it read the self.nb_classes and follow that
-        cmap = ListedColormap(
-            [
-                (0.0, 0.0, 0.0, 0.0),
-                (1.0, 0.0, 0.0, 1.0),
-                (0.0, 1.0, 0.0, 1.0),
-                (0.0, 0.0, 1.0, 1.0),
-                (1.0, 0.0, 1.0, 1.0),
-                (1.0, 1.0, 0.0, 1.0),
-            ]
-        )
+        new_colors = np.array(matplotlib.cm.get_cmap(matplotlib_colormap).colors).astype(np.float32)
+        cmap_np = np.zeros(shape = (new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32)
+        cmap_np[1:, :-1] = new_colors
+        cmap_np[1:, -1] = 1
+        cmap = ListedColormap(cmap_np)
         return cmap
 
     # FIXME: Currently only works for <4 classes. Add more colors and make sure the mapping logic works independently of the number of classes.
@@ -212,8 +206,8 @@ class LabelAnnotator(Container):
         to the annotation label layer
         """
         colors = self.cmap(
-            self._lbl_combo.value.features["annotations"] / self.nb_classes
-        )  # self.nb_classes
+            self._lbl_combo.value.features["annotations"] / len(self.cmap.colors)
+        )
         colordict = dict(zip(self._lbl_combo.value.features.index, colors))
         self._annotations_layer.color = colordict
         self._annotations_layer.opacity = 1.0
@@ -221,8 +215,8 @@ class LabelAnnotator(Container):
 
     def update_single_color(self, label):
         color = self.cmap(
-            self._lbl_combo.value.features["annotations"][label] / self.nb_classes
-        )  # self.nb_classes
+            self._lbl_combo.value.features["annotations"][label]  / len(self.cmap.colors)
+        )
         self._annotations_layer.color[label] = color
         self._annotations_layer.opacity = 1.0
         self._annotations_layer.color_mode = "direct"
