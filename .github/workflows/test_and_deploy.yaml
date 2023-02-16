@@ -53,6 +53,7 @@ jobs:
       
       - name: Run static analyses
         run: |
+          pip install .
           # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
           python -m pylint --fail-under=8 -f parseable src
 
