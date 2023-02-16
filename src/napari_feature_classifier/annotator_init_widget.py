@@ -33,8 +33,6 @@ class InitializeLabelAnnotator(Container):
         self.viewer.window.add_dock_widget(
             LabelAnnotator(self.viewer, get_class_selection(class_names=class_names))
         )
-        # TODO: Find better way to get hold of the widget pointer
-        init_widget = self.viewer.window._dock_widgets[
-            "Annotator (napari-feature-classifier)"
-        ]
-        self.viewer.window.remove_dock_widget(init_widget)
+        # This closes the initialization dockwidget
+        self.viewer.window.remove_dock_widget(self.native)
+        
