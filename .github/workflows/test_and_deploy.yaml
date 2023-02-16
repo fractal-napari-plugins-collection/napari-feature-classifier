@@ -36,6 +36,11 @@ jobs:
       # these libraries enable testing on Qt on linux
       - uses: tlambert03/setup-qt-libs@v1
 
+      - name: Run static analyses
+        run: |
+          # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
+          python -m pylint --fail-under=8 -f parseable src
+
       # strategy borrowed from vispy for installing opengl libs on windows
       - name: Install Windows OpenGL
         if: runner.os == 'Windows'
