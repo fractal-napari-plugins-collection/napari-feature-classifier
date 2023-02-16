@@ -54,6 +54,25 @@ There is a simple workflow for the classifier in the examples folder:
 - Follow the instructions to generate an example dataframe and an example label image
 - Use the classifier in napari with this simplified data
 
+## Refactored Classifier
+We're currently in the process of refactoring the classifier code to make it more modular. As a first step, we have created a separate Annotator widget that is already available in version 0.0.2 of the classifier. The current classifier doesn't make use of these annotations yet, so only use the new annotator widget if you need annotation only. We are refactoring the classifier to also work with this and will release the refactored classifier later.
+
+#### Initializing the new Annotator
+Start the annotator widget by going to `Plugins -> napari-feature-classifier -> Annotator`
+Select names for your classes. You can name up to 9 classes. Only classes that you give a name will be created upon initialization.
+Then click `Initialize`.
+
+<img width="1411" alt="Screenshot 2023-02-16 at 14 49 38" src="https://user-images.githubusercontent.com/18033446/219384524-9873bd66-270b-4cdd-b913-60d390f6c77a.png">
+
+A new annotator widget opens. Use the Radio-Buttons to select what class you're annotating (or keybindings for 1-9 for classes, 0 for deselect).
+The annotator will always work on the currently selected label layer. While the annotator is open, you can't edit the labels. Restart napari to allow editing of labels again.
+
+<img width="1411" alt="Screenshot 2023-02-16 at 14 50 00" src="https://user-images.githubusercontent.com/18033446/219384925-b20e4c1a-2eca-4070-8269-902493c5d5ef.png">
+
+The annotations are saved in the `layer.features` table of the corresponding label layer as an `annotations` column.
+<img width="1411" alt="Screenshot 2023-02-16 at 15 01 01" src="https://user-images.githubusercontent.com/18033446/219385788-f61bd0a5-fbb6-42d7-81e5-f77ee4d1b4ff.png">
+
+
 ## Installation
 
 This plugin is written for the new napari npe2 plugin engine. Thus, it requires napari >= 0.4.13.
