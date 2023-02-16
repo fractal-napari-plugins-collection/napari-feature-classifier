@@ -17,7 +17,8 @@ from magicgui.widgets import (
     RadioButtons,
     create_widget,
 )
-from matplotlib.cm import get_cmap
+#from matplotlib.cm import get_cmap
+import matplotlib
 from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
 
@@ -163,7 +164,7 @@ class LabelAnnotator(Container):
         """
         Generates colormaps depending on the number of classes
         """
-        new_colors = np.array(get_cmap(matplotlib_colormap).colors).astype(np.float32)
+        new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(np.float32)
         cmap_np = np.zeros(
             shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
         )
