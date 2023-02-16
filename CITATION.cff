@@ -5,9 +5,6 @@ title: 'napari-feature-classifier: An interactive classifier plugin to use with 
 url: https://github.com/fractal-napari-plugins-collection/napari-feature-classifier
 authors:
 - given-names: Joel
-  family-names: "L\xFCthi"
-- given-names: 'MaksHess  # We cannot split your name automatically bewteen ''given-names''
-    and ''family-names'', we apologize for that. Please do it manually'
-- given-names: 'Giuseppe Piero Brandino  # We cannot split your name automatically
-    bewteen ''given-names'' and ''family-names'', we apologize for that. Please do
-    it manually'
+  family-names: "Lüthi"
+- given-names: Maks
+  family-names: Hess
