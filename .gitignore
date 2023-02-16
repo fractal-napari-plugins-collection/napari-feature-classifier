@@ -85,3 +85,4 @@ venv/
 
 # Classifier files
 *.clf
+*.csv

@@ -1,6 +1,6 @@
 """ Tests for 3 core dock widgets to see if their initialization generates errors"""
-import numpy as np
 from pathlib import Path
+import numpy as np
 import pandas as pd
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.classifier_widgets import (
@@ -77,7 +77,7 @@ def test_classifier_initialization_widget(make_napari_viewer, capsys):
     # this time, our widget will be a MagicFactory or FunctionGui instance
     # TODO: Figure out how to pass feature selections.
     # Tricky because dataframe must be loaded first for them to be valid?
-    my_widget = initialize_classifier(viewer={'value':viewer},
+    _ = initialize_classifier(viewer={'value':viewer},
                                       label_layer={'choices': [label_layer]},
                                       feature_path={'value':test_df_path},
                                       classifier_name={'value':'test'},
@@ -114,10 +114,11 @@ def test_classifier_loading_widget(make_napari_viewer, capsys):
     #                 'classifier_path': test_classifier_path,
     #                 'feature_path': test_df_path}
     # my_widget = load_classifier(gui_options)
-    print(viewer)
-    print(type(viewer))
-    print(viewer.layers)
-    my_widget = load_classifier(viewer={'value':viewer},
+    # print(viewer)
+    # print(type(viewer))
+    # print(viewer.layers)
+    # my_widget
+    _ = load_classifier(viewer={'value':viewer},
                                 label_layer={'choices': [label_layer]},
                                 classifier_path={'value': test_classifier_path},
                                 feature_path={'value':test_df_path})
