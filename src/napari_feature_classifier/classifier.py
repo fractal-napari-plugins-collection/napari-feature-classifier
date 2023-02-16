@@ -11,8 +11,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 
-from src.napari_feature_classifier.data import ClassifierData
-from src.napari_feature_classifier.utils import napari_info
+from napari_feature_classifier.data import ClassifierData
+from napari_feature_classifier.utils import napari_info
 
 CompatibleEstimators = Union[RandomForestClassifier, LogisticRegression]
 
