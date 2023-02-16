@@ -1,1 +1,9 @@
 summary: An interactive classifier plugin to use with label images and feature measurements
+labels:
+  ontology: EDAM-BIOIMAGING:alpha06
+  terms:
+  - 2D Image # Data Shape
+  - 3D Image # Data Shape
+  - csv # Data Shape
+  - Object classification # Processing step
+  - Fluorescence Microscopy # Imaging Modality
