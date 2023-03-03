@@ -15,8 +15,10 @@ from magicgui.widgets import (
     ComboBox,
     Container,
     FileEdit,
+    LineEdit,
     PushButton,
     RadioButtons,
+    Select,
     TextEdit,
     create_widget,
 )
@@ -29,11 +31,17 @@ from napari_feature_classifier.annotator_widget import (
 
 
 def main():
-    # lbls = imageio.imread(
-    #     r"C:\Users\hessm\Documents\Programming\Python\fractal-napari-plugins\napari-feature-classifier\src\napari_feature_classifier\sample_data\test_labels.tif"
-    # )
+    lbls = imageio.imread(
+        r"C:\Users\hessm\Documents\Programming\Python\fractal-napari-plugins\napari-feature-classifier\src\napari_feature_classifier\sample_data\test_labels.tif"
+    )
     viewer = napari.Viewer()
-    # viewer.add_labels(lbls)
+    lbls_layer = viewer.add_labels(lbls)
+    labels = np.unique(lbls)[1:]
+    rng = np.random.default_rng(seed=42)
+    n_features = 10
+    features = rng.random(size=(len(labels), n_features))
+    print(lbls_layer.features)
+    # viewer.show(block=True)
     widget = ClassifierWidget(viewer)
     viewer.window.add_dock_widget(widget)
     viewer.show(block=True)
@@ -41,8 +49,10 @@ def main():
 
 class ClassifierInitContainer(Container):
     def __init__(self):
-        self._name_edit = TextEdit(value="classifier")
-        self._feature_combobox = ComboBox(choices=self.get_feature_options())
+        self._name_edit = LineEdit(value="classifier")
+        self._feature_combobox = Select(
+            choices=self.get_feature_options(), allow_multiple=True
+        )
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         self._initialize_button = PushButton(text="Initialize")
         super().__init__(
