@@ -85,6 +85,13 @@ If you're looking for other classification approaches, [apoc](https://github.com
 [napari-accelerated-pixel-and-object-classification (APOC)](https://github.com/haesleinhuepf/napari-accelerated-pixel-and-object-classification)  
 Alternatively, Clément Cazorla has built [napari-svetlana, a deep learning based classifier](https://www.napari-hub.org/plugins/napari-svetlana)
 
+## Release process
+1. Update the version number in src/napari-feature-classifier/__init__.py
+2. Update the version in setup.cfg
+3. Add a Github release with a new version tag (matching the version set above)
+4. Once tests pass, this should automatically be deployed to pypi
+5. Wait for conda automation to make a PR for an updated conda release (see https://github.com/conda-forge/napari-feature-classifier-feedstock). This can take 1-2 days. Make sure that PR gets merged.
+
 
 ## Contributing
 
