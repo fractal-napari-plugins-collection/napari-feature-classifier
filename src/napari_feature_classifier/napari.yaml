@@ -9,7 +9,7 @@ contributions:
       python_name: napari_feature_classifier.classifier_widgets:load_classifier
       title: Load a Classifier
     - id: napari-feature-classifier.annotator_init_widget
-      python_name: napari_feature_classifier.annotator_init_widget:InitializeLabelAnnotator
+      python_name: napari_feature_classifier.annotator_init_widget:InitializeLabelAnnotatorWidget
       title: Annotator
   widgets:
     - command: napari-feature-classifier.initialize_classifier

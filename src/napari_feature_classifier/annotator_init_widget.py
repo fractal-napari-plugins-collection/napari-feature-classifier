@@ -23,6 +23,8 @@ class LabelAnnotatorTextSelector(Container):
 
         self._text_edits = tuple([*default_line_edits, *empty_line_edits])
 
+        super().__init__(widgets=[*self._text_edits])
+
     def get_class_names(self):
         class_names = [
             e.value for e in self._text_edits if e.value != ""
@@ -35,9 +37,7 @@ class InitializeLabelAnnotatorWidget(Container):
         self.viewer = viewer
         self.label_class_container = LabelAnnotatorTextSelector(default_n_classes)
         self._init_button = PushButton(label="Initialize")
-        super().__init__(
-            widgets=[*self.label_class_container._text_edits, self._init_button]
-        )
+        super().__init__(widgets=[self.label_class_container, self._init_button])
         self._init_button.clicked.connect(self.initialize_annotator)
 
     def initialize_annotator(self):

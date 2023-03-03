@@ -50,6 +50,7 @@ class ClassifierInitContainer(Container):
                 self._name_edit,
                 self._feature_combobox,
                 self._annotation_name_selector,
+                self._initialize_button,
             ]
         )
 
@@ -75,6 +76,7 @@ class ClassifierWidget(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
         self._init_container = ClassifierInitContainer()
+        print(type(self._init_container))
         super().__init__(widgets=[self._init_container])
         self._init_container._initialize_button.clicked.connect(
             self.initialize_run_widget
