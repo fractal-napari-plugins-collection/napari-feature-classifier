@@ -93,7 +93,11 @@ class ClassifierWidget(Container):
         )
 
     def initialize_run_widget(self):
-        pass
+         class_names = self._init_container._annotation_name_selector.get_class_names()
+         # FIXME: Parse selected features
+         # FIXME: Parse selected name
+         self.close()
+         # self.runner_container = ClassifierRunContainer(self.viewer, class_names)
 
 
 if __name__ == "__main__":
