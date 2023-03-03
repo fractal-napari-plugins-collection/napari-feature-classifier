@@ -4,6 +4,8 @@ from enum import Enum
 from functools import partial
 from typing import Optional, Sequence, cast
 
+# from matplotlib.cm import get_cmap
+import matplotlib
 import napari
 import napari.layers
 import napari.viewer
@@ -17,8 +19,6 @@ from magicgui.widgets import (
     RadioButtons,
     create_widget,
 )
-#from matplotlib.cm import get_cmap
-import matplotlib
 from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
 
@@ -58,7 +58,6 @@ class LabelAnnotator(Container):
         self._viewer = viewer
 
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
-        self._lbl_combo.changed.connect(self._on_label_layer_changed)
 
         self._annotations_layer = self._viewer.add_labels(
             self._lbl_combo.value.data,
@@ -83,10 +82,8 @@ class LabelAnnotator(Container):
             ),
         )
         self._init_annotation(self._lbl_combo.value)
-        self._viewer.layers.selection.events.changed.connect(self._active_changed)
         self._save_destination = FileEdit(value=f"annotation.csv", mode="r")
         self._save_annotation = PushButton(label="Save Annotations")
-        self._save_annotation.clicked.connect(self._on_save_clicked)
         self._update_save_destination(self._lbl_combo.value)
         super().__init__(
             widgets=[
@@ -96,6 +93,9 @@ class LabelAnnotator(Container):
                 self._save_annotation,
             ]
         )
+        self._lbl_combo.changed.connect(self._on_label_layer_changed)
+        self._viewer.layers.selection.events.changed.connect(self._active_changed)
+        self._save_annotation.clicked.connect(self._on_save_clicked)
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
         if "annotations" not in label_layer.features:
@@ -164,7 +164,9 @@ class LabelAnnotator(Container):
         """
         Generates colormaps depending on the number of classes
         """
-        new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(np.float32)
+        new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
+            np.float32
+        )
         cmap_np = np.zeros(
             shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
         )
