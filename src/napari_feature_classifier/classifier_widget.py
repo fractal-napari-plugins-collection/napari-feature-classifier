@@ -83,6 +83,7 @@ class ClassifierInitContainer(Container):
 
 class ClassifierRunContainer(Container):
     def __init__(self, viewer: napari.viewer.Viewer, class_names: list[str]):
+        # Optionally get a classifier object or initialize one
         self._annotator = LabelAnnotator(
             viewer, get_class_selection(class_names=class_names)
         )
@@ -99,6 +100,12 @@ class ClassifierRunContainer(Container):
         self._save_button.clicked.connect(self.save)
 
     def run(self):
+        # TODO: 
+        # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
+        # 2. Update classifier internal feature store
+        # 3. Train the classifier
+        # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
+
         show_info("running classifier...")
 
     def save(self):
@@ -117,6 +124,8 @@ class LoadFeaturesContainer(Container):
 
 
 class LoadClassifierContainer(Container):
+    # TODO: Implement this. Separate container that leads to run
+    # Path to the classifier
     pass
 
 
