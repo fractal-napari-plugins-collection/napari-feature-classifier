@@ -64,7 +64,9 @@ def get_features(labels: Sequence[int], n_features: int = 10, seed: int = 42):
 class ClassifierInitContainer(Container):
     def __init__(self, feature_options: list[str]):
         self._name_edit = LineEdit(value="classifier", label="Classifier Name:")
-        self._feature_combobox = Select(choices=feature_options, allow_multiple=True, label="Feature Selection:")
+        self._feature_combobox = Select(
+            choices=feature_options, allow_multiple=True, label="Feature Selection:"
+        )
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         self._initialize_button = PushButton(text="Initialize")
         super().__init__(
@@ -121,16 +123,23 @@ class LoadClassifierContainer(Container):
 class ClassifierWidget(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
+
+        self._init_container = None
+        self._run_container = None
+
+        super().__init__(widgets=[])
+
+        self.initialize_init_widget()
+
+    def initialize_init_widget(self):
         # Extract features for first label layer
+        # TODO: Handle case where there's no layers.features in the first Labels layer.
         label_layer = [
             l for l in self._viewer.layers if isinstance(l, napari.layers.Labels)
         ][0]
         feature_names = list(label_layer.features.columns)
         self._init_container = ClassifierInitContainer(feature_names)
-        self._run_container = None
-
-        super().__init__(widgets=[self._init_container])
-
+        self.append(self._init_container)
         self._init_container._initialize_button.clicked.connect(
             self.initialize_run_widget
         )
