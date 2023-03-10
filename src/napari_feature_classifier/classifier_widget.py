@@ -52,8 +52,8 @@ def get_features(labels: Sequence[int], n_features: int = 10, seed: int = 42):
 
 class ClassifierInitContainer(Container):
     def __init__(self, feature_options: list[str]):
-        self._name_edit = LineEdit(value="classifier")
-        self._feature_combobox = Select(choices=feature_options, allow_multiple=True)
+        self._name_edit = LineEdit(value="classifier", label="Classifier Name:")
+        self._feature_combobox = Select(choices=feature_options, allow_multiple=True, label="Feature Selection:")
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         self._initialize_button = PushButton(text="Initialize")
         super().__init__(
