@@ -46,9 +46,11 @@ def main():
     lbls_layer2 = viewer.add_labels(lbls2)
 
     lbls_layer.features = get_features(labels, n_features=6)
-    widget = ClassifierWidget(viewer)
-    print(widget)
-    viewer.window.add_dock_widget(widget)
+    classifier_widget = ClassifierWidget(viewer)
+    load_widget = LoadFeaturesContainer()
+
+    viewer.window.add_dock_widget(classifier_widget)
+    viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
     dir(lbls_layer.features)
 
@@ -104,7 +106,14 @@ class ClassifierRunContainer(Container):
 
 
 class LoadFeaturesContainer(Container):
-    pass
+    def __init__(self):
+        self._load_destination = FileEdit(value=f"sample_data/test_df.csv", mode="r")
+        self._load_button = PushButton(label="Load Features")
+        super().__init__(widgets=[self._load_destination, self._load_button])
+        self._load_button.clicked.connect(self.load)
+
+    def load(self):
+        show_info("loading csv...")
 
 
 class LoadClassifierContainer(Container):
