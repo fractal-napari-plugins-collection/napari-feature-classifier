@@ -114,7 +114,6 @@ class LoadClassifierContainer(Container):
 class ClassifierWidget(Container):
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
-        # Extract features for first label layer
 
         self._init_container = None
         self._run_container = None
@@ -124,6 +123,8 @@ class ClassifierWidget(Container):
         self.initialize_init_widget()
 
     def initialize_init_widget(self):
+        # Extract features for first label layer
+        # TODO: Handle case where there's no layers.features in the first Labels layer.
         label_layer = [
             l for l in self._viewer.layers if isinstance(l, napari.layers.Labels)
         ][0]
