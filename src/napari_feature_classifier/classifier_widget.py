@@ -46,13 +46,13 @@ def main():
     lbls_layer2 = viewer.add_labels(lbls2)
 
     lbls_layer.features = get_features(labels, n_features=6)
-    classifier_widget = ClassifierWidget(viewer)
-    load_widget = LoadFeaturesContainer()
+    #classifier_widget = ClassifierWidget(viewer)
+    #load_widget = LoadFeaturesContainer()
 
-    viewer.window.add_dock_widget(classifier_widget)
-    viewer.window.add_dock_widget(load_widget)
+    #viewer.window.add_dock_widget(classifier_widget)
+    #viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
-    dir(lbls_layer.features)
+    #dir(lbls_layer.features)
 
 
 def get_features(labels: Sequence[int], n_features: int = 10, seed: int = 42):
@@ -100,6 +100,7 @@ class ClassifierRunContainer(Container):
         self._save_button.clicked.connect(self.save)
 
     def run(self):
+        # TODO JOEL
         # TODO: 
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
         # 2. Update classifier internal feature store
@@ -124,9 +125,20 @@ class LoadFeaturesContainer(Container):
 
 
 class LoadClassifierContainer(Container):
-    # TODO: Implement this. Separate container that leads to run
-    # Path to the classifier
-    pass
+    def __init__(self):
+        self._clf_destination = FileEdit(mode="r", filter="*.clf")
+        self._load_button = PushButton(label="Load Classifier")
+        super().__init__(widgets=[self._clf_destination, self._load_button])
+        self._load_button.clicked.connect(self.load)
+
+    def load(self):
+        show_info("loading classifier")
+        # FIXME: Load the actual classifier & pass it as an input
+        # FIXME: Get the actual class names as an input
+        class_names = ['Class 1', 'Class 2', 'Class 3']
+        self._run_container = ClassifierRunContainer(self._viewer, class_names)
+        self.clear()
+        self.append(self._run_container)
 
 
 class ClassifierWidget(Container):

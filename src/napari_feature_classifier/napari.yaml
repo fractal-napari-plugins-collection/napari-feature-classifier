@@ -11,6 +11,12 @@ contributions:
     - id: napari-feature-classifier.annotator_init_widget
       python_name: napari_feature_classifier.annotator_init_widget:InitializeLabelAnnotatorWidget
       title: Annotator
+    - id: napari-feature-classifier.initialize_classifier_new
+      python_name: napari_feature_classifier.classifier_widget:ClassifierWidget
+      title: Initialize a Classifier (new)
+    - id: napari-feature-classifier.load_classifier_new
+      python_name: napari_feature_classifier.classifier_widget:LoadClassifierContainer
+      title: Load a Classifier (new)
   widgets:
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
@@ -18,3 +24,7 @@ contributions:
       display_name: Load Classifier
     - command: napari-feature-classifier.annotator_init_widget
       display_name: Annotator
+    - command: napari-feature-classifier.initialize_classifier_new
+      display_name: Initialize a Classifier (new)
+    - command: napari-feature-classifier.load_classifier_new
+      display_name: Load Classifier (new)
