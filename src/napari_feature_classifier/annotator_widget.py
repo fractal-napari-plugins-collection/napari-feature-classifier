@@ -5,7 +5,6 @@ from functools import partial
 from typing import Optional, Sequence, cast
 
 # from matplotlib.cm import get_cmap
-import matplotlib
 import napari
 import napari.layers
 import napari.viewer
@@ -19,10 +18,10 @@ from magicgui.widgets import (
     RadioButtons,
     create_widget,
 )
-from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
 
 from napari_feature_classifier.utils import get_colormap, reset_display_colormaps
+
 
 def get_class_selection(
     n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
@@ -57,7 +56,7 @@ class LabelAnnotator(Container):
         ClassSelection=get_class_selection(n_classes=4),
     ):
         self._viewer = viewer
-        self._label_column = 'label'
+        self._label_column = "label"
 
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
 
@@ -102,22 +101,28 @@ class LabelAnnotator(Container):
     def _init_annotation(self, label_layer: napari.layers.Labels):
         if "annotations" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
-            annotation_df = pd.DataFrame({self._label_column: unique_labels, "annotations": np.NaN})
+            annotation_df = pd.DataFrame(
+                {self._label_column: unique_labels, "annotations": np.NaN}
+            )
             if self._label_column in label_layer.features.columns:
-                label_layer.features = label_layer.features.merge(annotation_df, on=self._label_column, how="outer")
+                label_layer.features = label_layer.features.merge(
+                    annotation_df, on=self._label_column, how="outer"
+                )
             else:
-                label_layer.features = pd.concat([label_layer.features, annotation_df], axis=1)
-                
+                label_layer.features = pd.concat(
+                    [label_layer.features, annotation_df], axis=1
+                )
+
         self._lbl_combo.value.opacity = 0.4
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
         self._select_layer(label_layer)
         reset_display_colormaps(
-            label_layer, 
-            feature_col = 'annotations',
-            display_layer = self._annotations_layer, 
-            label_column = self._label_column, 
-            cmap = self.cmap
+            label_layer,
+            feature_col="annotations",
+            display_layer=self._annotations_layer,
+            label_column=self._label_column,
+            cmap=self.cmap,
         )
         self._update_annotation_layer_name(label_layer)
 
@@ -135,10 +140,9 @@ class LabelAnnotator(Container):
             if label == 0 or not label:
                 show_info("No label clicked.")
                 return
-            
+
             label_layer.features.loc[
-                label_layer.features[self._label_column] == label, 
-                "annotations"
+                label_layer.features[self._label_column] == label, "annotations"
             ] = self._class_selector.value.value
 
             # Update only the single color value that changed
@@ -173,10 +177,13 @@ class LabelAnnotator(Container):
 
     def update_single_color(self, label):
         color = self.cmap(
-            float(self._lbl_combo.value.features.loc[
-                    self._lbl_combo.value.features[self._label_column] == label, 
-                    "annotations"
-                ]) / len(self.cmap.colors)
+            float(
+                self._lbl_combo.value.features.loc[
+                    self._lbl_combo.value.features[self._label_column] == label,
+                    "annotations",
+                ]
+            )
+            / len(self.cmap.colors)
         )
         self._annotations_layer.color[label] = color
         self._annotations_layer.opacity = 1.0

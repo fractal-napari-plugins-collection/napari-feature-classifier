@@ -12,9 +12,6 @@ from magicgui.widgets import Container, FileEdit, LineEdit, PushButton, Select
 from napari.utils.notifications import show_info
 
 
-from matplotlib.colors import ListedColormap
-import matplotlib
-
 from feature_loader_widget import LoadFeaturesContainer, make_features
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
@@ -38,15 +35,15 @@ def main():
     lbls_layer = viewer.add_labels(lbls)
     lbls_layer2 = viewer.add_labels(lbls2)
 
-    lbls_layer.features = make_features(labels, roi_id = "ROI1",n_features=6)
-    lbls_layer2.features = make_features(labels_2, roi_id = "ROI2", n_features=6)
-    #classifier_widget = ClassifierWidget(viewer)
-    #load_widget = LoadFeaturesContainer(lbls_layer2)
+    lbls_layer.features = make_features(labels, roi_id="ROI1", n_features=6)
+    lbls_layer2.features = make_features(labels_2, roi_id="ROI2", n_features=6)
+    # classifier_widget = ClassifierWidget(viewer)
+    # load_widget = LoadFeaturesContainer(lbls_layer2)
 
-    #viewer.window.add_dock_widget(classifier_widget)
-    #viewer.window.add_dock_widget(load_widget)
+    # viewer.window.add_dock_widget(classifier_widget)
+    # viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
-    #dir(lbls_layer.features)
+    # dir(lbls_layer.features)
 
 
 class ClassifierInitContainer(Container):
@@ -72,12 +69,12 @@ class ClassifierInitContainer(Container):
 
 class ClassifierRunContainer(Container):
     def __init__(
-            self, 
-            viewer: napari.viewer.Viewer, 
-            classifier: Optional[Classifier] = None,
-            class_names: Optional[list[str]] = None,
-            feature_names: Optional[list[str]] = None,
-        ):
+        self,
+        viewer: napari.viewer.Viewer,
+        classifier: Optional[Classifier] = None,
+        class_names: Optional[list[str]] = None,
+        feature_names: Optional[list[str]] = None,
+    ):
         self._viewer = viewer
         # Initialize the classifier
         if classifier:
@@ -86,20 +83,20 @@ class ClassifierRunContainer(Container):
             self.feature_names = self._classifier.get_feature_names()
         else:
             if not class_names or not feature_names:
-                raise ValueError("A classifier object or "
-                                 "class_names & feature_names "
-                                 "must be provided"
-                                 )
+                raise ValueError(
+                    "A classifier object or "
+                    "class_names & feature_names "
+                    "must be provided"
+                )
             self._classifier = Classifier(
-                feature_names = feature_names, 
-                class_names=class_names
+                feature_names=feature_names, class_names=class_names
             )
             self.class_names = class_names
             self.feature_names = feature_names
-        # FIXME: Should the user be able to select this? 
+        # FIXME: Should the user be able to select this?
         # FIXME: Is this a property of the classifier?
-        self._label_column = 'label'
-        self._roi_id_colum = 'roi_id'
+        self._label_column = "label"
+        self._roi_id_colum = "roi_id"
 
         self._annotator = LabelAnnotator(
             self._viewer, get_class_selection(class_names=self.class_names)
@@ -125,19 +122,22 @@ class ClassifierRunContainer(Container):
         # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
         new_df = pd.DataFrame()
         self._classifier.add_features(new_df)
-        self._classifier.train() # Show performance of training
+        self._classifier.train()  # Show performance of training
         self.make_predictions()
 
     def make_predictions(self):
         # Get all the label layers that have fitting features
         relevant_label_layers = []
         required_columns = [self._label_column, self._roi_id_colum]
-        excluded_label_layers = ['Annotations', 'Predictions']
+        excluded_label_layers = ["Annotations", "Predictions"]
         for label_layer in self._viewer.layers:
-            if isinstance(label_layer, napari.layers.Labels) and label_layer.name not in excluded_label_layers:
+            if (
+                isinstance(label_layer, napari.layers.Labels)
+                and label_layer.name not in excluded_label_layers
+            ):
                 if label_layer.features is not None:
                     if all(x in label_layer.features.columns for x in required_columns):
-                                        relevant_label_layers.append(label_layer)
+                        relevant_label_layers.append(label_layer)
 
         # Get the features dataframes with the relevant features
         prediction_dfs = {}
@@ -155,11 +155,11 @@ class ClassifierRunContainer(Container):
             # Merge the predictions back into the layer.features dataframe
             # TODO: Check that this merge is robust, never drops rows etc.
             label_layer.features = label_layer.features.merge(
-                prediction_results_dict[roi_id], 
-                left_on = [self._label_column, self._roi_id_colum], 
-                right_index=True
+                prediction_results_dict[roi_id],
+                left_on=[self._label_column, self._roi_id_colum],
+                right_index=True,
             )
-        
+
         # TODO: Create/update the prediction layer for the currently selected label layer
         # FIXME: Get the right label layer
         label_layer = relevant_label_layers[0]
@@ -177,14 +177,14 @@ class ClassifierRunContainer(Container):
             scale=label_layer.scale,
             name="Predictions",
         )
-        #self._prediction_layer.data = label_layer.data
-        #self._prediction_layer.scale = label_layer.scale
+        # self._prediction_layer.data = label_layer.data
+        # self._prediction_layer.scale = label_layer.scale
         reset_display_colormaps(
-            label_layer, 
-            feature_col = "predict", 
-            display_layer = self._prediction_layer, 
-            label_column = self._label_column, 
-            cmap = get_colormap()
+            label_layer,
+            feature_col="predict",
+            display_layer=self._prediction_layer,
+            label_column=self._label_column,
+            cmap=get_colormap(),
         )
 
     # def reset_prediction_colormaps(self, label_layer):
@@ -221,17 +221,30 @@ class ClassifierRunContainer(Container):
         # FIXME: Check that roi_id only has 1 value in the column
         return label_layer.features[self._roi_id_colum].unique()[0]
 
-
     def get_relevant_features(self, df, filter_annotations: bool = False):
-         # Get the relevant features from the pandas table
-         # Creates double-indexing with label & roi_id?
-         # filter_annotations: Only return rows that contain annotations?
+        # Get the relevant features from the pandas table
+        # Creates double-indexing with label & roi_id?
+        # filter_annotations: Only return rows that contain annotations?
         if not filter_annotations:
-            df_relevant = df[[*self.feature_names, self._label_column, self._roi_id_colum]]
-            df_relevant.set_index([self._label_column, self._roi_id_colum], inplace=True)
-        else: 
-            df_relevant = df.loc[df['annotations'].notna(), [*self.feature_names, self._label_column, self._roi_id_colum, 'annotations']]
-            df_relevant.set_index([self._label_column, self._roi_id_colum], inplace=True)
+            df_relevant = df[
+                [*self.feature_names, self._label_column, self._roi_id_colum]
+            ]
+            df_relevant.set_index(
+                [self._label_column, self._roi_id_colum], inplace=True
+            )
+        else:
+            df_relevant = df.loc[
+                df["annotations"].notna(),
+                [
+                    *self.feature_names,
+                    self._label_column,
+                    self._roi_id_colum,
+                    "annotations",
+                ],
+            ]
+            df_relevant.set_index(
+                [self._label_column, self._roi_id_colum], inplace=True
+            )
         return df_relevant
 
     def save(self):
@@ -252,8 +265,8 @@ class LoadClassifierContainer(Container):
         show_info("loading classifier")
         # FIXME: Load the actual classifier & pass it as an input
         # No more tmp class_names & feature_names
-        class_names_tmp = ['Class 1', 'Class 2', 'Class 3']
-        feature_names_tmp = ['feature_1', 'feature_2', 'feature_3']
+        class_names_tmp = ["Class 1", "Class 2", "Class 3"]
+        feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
         classifier = Classifier(feature_names_tmp, class_names_tmp)
 
 
@@ -269,8 +282,8 @@ class LoadClassifierContainer(Container):
         show_info("loading classifier")
         # FIXME: Load the actual classifier & pass it as an input
         # No more tmp class_names & feature_names
-        class_names_tmp = ['Class 1', 'Class 2', 'Class 3']
-        feature_names_tmp = ['feature_1', 'feature_2', 'feature_3']
+        class_names_tmp = ["Class 1", "Class 2", "Class 3"]
+        feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
         classifier = Classifier(feature_names_tmp, class_names_tmp)
 
         self._run_container = ClassifierRunContainer(self._viewer, classifier)
@@ -312,9 +325,7 @@ class ClassifierWidget(Container):
             return
         else:
             self._run_container = ClassifierRunContainer(
-                self._viewer, 
-                class_names=class_names, 
-                feature_names=feature_names
+                self._viewer, class_names=class_names, feature_names=feature_names
             )
             self.clear()
             self.append(self._run_container)

@@ -2,6 +2,7 @@
 from napari.utils.notifications import show_info
 import numpy as np
 
+
 class Classifier(object):
     def __init__(self, feature_names, class_names):
         self._feature_names = feature_names
@@ -16,9 +17,9 @@ class Classifier(object):
     def predict(self, df):
         # FIXME: Generate actual predictions for the df
         # FIXME: SettingWithCopyWarning
-        df['predict'] = np.random.randint(1,4,size=len(df))
-        return df[['predict']]
-    
+        df["predict"] = np.random.randint(1, 4, size=len(df))
+        return df[["predict"]]
+
     def predict_on_dict(self, dict_of_dfs):
         # Make a prediction on each of the dataframes provided
         predicted_dicts = {}
@@ -30,14 +31,13 @@ class Classifier(object):
     def add_features(self, new_feature_df):
         # TODO: Add features
         show_info("Adding features...")
-    
+
     def get_class_names(self):
         return self._class_names
-    
+
     def get_feature_names(self):
         return self._feature_names
 
     def save(self, output_path):
         # TODO: Implement saving
         show_info(f"Saving classifier at {output_path}...")
-    

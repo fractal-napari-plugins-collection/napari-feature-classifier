@@ -27,7 +27,7 @@ def load_features_csv(
 
 @pa.check_types
 def make_features(
-    labels: Sequence[int], roi_id: str='id', n_features: int = 10, seed: int = 42
+    labels: Sequence[int], roi_id: str = "id", n_features: int = 10, seed: int = 42
 ) -> DataFrame[LabelFeatureSchema]:
     columns = [f"feature_{i}" for i in range(n_features)]
     rng = np.random.default_rng(seed=seed)

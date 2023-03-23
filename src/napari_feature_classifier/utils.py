@@ -65,20 +65,21 @@ def get_colormap(matplotlib_colormap="Set1"):
     return cmap
 
 
-def reset_display_colormaps(label_layer, feature_col, display_layer, label_column, cmap):
+def reset_display_colormaps(
+    label_layer, feature_col, display_layer, label_column, cmap
+):
     """
     Reset the colormap based on the annotations in
     label_layer.features['annotation'] and sends the updated colormap
     to the annotation label layer
     """
     print(label_layer.features)
-    colors = cmap(
-        label_layer.features[feature_col] / len(cmap.colors)
-    )
+    colors = cmap(label_layer.features[feature_col] / len(cmap.colors))
     colordict = dict(zip(label_layer.features[label_column], colors))
     display_layer.color = colordict
     display_layer.opacity = 1.0
     display_layer.color_mode = "direct"
+
 
 #     # Check if it runs in napari
 #     # This currently triggers an exception.
