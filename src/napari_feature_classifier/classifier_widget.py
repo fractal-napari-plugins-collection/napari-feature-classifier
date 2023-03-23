@@ -14,6 +14,7 @@ from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
     get_class_selection,
 )
+from napari_feature_classifier.classifier_new import Classifier
 
 
 def main():
@@ -32,10 +33,10 @@ def main():
     classifier_widget = ClassifierWidget(viewer)
     load_widget = LoadFeaturesContainer(lbls_layer2)
 
-    viewer.window.add_dock_widget(classifier_widget)
-    viewer.window.add_dock_widget(load_widget)
+    #viewer.window.add_dock_widget(classifier_widget)
+    #viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
-    dir(lbls_layer.features)
+    #dir(lbls_layer.features)
 
 
 class ClassifierInitContainer(Container):
@@ -55,10 +56,32 @@ class ClassifierInitContainer(Container):
             ]
         )
 
+    def get_selected_features(self):
+        return self._feature_combobox.value
+
 
 class ClassifierRunContainer(Container):
-    def __init__(self, viewer: napari.viewer.Viewer, class_names: list[str]):
-        # Optionally get a classifier object or initialize one
+    def __init__(
+            self, 
+            viewer: napari.viewer.Viewer, 
+            classifier: Optional[Classifier] = None,
+            class_names: Optional[list[str]] = None,
+            feature_names: Optional[list[str]] = None,
+        ):
+        # Initialize the classifier
+        if classifier:
+            self._classifier = classifier
+            class_names = self._classifier.get_class_names()
+        else:
+            if not class_names or not feature_names:
+                raise ValueError("A classifier object or "
+                                 "class_names & feature_names "
+                                 "must be provided"
+                                 )
+            self._classifier = Classifier(
+                feature_names = feature_names, 
+                class_names=class_names
+            )
         self._annotator = LabelAnnotator(
             viewer, get_class_selection(class_names=class_names)
         )
@@ -77,20 +100,57 @@ class ClassifierRunContainer(Container):
     def run(self):
         # TODO:
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
+        # => label layer hashing for unique ID
         # 2. Update classifier internal feature store
         # 3. Train the classifier
         # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
-
-        show_info("running classifier...")
+        new_df = pd.DataFrame()
+        self._classifier.add_features(new_df)
+        self._classifier.train() # Show performance of training
+        self._classifier.predict() # In what form does this get the info back to match the label layers?
 
     def save(self):
-        show_info("saving classifier...")
+        # FIXME: Add options to define output_path & use that
+        output_path = Path("sample_data/test_saving.clf")
+        self._classifier.save(output_path)
 
 
 class LoadClassifierContainer(Container):
-    # TODO: Implement this. Separate container that leads to run
-    # Path to the classifier
-    pass
+    def __init__(self, viewer: napari.viewer.Viewer):
+        self._viewer = viewer
+        self._clf_destination = FileEdit(mode="r", filter="*.clf")
+        self._load_button = PushButton(label="Load Classifier")
+        super().__init__(widgets=[self._clf_destination, self._load_button])
+        self._load_button.clicked.connect(self.load)
+
+    def load(self):
+        show_info("loading classifier")
+        # FIXME: Load the actual classifier & pass it as an input
+        # No more tmp class_names & feature_names
+        class_names_tmp = ['Class 1', 'Class 2', 'Class 3']
+        feature_names_tmp = ['feature_1', 'feature_2', 'feature_3']
+        classifier = Classifier(feature_names_tmp, class_names_tmp)
+
+
+class LoadClassifierContainer(Container):
+    def __init__(self, viewer: napari.viewer.Viewer):
+        self._viewer = viewer
+        self._clf_destination = FileEdit(mode="r", filter="*.clf")
+        self._load_button = PushButton(label="Load Classifier")
+        super().__init__(widgets=[self._clf_destination, self._load_button])
+        self._load_button.clicked.connect(self.load)
+
+    def load(self):
+        show_info("loading classifier")
+        # FIXME: Load the actual classifier & pass it as an input
+        # No more tmp class_names & feature_names
+        class_names_tmp = ['Class 1', 'Class 2', 'Class 3']
+        feature_names_tmp = ['feature_1', 'feature_2', 'feature_3']
+        classifier = Classifier(feature_names_tmp, class_names_tmp)
+
+        self._run_container = ClassifierRunContainer(self._viewer, classifier)
+        self.clear()
+        self.append(self._run_container)
 
 
 class ClassifierWidget(Container):
@@ -107,6 +167,8 @@ class ClassifierWidget(Container):
     def initialize_init_widget(self):
         # Extract features for first label layer
         # TODO: Handle case where there's no layers.features in the first Labels layer.
+        # TODO: Handle the case where there is no label layer
+        # TODO: Handle the case where the second label layer has the features
         label_layer = [
             l for l in self._viewer.layers if isinstance(l, napari.layers.Labels)
         ][0]
@@ -119,9 +181,18 @@ class ClassifierWidget(Container):
 
     def initialize_run_widget(self):
         class_names = self._init_container._annotation_name_selector.get_class_names()
-        self._run_container = ClassifierRunContainer(self._viewer, class_names)
-        self.clear()
-        self.append(self._run_container)
+        feature_names = self._init_container.get_selected_features()
+        if not feature_names:
+            show_info("No features selected")
+            return
+        else:
+            self._run_container = ClassifierRunContainer(
+                self._viewer, 
+                class_names=class_names, 
+                feature_names=feature_names
+            )
+            self.clear()
+            self.append(self._run_container)
 
 
 if __name__ == "__main__":
