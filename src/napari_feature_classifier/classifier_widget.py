@@ -117,7 +117,7 @@ class ClassifierRunContainer(Container):
     def run(self):
         # TODO:
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
-        # => label layer hashing for unique ID
+        # => label layer hashing for unique IDs if roi_id does not exist yet
         # 2. Update classifier internal feature store
         # 3. Train the classifier
         # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
@@ -145,14 +145,13 @@ class ClassifierRunContainer(Container):
             roi_id = self.get_layer_roi_id(label_layer)
             # Merge the predictions back into the layer.features dataframe
             # TODO: Check that this merge is robust, never drops rows etc.
-            # FIXME: A second run leads to having predict_x & predict_y columns
-            # => overwrite that column if it exists
             if 'predict' in label_layer.features.columns:
                 label_layer.features.drop(columns=['predict'], inplace=True)
             label_layer.features = label_layer.features.merge(
                 prediction_results_dict[roi_id],
                 left_on=[self._label_column, self._roi_id_colum],
                 right_index=True,
+                how='outer'
             )
 
         # TODO: Create/update the prediction layer for the currently selected label layer
