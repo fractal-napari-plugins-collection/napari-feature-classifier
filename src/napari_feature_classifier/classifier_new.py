@@ -1,6 +1,7 @@
 # FIXME: Get rid of show_info in classifier class
 from napari.utils.notifications import show_info
 import numpy as np
+import pandas as pd
 
 
 class Classifier(object):
@@ -16,8 +17,10 @@ class Classifier(object):
 
     def predict(self, df):
         # FIXME: Generate actual predictions for the df
-        # FIXME: SettingWithCopyWarning
-        df["predict"] = np.random.randint(1, 4, size=len(df))
+        # FIXME: SettingWithCopyWarning => check if the actual run still 
+        # generates one, when we actually predict something
+        with pd.option_context('mode.chained_assignment', None):
+            df["predict"] = np.random.randint(1, 4, size=len(df))
         return df[["predict"]]
 
     def predict_on_dict(self, dict_of_dfs):

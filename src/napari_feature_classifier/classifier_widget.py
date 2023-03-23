@@ -97,6 +97,7 @@ class ClassifierRunContainer(Container):
         # FIXME: Is this a property of the classifier?
         self._label_column = "label"
         self._roi_id_colum = "roi_id"
+        self._prediction_layer = None
 
         self._annotator = LabelAnnotator(
             self._viewer, get_class_selection(class_names=self.class_names)
@@ -127,17 +128,7 @@ class ClassifierRunContainer(Container):
 
     def make_predictions(self):
         # Get all the label layers that have fitting features
-        relevant_label_layers = []
-        required_columns = [self._label_column, self._roi_id_colum]
-        excluded_label_layers = ["Annotations", "Predictions"]
-        for label_layer in self._viewer.layers:
-            if (
-                isinstance(label_layer, napari.layers.Labels)
-                and label_layer.name not in excluded_label_layers
-            ):
-                if label_layer.features is not None:
-                    if all(x in label_layer.features.columns for x in required_columns):
-                        relevant_label_layers.append(label_layer)
+        relevant_label_layers = self.get_relevant_label_layers()
 
         # Get the features dataframes with the relevant features
         prediction_dfs = {}
@@ -154,6 +145,10 @@ class ClassifierRunContainer(Container):
             roi_id = self.get_layer_roi_id(label_layer)
             # Merge the predictions back into the layer.features dataframe
             # TODO: Check that this merge is robust, never drops rows etc.
+            # FIXME: A second run leads to having predict_x & predict_y columns
+            # => overwrite that column if it exists
+            if 'predict' in label_layer.features.columns:
+                label_layer.features.drop(columns=['predict'], inplace=True)
             label_layer.features = label_layer.features.merge(
                 prediction_results_dict[roi_id],
                 left_on=[self._label_column, self._roi_id_colum],
@@ -167,18 +162,18 @@ class ClassifierRunContainer(Container):
         # TODO: Make the selection change to the label layer with the features
         # TODO: Make the prediction layer change based on selection of label layer
         # TODO: Turn off the annotation layer? Or ok like that?
-
-        # FIXME: A second run leads to having predict_x & predict_y columns
+        
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
-        # FIXME: Add this earlier?
-        self._prediction_layer = self._viewer.add_labels(
-            label_layer.data,
-            scale=label_layer.scale,
-            name="Predictions",
-        )
-        # self._prediction_layer.data = label_layer.data
-        # self._prediction_layer.scale = label_layer.scale
+        if self._prediction_layer:
+            self._prediction_layer.data = label_layer.data
+            self._prediction_layer.scale = label_layer.scale
+        else:
+            self._prediction_layer = self._viewer.add_labels(
+                label_layer.data,
+                scale=label_layer.scale,
+                name="Predictions",
+            )
         reset_display_colormaps(
             label_layer,
             feature_col="predict",
@@ -187,35 +182,19 @@ class ClassifierRunContainer(Container):
             cmap=get_colormap(),
         )
 
-    # def reset_prediction_colormaps(self, label_layer):
-    #     """
-    #     Reset the colormap based on the predictions in
-    #     label_layer.features['predict'] and sends the updated colormap
-    #     to the annotation label layer
-    #     """
-    #     self.cmap = get_colormap()
-    #     colors = self.cmap(
-    #         label_layer.features["predict"] / len(self.cmap.colors)
-    #     )
-    #     colordict = dict(zip(label_layer.features[self._label_column], colors))
-    #     self._prediction_layer.color = colordict
-    #     self._prediction_layer.opacity = 1.0
-    #     self._prediction_layer.color_mode = "direct"
-
-    # def get_colormap(self, matplotlib_colormap="Set1"):
-    #     """
-    #     Generates colormaps depending on the number of classes
-    #     """
-    #     new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
-    #         np.float32
-    #     )
-    #     cmap_np = np.zeros(
-    #         shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
-    #     )
-    #     cmap_np[1:, :-1] = new_colors
-    #     cmap_np[1:, -1] = 1
-    #     cmap = ListedColormap(cmap_np)
-    #     return cmap
+    def get_relevant_label_layers(self):
+        relevant_label_layers = []
+        required_columns = [self._label_column, self._roi_id_colum]
+        excluded_label_layers = ["Annotations", "Predictions"]
+        for label_layer in self._viewer.layers:
+            if (
+                isinstance(label_layer, napari.layers.Labels)
+                and label_layer.name not in excluded_label_layers
+            ):
+                if label_layer.features is not None:
+                    if all(x in label_layer.features.columns for x in required_columns):
+                        relevant_label_layers.append(label_layer)
+        return relevant_label_layers
 
     def get_layer_roi_id(self, label_layer):
         # FIXME: Check that roi_id only has 1 value in the column
