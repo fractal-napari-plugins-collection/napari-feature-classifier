@@ -46,7 +46,7 @@ def main():
     lbls_layer = viewer.add_labels(lbls)
     lbls_layer2 = viewer.add_labels(lbls2)
 
-    lbls_layer.features = get_features(labels, n_features=6)
+    lbls_layer.features = get_features(labels, n_features=20)
     #classifier_widget = ClassifierWidget(viewer)
     #load_widget = LoadFeaturesContainer()
 
@@ -125,18 +125,19 @@ class ClassifierRunContainer(Container):
     def run(self):
         # TODO: 
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
+        # => label layer hashing for unique ID
         # 2. Update classifier internal feature store
         # 3. Train the classifier
         # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
         new_df = pd.DataFrame()
         self._classifier.add_features(new_df)
-        self._classifier.train()
-        self._classifier.predict()
+        self._classifier.train() # Show performance of training
+        self._classifier.predict() # In what form does this get the info back to match the label layers?
 
     def save(self):
         # FIXME: Add options to define output_path & use that
         output_path = Path("sample_data/test_saving.clf")
-        self.save(output_path)
+        self._classifier.save(output_path)
 
 
 class LoadFeaturesContainer(Container):

@@ -14,6 +14,7 @@ class Classifier(object):
     def predict(self):
         # TODO: Make a prediction
         show_info("Making a prediction...")
+        # TODO: Share prediction scores with the user
 
     def add_features(self, new_feature_df):
         # TODO: Add features
