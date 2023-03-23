@@ -1,10 +1,13 @@
 from pathlib import Path
 
+from typing import Optional
+
 import imageio
 import napari
 import napari.layers
 import napari.viewer
 import numpy as np
+import pandas as pd
 from magicgui.widgets import Container, FileEdit, LineEdit, PushButton, Select
 from napari.utils.notifications import show_info
 
