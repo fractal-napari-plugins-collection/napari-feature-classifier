@@ -4,6 +4,9 @@ from functools import lru_cache
 # import warnings
 import pandas as pd
 from napari.utils.notifications import show_info
+from matplotlib.colors import ListedColormap
+import matplotlib
+import numpy as np
 
 # from napari._qt.dialogs.qt_notification import NapariQtNotification
 # from napari._qt.qt_event_loop import _ipython_has_eventloop
@@ -45,6 +48,37 @@ def in_notebook():
         return False
     return True
 
+
+def get_colormap(matplotlib_colormap="Set1"):
+    """
+    Generates colormaps depending on the number of classes
+    """
+    new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
+        np.float32
+    )
+    cmap_np = np.zeros(
+        shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
+    )
+    cmap_np[1:, :-1] = new_colors
+    cmap_np[1:, -1] = 1
+    cmap = ListedColormap(cmap_np)
+    return cmap
+
+
+def reset_display_colormaps(label_layer, feature_col, display_layer, label_column, cmap):
+    """
+    Reset the colormap based on the annotations in
+    label_layer.features['annotation'] and sends the updated colormap
+    to the annotation label layer
+    """
+    print(label_layer.features)
+    colors = cmap(
+        label_layer.features[feature_col] / len(cmap.colors)
+    )
+    colordict = dict(zip(label_layer.features[label_column], colors))
+    display_layer.color = colordict
+    display_layer.opacity = 1.0
+    display_layer.color_mode = "direct"
 
 #     # Check if it runs in napari
 #     # This currently triggers an exception.

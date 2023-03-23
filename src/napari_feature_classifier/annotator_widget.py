@@ -22,6 +22,7 @@ from magicgui.widgets import (
 from matplotlib.colors import ListedColormap
 from napari.utils.notifications import show_info
 
+from napari_feature_classifier.utils import get_colormap, reset_display_colormaps
 
 def get_class_selection(
     n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
@@ -73,7 +74,7 @@ class LabelAnnotator(Container):
         # Class selection
         self.ClassSelection = ClassSelection
         self.nb_classes = len(self.ClassSelection) - 1
-        self.cmap = self.get_colormap()
+        self.cmap = get_colormap()
         self._class_selector = cast(
             RadioButtons,
             create_widget(
@@ -111,7 +112,13 @@ class LabelAnnotator(Container):
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
         self._select_layer(label_layer)
-        self.reset_annotation_colormaps()
+        reset_display_colormaps(
+            label_layer, 
+            feature_col = 'annotations',
+            display_layer = self._annotations_layer, 
+            label_column = self._label_column, 
+            cmap = self.cmap
+        )
         self._update_annotation_layer_name(label_layer)
 
         @self._lbl_combo.value.mouse_drag_callbacks.append
@@ -163,35 +170,6 @@ class LabelAnnotator(Container):
         self._update_save_destination(label_layer)
         self._update_annotation_layer_name(label_layer)
         # set your internal annotation layer here.
-
-    def get_colormap(self, matplotlib_colormap="Set1"):
-        """
-        Generates colormaps depending on the number of classes
-        """
-        new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
-            np.float32
-        )
-        cmap_np = np.zeros(
-            shape=(new_colors.shape[0] + 1, new_colors.shape[1] + 1), dtype=np.float32
-        )
-        cmap_np[1:, :-1] = new_colors
-        cmap_np[1:, -1] = 1
-        cmap = ListedColormap(cmap_np)
-        return cmap
-
-    def reset_annotation_colormaps(self):
-        """
-        Reset the colormap based on the annotations in
-        label_layer.features['annotation'] and sends the updated colormap
-        to the annotation label layer
-        """
-        colors = self.cmap(
-            self._lbl_combo.value.features["annotations"] / len(self.cmap.colors)
-        )
-        colordict = dict(zip(self._lbl_combo.value.features[self._label_column], colors))
-        self._annotations_layer.color = colordict
-        self._annotations_layer.opacity = 1.0
-        self._annotations_layer.color_mode = "direct"
 
     def update_single_color(self, label):
         color = self.cmap(
