@@ -1,30 +1,14 @@
-import math
-import warnings
-from enum import Enum
-from functools import partial
 from pathlib import Path
-from typing import Optional, Sequence, cast
 
 import imageio
-import matplotlib
 import napari
 import napari.layers
 import napari.viewer
 import numpy as np
-import pandas as pd
-from magicgui.widgets import (
-    ComboBox,
-    Container,
-    FileEdit,
-    LineEdit,
-    PushButton,
-    RadioButtons,
-    Select,
-    TextEdit,
-    create_widget,
-)
+from magicgui.widgets import Container, FileEdit, LineEdit, PushButton, Select
 from napari.utils.notifications import show_info
 
+from feature_loader_widget import LoadFeaturesContainer, make_features
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
@@ -38,29 +22,20 @@ def main():
     lbls2[:, 3:, 2:] = lbls[:, :-3, :-2]
     lbls2 = lbls2 * 20
 
-    labels = np.unique(lbls)
-    labels2 = np.unique(lbls2)
+    labels = np.unique(lbls)[1:]
 
     viewer = napari.Viewer()
     lbls_layer = viewer.add_labels(lbls)
     lbls_layer2 = viewer.add_labels(lbls2)
 
-    lbls_layer.features = get_features(labels, n_features=6)
+    lbls_layer.features = make_features(labels, n_features=6)
     classifier_widget = ClassifierWidget(viewer)
-    load_widget = LoadFeaturesContainer()
+    load_widget = LoadFeaturesContainer(lbls_layer2)
 
     viewer.window.add_dock_widget(classifier_widget)
     viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
     dir(lbls_layer.features)
-
-
-def get_features(labels: Sequence[int], n_features: int = 10, seed: int = 42):
-    columns = [f"feature_{i}" for i in range(n_features)]
-    rng = np.random.default_rng(seed=seed)
-    features = rng.random(size=(len(labels), n_features))
-    features[0, :] = np.nan
-    return pd.DataFrame(index=labels, columns=columns, data=features)
 
 
 class ClassifierInitContainer(Container):
@@ -100,7 +75,7 @@ class ClassifierRunContainer(Container):
         self._save_button.clicked.connect(self.save)
 
     def run(self):
-        # TODO: 
+        # TODO:
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
         # 2. Update classifier internal feature store
         # 3. Train the classifier
@@ -110,17 +85,6 @@ class ClassifierRunContainer(Container):
 
     def save(self):
         show_info("saving classifier...")
-
-
-class LoadFeaturesContainer(Container):
-    def __init__(self):
-        self._load_destination = FileEdit(value=f"sample_data/test_df.csv", mode="r")
-        self._load_button = PushButton(label="Load Features")
-        super().__init__(widgets=[self._load_destination, self._load_button])
-        self._load_button.clicked.connect(self.load)
-
-    def load(self):
-        show_info("loading csv...")
 
 
 class LoadClassifierContainer(Container):
