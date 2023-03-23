@@ -47,7 +47,24 @@ def get_class_selection(
     return ClassSelection
 
 
-# TODO: Think about what happens when the widget is closed
+def _get_appropriate_label_layer_names(
+    viewer: napari.viewer.Viewer,
+) -> list[napari.layers.Labels]:
+    # Select label layers that are not `Annotation` or `Prediction`.
+    return [
+        layer.name
+        for layer in viewer.layers
+        if isinstance(layer, napari.layers.Labels)
+        and layer.name not in ["Annotation", "Prediction"]
+    ]
+
+
+def _get_appropriate_label_layer(widget: ComboBox, viewer: napari.viewer.Viewer):
+    return viewer.layers[widget.value]
+
+# TODO: Put _lbl_combo Combobox into a separate Container so it can be used in other widgets.
+# TODO: Make sure `Annotations` and `Predictions` don't show up in the ComboBox.
+# TODO: Think about what happens when the widget is closed.
 # TODO: Make sure annotation layer can't be selected in the `self._lbl_combo`.
 class LabelAnnotator(Container):
     def __init__(
@@ -58,6 +75,11 @@ class LabelAnnotator(Container):
         self._viewer = viewer
 
         self._lbl_combo = cast(ComboBox, create_widget(annotation=napari.layers.Labels))
+        # Faided attempt at manually creating the ComboBox without Annotation and Prediction.
+        # self._lbl_combo = ComboBox(
+        #     choices=partial(_get_appropriate_label_layer_names, viewer=self._viewer),
+        #     bind=partial(_get_appropriate_label_layer, viewer=self._viewer),
+        # )
 
         self._annotations_layer = self._viewer.add_labels(
             self._lbl_combo.value.data,

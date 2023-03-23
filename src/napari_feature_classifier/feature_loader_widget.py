@@ -8,7 +8,7 @@ import pandas as pd
 import pandera as pa
 from magicgui.widgets import Container, FileEdit, PushButton
 from napari.utils.notifications import show_info
-from pandera.typing import DataFrame, Index, Series
+from pandera.typing import DataFrame, Series
 
 
 class LabelFeatureSchema(pa.SchemaModel):
@@ -18,16 +18,23 @@ class LabelFeatureSchema(pa.SchemaModel):
 
 @pa.check_types
 def load_features_csv(
-    fn: PathLike, index_column="label"
+    fn: PathLike, index_column_or_columns: str | list[str] = "label"
 ) -> DataFrame[LabelFeatureSchema]:
-    df = pd.read_csv(fn).set_index(index_column)
+    df = pd.read_csv(fn)
+    if isinstance(index_column_or_columns, str):
+        assert (
+            index_column_or_columns in df
+        ), f"missing index column `{index_column_or_columns}` in csv file."
+        return DataFrame[LabelFeaturesSchema](
+            df.rename(columns={index_column_or_columns: "label"})
+        )
     # return pd.DataFrame(data=np.random.rand(5, 5), columns=list("abcde"), index=list(range(1, 10, 2)))
     return DataFrame[LabelFeatureSchema](df)
 
 
 @pa.check_types
 def make_features(
-    labels: Sequence[int], roi_id: str='id', n_features: int = 10, seed: int = 42
+    labels: Sequence[int], roi_id: str = "id", n_features: int = 10, seed: int = 42
 ) -> DataFrame[LabelFeatureSchema]:
     columns = [f"feature_{i}" for i in range(n_features)]
     rng = np.random.default_rng(seed=seed)
