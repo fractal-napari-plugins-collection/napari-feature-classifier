@@ -11,7 +11,7 @@ import napari.viewer
 import numpy as np
 import pandas as pd
 from magicgui.widgets import (
-    ComboBox,
+    Label,
     Container,
     FileEdit,
     PushButton,
@@ -20,7 +20,7 @@ from magicgui.widgets import (
 )
 from napari.utils.notifications import show_info
 
-from napari_feature_classifier.utils import get_colormap, reset_display_colormaps
+from napari_feature_classifier.utils import get_colormap, reset_display_colormaps, get_valid_label_layers
 from napari_feature_classifier.label_layer_selector import LabelLayerSelector
 
 
@@ -58,26 +58,23 @@ class LabelAnnotator(Container):
         self._viewer = viewer
         self._label_column = "label"
 
-        self._lbl_combo = LabelLayerSelector(viewer=self._viewer)
+        # This is None if no layer or multiple layers are selected
+        if self._viewer.layers.selection.active:
+            if self._viewer.layers.selection.active in get_valid_label_layers(viewer=self._viewer):
+                self._last_selected_layer = self._viewer.layers.selection.active
+        else:
+            # FIXME: Handle case of no valid label layers (shouldn't let the user initialize the widget in this case)
+            self._last_selected_layer = get_valid_label_layers(viewer=self._viewer)[0]
 
-        current_selection = self._viewer.layers.selection.active
-        print(self._viewer.layers.selection.active)
+        self.last_selected_layer_label = Label(label = "Last selected label layer:", value=self._last_selected_layer)
 
+        # TODO: Set the label selection to the last layer selected before adding the label image?
         self._annotations_layer = self._viewer.add_labels(
-            self._lbl_combo.get_selected_label_layer().data,
-            scale=self._lbl_combo.get_selected_label_layer().scale,
+            self._last_selected_layer.data,
+            scale=self._last_selected_layer.scale,
             name="Annotations",
         )
-        print(self._viewer.layers.selection.active)
-        # self._viewer.layers.selection.add(current_selection)
-        print(self._viewer.layers.selection.active)
-        self._lbl_combo.value = current_selection.name
-        print(self._viewer.layers.selection.active)
-
-
-        for layer in self._viewer.layers:
-            if isinstance(layer, napari.layers.Labels):
-                layer.editable = False
+        self._annotations_layer.editable = False
 
         # Class selection
         self.ClassSelection = ClassSelection
@@ -86,28 +83,48 @@ class LabelAnnotator(Container):
         self._class_selector = cast(
             RadioButtons,
             create_widget(
+                label="Class Selection",
                 value=ClassSelection[list(ClassSelection.__members__.keys())[1]],
                 annotation=ClassSelection,
                 widget_type=RadioButtons,
             ),
         )
-        self._init_annotation(self._lbl_combo.get_selected_label_layer())
-        self._save_destination = FileEdit(value=f"annotation.csv", mode="r")
+        self._init_annotation(self._last_selected_layer)
+        self._save_destination = FileEdit(label = "Save Path", value=f"annotation.csv", mode="r")
         self._save_annotation = PushButton(label="Save Annotations")
-        self._update_save_destination(self._lbl_combo.get_selected_label_layer())
+        self._update_save_destination(self._last_selected_layer)
         super().__init__(
             widgets=[
-                self._lbl_combo,
+                self.last_selected_layer_label,
                 self._class_selector,
                 self._save_destination,
                 self._save_annotation,
             ]
         )
         self._save_annotation.clicked.connect(self._on_save_clicked)
-        self._lbl_combo.changed.connect(self._on_label_layer_changed)
+        # Connect to label layer change, potentially call init
+        self._viewer.layers.selection.events.changed.connect(self.selection_changed)
 
-    # @self._lbl_combo.value.mouse_drag_callbacks.append
-    def toggle_label(self, labels_layer, event):  # pylint: disable-msg=W0613
+    def selection_changed(self, event):
+        # Check if the selection change results in a valid label layer being 
+        # selected. If so, initialize the annotator for it.
+        if self._viewer.layers.selection.active:
+            if self._viewer.layers.selection.active in get_valid_label_layers(viewer=self._viewer):
+                self._init_annotation(self._viewer.layers.selection.active)
+                self._save_annotation.enabled = True
+                self._save_destination.enabled = True
+                self._class_selector.enabled = True
+                self.last_selected_layer_label.value = self._viewer.layers.selection.active
+            else:
+                self._save_annotation.enabled = False
+                self._save_destination.enabled = False
+                self._class_selector.enabled = False
+        else:
+            self._save_annotation.enabled = False
+            self._save_destination.enabled = False
+            self._class_selector.enabled = False
+
+    def toggle_label(self, labels_layer, event):
         # Need to scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
@@ -126,14 +143,15 @@ class LabelAnnotator(Container):
         ] = self._class_selector.value.value
 
         # Update only the single color value that changed
-        self.update_single_color(label)
+        self.update_single_color(labels_layer, label)
 
-    def set_class_n(self, layer, n: int):
+    def set_class_n(self, n: int):
         self._class_selector.value = self.ClassSelection[
             list(self.ClassSelection.__members__)[n]
         ]
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
+        label_layer.editable = False
         if "annotations" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
             annotation_df = pd.DataFrame(
@@ -171,17 +189,16 @@ class LabelAnnotator(Container):
     def _update_save_destination(self, label_layer: napari.layers.Labels):
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
-    def _on_label_layer_changed(self):
-        label_layer = self._lbl_combo.get_selected_label_layer()
-        self._init_annotation(label_layer)
-        self._update_save_destination(label_layer)
+    # def _on_label_layer_changed(self):
+    #     label_layer = self._lbl_combo.get_selected_label_layer()
+    #     self._init_annotation(label_layer)
+    #     self._update_save_destination(label_layer)
 
-    def update_single_color(self, label):
-        current_label_layer = self._lbl_combo.get_selected_label_layer()
+    def update_single_color(self, label_layer, label):
         color = self.cmap(
             float(
-                current_label_layer.features.loc[
-                    current_label_layer.features[self._label_column] == label,
+                label_layer.features.loc[
+                    label_layer.features[self._label_column] == label,
                     "annotations",
                 ]
             )
@@ -192,7 +209,7 @@ class LabelAnnotator(Container):
         self._annotations_layer.color_mode = "direct"
 
     def _on_save_clicked(self):
-        annotations = self._lbl_combo.get_selected_label_layer().features["annotations"]
+        annotations = self._last_selected_layer.features["annotations"]
         df = pd.DataFrame(annotations)
         class_names = []
         for annotation in annotations:

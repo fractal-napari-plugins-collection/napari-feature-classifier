@@ -7,6 +7,7 @@ from napari.utils.notifications import show_info
 from matplotlib.colors import ListedColormap
 import matplotlib
 import numpy as np
+import napari
 
 # from napari._qt.dialogs.qt_notification import NapariQtNotification
 # from napari._qt.qt_event_loop import _ipython_has_eventloop
@@ -121,3 +122,14 @@ def napari_info(message):
     # But can't make that work at the moment
     if in_notebook():
         print(message)
+
+def get_valid_label_layers(viewer) -> list[str]:
+    # Get a list of label layers that are not `Annotations` or `Predictions`.
+    return [
+        layer
+        for layer in viewer.layers
+        if isinstance(layer, napari.layers.Labels)
+        and layer.name not in ["Annotations", "Predictions"]
+    ]
+
+
