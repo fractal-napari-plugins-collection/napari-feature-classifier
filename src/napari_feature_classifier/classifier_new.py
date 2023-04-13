@@ -2,12 +2,25 @@
 from napari.utils.notifications import show_info
 import numpy as np
 import pandas as pd
+import pandera as pa
+from pandera.typing import DataFrame, Series
+
+class ClassifierDataSchema(pa.SchemaModel):
+    # TODO: Get
+    # FIXME: Make those index columns
+    roi_id: Series[str] = pa.Field(coerce=True, unique=False)
+    label: Series[int] = pa.Field(coerce=True, unique=True)
 
 
 class Classifier(object):
     def __init__(self, feature_names, class_names):
         self._feature_names = feature_names
         self._class_names = class_names
+        self._label_column = "label"
+        self._roi_id_colum = "roi_id"
+        # TODO: Set up data storage schema
+        self.classifier_data = DataFrame[ClassifierDataSchema]()
+
         # TODO: Initialize the classifier
 
     def train(self):
