@@ -19,8 +19,7 @@ from napari_feature_classifier.annotator_widget import (
     get_class_selection,
 )
 from napari_feature_classifier.classifier_new import Classifier
-from napari_feature_classifier.utils import get_colormap, reset_display_colormaps
-from napari_feature_classifier.label_layer_selector import LabelLayerSelector
+from napari_feature_classifier.utils import get_colormap, reset_display_colormaps, get_valid_label_layers, get_selected_or_valid_label_layer
 
 
 def main():
@@ -77,6 +76,7 @@ class ClassifierRunContainer(Container):
         feature_names: Optional[list[str]] = None,
     ):
         self._viewer = viewer
+        self._last_selected_label_layer = get_selected_or_valid_label_layer(viewer=self._viewer)
         # Initialize the classifier
         if classifier:
             self._classifier = classifier
@@ -98,11 +98,20 @@ class ClassifierRunContainer(Container):
         # FIXME: Is this a property of the classifier?
         self._label_column = "label"
         self._roi_id_colum = "roi_id"
-        self._prediction_layer = None
 
         self._annotator = LabelAnnotator(
             self._viewer, get_class_selection(class_names=self.class_names)
         )
+
+        self._prediction_layer = self._viewer.add_labels(
+            self._last_selected_label_layer.data,
+            scale=self._last_selected_label_layer.scale,
+            name="Predictions",
+        )
+
+        # Set the label selection to a valid label layer => Running into proxy bug
+        self._viewer.layers.selection.active = self._last_selected_label_layer
+
         self._run_button = PushButton(text="Run Classifier")
         self._save_button = PushButton(text="Save Classifier")
         super().__init__(
@@ -114,6 +123,8 @@ class ClassifierRunContainer(Container):
         )
         self._run_button.clicked.connect(self.run)
         self._save_button.clicked.connect(self.save)
+        self._viewer.layers.selection.events.changed.connect(self.selection_changed)
+        self._init_prediction_layer(self._last_selected_label_layer)
 
 
     def run(self):
@@ -164,17 +175,35 @@ class ClassifierRunContainer(Container):
         # TODO: Make the prediction layer change based on selection of label layer
         # TODO: Turn off the annotation layer? Or ok like that?
         
+    def selection_changed(self):
+        # Check if the selection change results in a valid label layer being 
+        # selected. If so, initialize the prediction layer for it.
+        if self._viewer.layers.selection.active:
+            if self._viewer.layers.selection.active in get_valid_label_layers(viewer=self._viewer):
+                self._last_selected_layer = self._viewer.layers.selection.active
+                self._init_prediction_layer(self._viewer.layers.selection.active)
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
-        if self._prediction_layer:
-            self._prediction_layer.data = label_layer.data
-            self._prediction_layer.scale = label_layer.scale
-        else:
-            self._prediction_layer = self._viewer.add_labels(
-                label_layer.data,
-                scale=label_layer.scale,
-                name="Predictions",
+        # Check if the predict column already exists in the layer.features
+        if "predict" not in label_layer.features:
+            unique_labels = np.unique(label_layer.data)[1:]
+            predict_df = pd.DataFrame(
+                {self._label_column: unique_labels, "predict": np.NaN}
             )
+            if self._label_column in label_layer.features.columns:
+                label_layer.features = label_layer.features.merge(
+                    predict_df, on=self._label_column, how="outer"
+                )
+            else:
+                label_layer.features = pd.concat(
+                    [label_layer.features, predict_df], axis=1
+                )
+
+        # Update the label data in the prediction layer
+        self._prediction_layer.data = label_layer.data
+        self._prediction_layer.scale = label_layer.scale
+
+        # Update the colormap of the prediction layer
         reset_display_colormaps(
             label_layer,
             feature_col="predict",

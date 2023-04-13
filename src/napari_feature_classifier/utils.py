@@ -133,3 +133,14 @@ def get_valid_label_layers(viewer) -> list[str]:
     ]
 
 
+def get_selected_or_valid_label_layer(viewer) -> napari.layers.Labels:
+    # Get the selected label layer, or the first valid label layer
+    # This is None if no layer or multiple layers are selected
+    selected_layer = viewer.layers.selection.active
+    valid_layers = get_valid_label_layers(viewer=viewer)
+    if selected_layer and selected_layer in valid_layers:
+        return viewer.layers[selected_layer.name]
+    elif len(valid_layers) > 0:
+        return valid_layers[0]
+    else:
+        raise NotImplementedError("No valid label layers were found")
