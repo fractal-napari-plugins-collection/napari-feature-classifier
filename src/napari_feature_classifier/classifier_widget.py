@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from typing import Optional
+from typing import Optional, Sequence, cast
 
 import imageio
 import napari
@@ -8,7 +8,7 @@ import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
-from magicgui.widgets import Container, FileEdit, LineEdit, PushButton, Select
+from magicgui.widgets import Container, ComboBox, FileEdit, LineEdit, PushButton, Select, create_widget
 from napari.utils.notifications import show_info
 
 
@@ -20,6 +20,7 @@ from napari_feature_classifier.annotator_widget import (
 )
 from napari_feature_classifier.classifier_new import Classifier
 from napari_feature_classifier.utils import get_colormap, reset_display_colormaps
+from napari_feature_classifier.label_layer_selector import LabelLayerSelector
 
 
 def main():
@@ -113,6 +114,7 @@ class ClassifierRunContainer(Container):
         )
         self._run_button.clicked.connect(self.run)
         self._save_button.clicked.connect(self.save)
+
 
     def run(self):
         # TODO:
@@ -231,21 +233,21 @@ class ClassifierRunContainer(Container):
         self._classifier.save(output_path)
 
 
-class LoadClassifierContainer(Container):
-    def __init__(self, viewer: napari.viewer.Viewer):
-        self._viewer = viewer
-        self._clf_destination = FileEdit(mode="r", filter="*.clf")
-        self._load_button = PushButton(label="Load Classifier")
-        super().__init__(widgets=[self._clf_destination, self._load_button])
-        self._load_button.clicked.connect(self.load)
+# class LoadClassifierContainer(Container):
+#     def __init__(self, viewer: napari.viewer.Viewer):
+#         self._viewer = viewer
+#         self._clf_destination = FileEdit(mode="r", filter="*.clf")
+#         self._load_button = PushButton(label="Load Classifier")
+#         super().__init__(widgets=[self._clf_destination, self._load_button])
+#         self._load_button.clicked.connect(self.load)
 
-    def load(self):
-        show_info("loading classifier")
-        # FIXME: Load the actual classifier & pass it as an input
-        # No more tmp class_names & feature_names
-        class_names_tmp = ["Class 1", "Class 2", "Class 3"]
-        feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
-        classifier = Classifier(feature_names_tmp, class_names_tmp)
+#     def load(self):
+#         show_info("loading classifier")
+#         # FIXME: Load the actual classifier & pass it as an input
+#         # No more tmp class_names & feature_names
+#         class_names_tmp = ["Class 1", "Class 2", "Class 3"]
+#         feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
+#         classifier = Classifier(feature_names_tmp, class_names_tmp)
 
 
 class LoadClassifierContainer(Container):
