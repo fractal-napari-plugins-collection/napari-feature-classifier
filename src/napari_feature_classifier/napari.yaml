@@ -17,6 +17,9 @@ contributions:
     - id: napari-feature-classifier.load_classifier_new
       python_name: napari_feature_classifier.classifier_widget:LoadClassifierContainer
       title: Load a Classifier (new)
+    - id: napari-feature-classifier.layer_selection_plugin
+      python_name: napari_feature_classifier.layer_selection_plugin:LabelSelector
+      title: Layer selection Test
   widgets:
     - command: napari-feature-classifier.initialize_classifier
       display_name: Initialize a Classifier
@@ -28,3 +31,5 @@ contributions:
       display_name: Initialize a Classifier (new)
     - command: napari-feature-classifier.load_classifier_new
       display_name: Load Classifier (new)
+    - command: napari-feature-classifier.layer_selection_plugin
+      display_name: Layer selection Test
