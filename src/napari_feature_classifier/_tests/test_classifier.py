@@ -17,6 +17,38 @@ def get_classifier():
     return Classifier(feature_names=CLASSIFIER_FEATURE_NAMES,
                       class_names=CLASS_NAMES)
 
+def get_train_predict_dfs():
+    df_train = pd.DataFrame(
+        {
+            "roi_id": ["site1"] * 50,
+            "label": range(1, 50 + 1),
+            "annotations": [1, 2, 1, 1, 2] * 10,
+            **{feature_name: np.random.randn(50) for feature_name in TABLE_FEATURE_NAMES},
+
+        }
+    )
+    df_predict = pd.DataFrame(
+        {
+            "roi_id": ["site2"] * 50,
+            "label": range(1, 50 + 1),
+            # "annotations": [1, 2, 1, 1, 2] * 10,
+            **{feature_name: np.random.randn(50) for feature_name in TABLE_FEATURE_NAMES},
+
+        }
+    )
+    return df_train, df_predict
+
+# TODO: Add a real test.
+def test_prediction():
+    df_train, df_predict = get_train_predict_dfs()
+    df_predict_with_nans = df_predict.copy()
+    df_predict_with_nans.loc[[5, 10, 23], 'feature1'] = np.nan
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+    predictions = c.predict(df_predict_with_nans)
+    return predictions
+
 
 def get_df():
     n = 5

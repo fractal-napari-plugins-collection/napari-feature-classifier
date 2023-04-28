@@ -23,7 +23,7 @@ class Classifier:
         self._classifier = classifier
         self._training_data_perc: float = 0.8
         self._index_columns: list[str] = ["roi_id", "label"]
-        self._input_schema, self._schema = get_input_and_internal_schemas(
+        self._input_schema, self._schema, self._predict_schema = get_input_internal_and_predict_schemas(
             feature_names=feature_names,
             index_columns=self._index_columns,
             class_names=self._class_names,
@@ -61,14 +61,19 @@ class Classifier:
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
         return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
 
-    # TODO: Add predictions
     def predict(self, df):
-        # FIXME: Generate actual predictions for the df
         # FIXME: SettingWithCopyWarning => check if the actual run still
         # generates one, when we actually predict something
-        with pd.option_context("mode.chained_assignment", None):
-            df["predict"] = np.random.randint(1, 4, size=len(df))
-        return df[["predict"]]
+        df_valid = self._validate_predict_features(df)
+        prediction = self._classifier.predict(df_valid)
+        prediction = pd.Series(data=prediction, index=df_valid.index, dtype=pd.Int64Dtype()).rename('prediction')
+        aligned_prediction = (
+            df
+            .reset_index()
+            .set_index(self._index_columns)
+            .merge(prediction, left_index=True, right_index=True, how='outer')
+        )['prediction']
+        return aligned_prediction
 
     def predict_on_dict(self, dict_of_dfs):
         # Make a prediction on each of the dataframes provided
@@ -87,6 +92,17 @@ class Classifier:
         index_delete = df_valid[df_valid.annotations == -1].index
         self._data = merged_data.drop(index=index_delete)
         return self
+    
+    def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
+        df_no_nans = df.dropna(subset=self._feature_names)
+        if len(df) != len(df_no_nans):
+            print(
+                f"Could not do predictions for {len(df)-len(df_no_nans)}/{len(df)} "
+                "objects because of features that contained `NA`s."
+            )
+        
+        df_valid = self._predict_schema.validate(df_no_nans).set_index(self._index_columns)
+        return df_valid
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
         # Drop rows that don't have annotations
@@ -97,7 +113,7 @@ class Classifier:
         if len(df_no_nans) != len(df_annotated):
             print(
                 f"Dropped {len(df_annotated)-len(df_no_nans)}/{len(df_annotated)} "
-                "objects because of features that contained `NA`s"
+                "objects because of features that contained `NA`s."
             )
 
         # Validat the dataframe according to the schemas
@@ -164,7 +180,7 @@ def get_random_object_id(n_chars=10):
 
 # TODO: This is cursed, annotations is supposed to be a nullable pandas int type but
 # those don't seem to be recognized by pa.Check(ignore_na=True) when doing the checks :(
-def get_input_and_internal_schemas(
+def get_input_internal_and_predict_schemas(
     feature_names: Sequence[str],
     class_names: Sequence[str],
     index_columns: Sequence[str] = ("roi_id", "label"),
@@ -200,4 +216,6 @@ def get_input_and_internal_schemas(
     internal_schema = input_schema.set_index(list(index_columns)).add_columns(
         {"hash": pa.Column(pa.Float32, coerce=True, checks=pa.Check.between(0.0, 1.0))}
     )
-    return input_schema, internal_schema
+
+    predict_schema = input_schema.remove_columns(['annotations'])
+    return input_schema, internal_schema, predict_schema
