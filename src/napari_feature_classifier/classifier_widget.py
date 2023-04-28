@@ -179,6 +179,11 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
 
     def run(self):
+        # self.add_features_to_classifier()
+        self._classifier.train()  # Show performance of training
+        self.make_predictions()
+
+    def add_features_to_classifier(self):
         # Generate a dict of features: Key are roi_ids, values are dataframes from layer.features.
         dict_of_features = {}
         for layer in self._viewer.layers:
@@ -202,18 +207,6 @@ class ClassifierRunContainer(Container):
                     dict_of_features[layer.name] = layer.features
         self._classifier.add_dict_of_features(dict_of_features)
 
-        # TODO:
-        # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
-        # => (label layer hashing for unique IDs if roi_id does not exist yet) => later, start with layer name as roi_id
-        # 2. Update classifier internal feature store
-        # 3. Train the classifier
-        # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
-        # new_df = pd.DataFrame()
-        # Provides a dict with ROI id as key and df as value
-        # self._classifier.add_features(new_df)
-        self._classifier.train()  # Show performance of training
-        self.make_predictions()
-
     def make_predictions(self):
         # Get all the label layers that have fitting features
         relevant_label_layers = self.get_relevant_label_layers()
@@ -222,7 +215,11 @@ class ClassifierRunContainer(Container):
         prediction_dfs = {}
         for label_layer in relevant_label_layers:
             roi_id = self.get_layer_roi_id(label_layer)
-            # FIXME: Check that roi_id does not exist yet (from another label layer)
+            if roi_id in prediction_dfs.keys():
+                raise ValueError(
+                    f"Duplicate roi_id {roi_id} found in {label_layer.name}. "
+                    "It's already present as the roi_id of another label layer. "
+                )
             prediction_dfs[roi_id] = self.get_relevant_features(label_layer.features)
 
         # Get the classifier predictions
@@ -241,14 +238,8 @@ class ClassifierRunContainer(Container):
                 right_index=True,
                 how="outer",
             )
-
-        # TODO: Create/update the prediction layer for the currently selected label layer
-        # FIXME: Get the right label layer
-        label_layer = relevant_label_layers[0]
-        self._init_prediction_layer(label_layer)
-        # TODO: Make the selection change to the label layer with the features
-        # TODO: Make the prediction layer change based on selection of label layer
-        # TODO: Turn off the annotation layer? Or ok like that?
+        
+        self._init_prediction_layer(self._last_selected_label_layer)
 
     def selection_changed(self):
         # Check if the selection change results in a valid label layer being
@@ -304,8 +295,12 @@ class ClassifierRunContainer(Container):
         return relevant_label_layers
 
     def get_layer_roi_id(self, label_layer):
-        # FIXME: Check that roi_id only has 1 value in the column
-        return label_layer.features[self._roi_id_colum].unique()[0]
+        roi_ids = label_layer.features[self._roi_id_colum].unique()
+        if len(roi_ids) > 1:
+            raise NotImplementedError(
+                f"{label_layer=} contained no-unique roi_ids: {roi_ids}"
+            )
+        return roi_ids[0]
 
     def get_relevant_features(self, df, filter_annotations: bool = False):
         # Get the relevant features from the pandas table
@@ -337,23 +332,6 @@ class ClassifierRunContainer(Container):
         # FIXME: Add options to define output_path & use that
         output_path = Path("sample_data/test_saving.clf")
         self._classifier.save(output_path)
-
-
-# class LoadClassifierContainer(Container):
-#     def __init__(self, viewer: napari.viewer.Viewer):
-#         self._viewer = viewer
-#         self._clf_destination = FileEdit(mode="r", filter="*.clf")
-#         self._load_button = PushButton(label="Load Classifier")
-#         super().__init__(widgets=[self._clf_destination, self._load_button])
-#         self._load_button.clicked.connect(self.load)
-
-#     def load(self):
-#         show_info("loading classifier")
-#         # FIXME: Load the actual classifier & pass it as an input
-#         # No more tmp class_names & feature_names
-#         class_names_tmp = ["Class 1", "Class 2", "Class 3"]
-#         feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
-#         classifier = Classifier(feature_names_tmp, class_names_tmp)
 
 
 class LoadClassifierContainer(Container):
