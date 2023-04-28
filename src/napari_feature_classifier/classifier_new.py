@@ -9,13 +9,19 @@ import pandera as pa
 import xxhash
 
 import numpy as np
-import pandas as pd
 from napari.utils.notifications import show_info
 
+from sklearn.metrics import f1_score
+from sklearn.ensemble import RandomForestClassifier
+
+
+
 class Classifier:
-    def __init__(self, feature_names, class_names):
+    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
         self._feature_names: list[str] = list(feature_names)
         self._class_names: list[str] = list(class_names)
+        self._classifier = classifier
+        self._training_data_perc: float = 0.8
         self._index_columns: list[str] = ["roi_id", "label"]
         self._input_schema, self._schema = get_input_and_internal_schemas(
             feature_names=feature_names,
@@ -27,11 +33,35 @@ class Classifier:
         # Can remove `self._schema.validate` call once fixed.
         self._data: pd.DataFrame = self._schema.validate(self._schema.example(0))
 
+    # TODO: Add tests.
     def train(self):
-        # TODO: Train the classifier
         show_info("Training classifier...")
-        # TODO: Share training score
+        train_data = self._data[self._data.hash < self._training_data_perc]
+        test_data = self._data[self._data.hash >= self._training_data_perc]
+        
+        X_train = train_data.drop(['hash', 'annotations'], axis=1)
+        X_test = test_data.drop(['hash', 'annotations'], axis=1)
+        
+        y_train = train_data['annotations']
+        y_test = test_data['annotations']
 
+        self._classifier.fit(X_train, y_train)
+
+        f1 = f1_score(y_test, self._classifier.predict(X_test), average="macro")
+        # napari_info("F1 score on test set: {}".format(f1))
+        show_info(
+            f"F1 score on test set: {f1} \n"
+            f"Annotations split into {len(X_train)} training and {len(X_test)} "
+            "test samples. \n"
+            f"Training set contains {self.get_counts_per_class(y_train)}. \n"
+            f"Test set contains {self.get_counts_per_class(y_test)}."
+        )
+        return f1
+    
+    def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
+        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
+
+    # TODO: Add predictions
     def predict(self, df):
         # FIXME: Generate actual predictions for the df
         # FIXME: SettingWithCopyWarning => check if the actual run still
@@ -56,6 +86,7 @@ class Classifier:
 
         index_delete = df_valid[df_valid.annotations == -1].index
         self._data = merged_data.drop(index=index_delete)
+        return self
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
         # Drop rows that don't have annotations
