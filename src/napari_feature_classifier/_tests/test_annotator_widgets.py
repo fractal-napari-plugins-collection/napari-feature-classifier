@@ -8,7 +8,7 @@ from napari_feature_classifier.annotator_widget import (
     get_class_selection
 )
 
-lbl_img_np = imageio.v2.imread(Path("sample_data/test_labels.tif"))
+lbl_img_np = imageio.v2.imread(Path("src/napari_feature_classifier/sample_data/test_labels.tif"))
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object

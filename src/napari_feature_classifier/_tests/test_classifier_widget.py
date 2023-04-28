@@ -9,7 +9,7 @@ from napari_feature_classifier.classifier_widget import (
     ClassifierWidget,
 )
 
-lbl_img_np = imageio.v2.imread(Path("sample_data/test_labels.tif"))
+lbl_img_np = imageio.v2.imread(Path("src/napari_feature_classifier/sample_data/test_labels.tif"))
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
