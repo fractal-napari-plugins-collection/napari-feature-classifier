@@ -15,7 +15,6 @@ from magicgui.widgets import (
     LineEdit,
     PushButton,
     Select,
-    create_widget,
 )
 from napari.utils.notifications import show_info
 
@@ -56,7 +55,6 @@ def main():
     # viewer.window.add_dock_widget(classifier_widget)
     # viewer.window.add_dock_widget(load_widget)
     viewer.show(block=True)
-    # dir(lbls_layer.features)
 
 
 class ClassifierInitContainer(Container):
@@ -146,8 +144,7 @@ class ClassifierRunContainer(Container):
             )
             self.class_names = class_names
             self.feature_names = feature_names
-        # FIXME: Should the user be able to select this?
-        # FIXME: Is this a property of the classifier?
+
         self._label_column = "label"
         self._roi_id_colum = "roi_id"
 
@@ -179,7 +176,7 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
 
     def run(self):
-        # self.add_features_to_classifier()
+        self.add_features_to_classifier()
         self._classifier.train()  # Show performance of training
         self.make_predictions()
 
