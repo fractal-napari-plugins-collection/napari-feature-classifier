@@ -162,10 +162,12 @@ class ClassifierRunContainer(Container):
         self._viewer.layers.selection.active = self._last_selected_label_layer
 
         self._run_button = PushButton(text="Run Classifier")
+        self._save_destination = FileEdit(label = "Classifier Save Path", value=f"{self._last_selected_label_layer}_classifier.clf", mode="w")
         self._save_button = PushButton(text="Save Classifier")
         super().__init__(
             widgets=[
                 self._annotator,
+                self._save_destination,
                 self._run_button,
                 self._save_button,
             ]
@@ -326,8 +328,7 @@ class ClassifierRunContainer(Container):
         return df_relevant
 
     def save(self):
-        # FIXME: Add options to define output_path & use that
-        output_path = Path("sample_data/test_saving.clf")
+        output_path = Path(self._save_destination.value)
         self._classifier.save(output_path)
 
 
@@ -350,6 +351,9 @@ class LoadClassifierContainer(Container):
         self._run_container = ClassifierRunContainer(self._viewer, classifier)
         self.clear()
         self.append(self._run_container)
+
+        # TODO: Add functionality that loads existing annotations from the 
+        # classifier and adds them back to the currently open label images
 
 
 class ClassifierWidget(Container):

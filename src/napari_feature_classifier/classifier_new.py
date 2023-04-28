@@ -1,5 +1,6 @@
 # %%
 # FIXME: Get rid of show_info in classifier class
+import pickle
 import random
 import string
 from itertools import chain
@@ -201,76 +202,78 @@ class Classifier:
         return self._feature_names
 
     def save(self, output_path):
-        # TODO: Implement saving
+        # TODO: Check that pickle dump works once helper functions become part of the class
         show_info(f"Saving classifier at {output_path}...")
+        with open(output_path, "wb") as f:
+            f.write(pickle.dumps(self))
 
 
-# # %%
-# feature_names = ["feature1", "feature2", "feature3"]
-# class_names = ["s", "m"]
-# df_raw = pd.read_csv(
-#     r"C:\Users\hessm\Documents\Programming\Python\fractal-napari-plugins\napari-feature-classifier\src\napari_feature_classifier\sample_data\test_df_with_roi.csv"
-# ).assign(feature3=1)
-# df_raw = (
-#     df_raw.assign(
-#         annotations=np.random.randint(1, len(class_names) + 1, size=len(df_raw))
-#     )
-#     .assign(is_train=np.random.randint(2, size=len(df_raw)))
-#     .astype({"annotations": "Int64"})
-# )
-# df_raw.annotations.loc[:3] = None
+# %%
+feature_names = ["feature1", "feature2", "feature3"]
+class_names = ["s", "m"]
+df_raw = pd.read_csv(
+    r"C:\Users\hessm\Documents\Programming\Python\fractal-napari-plugins\napari-feature-classifier\src\napari_feature_classifier\sample_data\test_df_with_roi.csv"
+).assign(feature3=1)
+df_raw = (
+    df_raw.assign(
+        annotations=np.random.randint(1, len(class_names) + 1, size=len(df_raw))
+    )
+    .assign(is_train=np.random.randint(2, size=len(df_raw)))
+    .astype({"annotations": "Int64"})
+)
+df_raw.annotations.loc[:3] = None
 
-# df = df_raw.set_index(["roi_id", "label"])
-# df2 = (
-#     (df_raw.set_index("roi_id") + 17)
-#     .reset_index()
-#     .set_index(["roi_id", "label"])
-#     .subtract(17)
-# )
-# df3 = df_raw.drop("roi_id", axis=1).assign(roi_id="site2")
-# # %%
-# c = Classifier(["feature1", "feature2", "feature3"], ["s", "m"])
+df = df_raw.set_index(["roi_id", "label"])
+df2 = (
+    (df_raw.set_index("roi_id") + 17)
+    .reset_index()
+    .set_index(["roi_id", "label"])
+    .subtract(17)
+)
+df3 = df_raw.drop("roi_id", axis=1).assign(roi_id="site2")
+# %%
+c = Classifier(["feature1", "feature2", "feature3"], ["s", "m"])
+print(c._data)
+c.add_features(df)
+print(c._data)
+c.add_features(df2)
+print(c._data)
+# c.add_features(df * 2)
 # print(c._data)
-# c.add_features(df)
-# print(c._data)
-# c.add_features(df2)
-# print(c._data)
-# # c.add_features(df * 2)
-# # print(c._data)
-# c.add_features(df3)
-# print(c._data)
-# # print((c._data.hash < 0.2).sum() / len(c._data))
+c.add_features(df3)
+print(c._data)
+# print((c._data.hash < 0.2).sum() / len(c._data))
 
-# # %%
-# feature_names = ["feature1", "feature2", "feature3"]
-# input_schema = get_input_schema(feature_names)
-# schema = input_schema.set_index(["roi_id", "label"])
-# # %%
-# input_schema.validate(df.reset_index().reset_index())
+# %%
+feature_names = ["feature1", "feature2", "feature3"]
+input_schema = get_input_schema(feature_names)
+schema = input_schema.set_index(["roi_id", "label"])
+# %%
+input_schema.validate(df.reset_index().reset_index())
 
-# # %%
-# schema = pa.DataFrameSchema(
-#     columns={
-#         "feature1": pa.Column(pa.Float32, coerce=True),
-#         "feature2": pa.Column(pa.Float32, coerce=True),
-#     },
-#     index=pa.MultiIndex(
-#         [
-#             pa.Index(pa.String, name="idx1", coerce=True),
-#             pa.Index(pa.Int64, name="idx2", coerce=True),
-#         ]
-#     ),
-# )
+# %%
+schema = pa.DataFrameSchema(
+    columns={
+        "feature1": pa.Column(pa.Float32, coerce=True),
+        "feature2": pa.Column(pa.Float32, coerce=True),
+    },
+    index=pa.MultiIndex(
+        [
+            pa.Index(pa.String, name="idx1", coerce=True),
+            pa.Index(pa.Int64, name="idx2", coerce=True),
+        ]
+    ),
+)
 
-# df = pd.DataFrame(
-#     data={
-#         "idx1": ["a", "b", "c"],
-#         "idx2": [0, 1, 2],
-#         "feature1": [1.0, 2.0, 3.0],
-#         "feature2": [4.0, 5.0, 6.0],
-#     }
-# ).set_index(["idx1", "idx2"])
+df = pd.DataFrame(
+    data={
+        "idx1": ["a", "b", "c"],
+        "idx2": [0, 1, 2],
+        "feature1": [1.0, 2.0, 3.0],
+        "feature2": [4.0, 5.0, 6.0],
+    }
+).set_index(["idx1", "idx2"])
 
-# df_valid = schema.validate(df)
+df_valid = schema.validate(df)
 
-# df_example = schema.example(3)
+df_example = schema.example(3)
