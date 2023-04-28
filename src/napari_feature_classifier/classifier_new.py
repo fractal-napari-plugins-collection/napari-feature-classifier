@@ -49,7 +49,6 @@ class Classifier:
         return predicted_dicts
 
     def add_features(self, df_raw: pd.DataFrame):
-        # TODO: make sure objects with `annotation` == np.na get removed.
         df_valid = self._validate_input_features(df_raw.reset_index())
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
