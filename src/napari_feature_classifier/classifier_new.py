@@ -51,8 +51,8 @@ class Classifier:
     def add_features(self, df_raw: pd.DataFrame):
         # TODO: make sure objects with `annotation` == np.na get removed.
         show_info("Adding features...")
-        print(df_raw)
-        df_valid = self._validate_input_features(df_raw)
+
+        df_valid = self._validate_input_features(df_raw.reset_index())
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
         merged_data = pd.concat([self._data.loc[index], df_valid]).sort_index()
