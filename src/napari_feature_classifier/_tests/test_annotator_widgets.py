@@ -1,30 +1,14 @@
 """ Tests for annotator widget initialization"""
 import numpy as np
+import imageio
+from pathlib import Path
 from napari_feature_classifier.annotator_init_widget import InitializeLabelAnnotatorWidget
 from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
     get_class_selection
 )
 
-# Define a simple test label image for all widgets
-shape = (1, 50, 50)
-lbl_img_np = np.zeros(shape).astype('uint16')
-lbl_img_np[0, 5:10, 5:10] = 1
-lbl_img_np[0, 15:20, 5:10] = 2
-lbl_img_np[0, 25:30, 5:10] = 3
-lbl_img_np[0, 5:10, 15:20] = 4
-lbl_img_np[0, 15:20, 15:20] = 5
-lbl_img_np[0, 25:30, 15:20] = 6
-lbl_img_np[0, 35:40, 15:20] = 7
-lbl_img_np[0, 35:40, 25:30] = 8
-lbl_img_np[0, 5:10, 35:40] = 9
-lbl_img_np[0, 25:30, 25:30] = 10
-lbl_img_np[0, 25:30, 35:40] = 11
-lbl_img_np[0, 5:10, 25:30] = 12
-lbl_img_np[0, 15:20, 25:30] = 13
-lbl_img_np[0, 15:20, 35:40] = 14
-lbl_img_np[0, 35:40, 5:10] = 15
-lbl_img_np[0, 35:40, 35:40] = 16
+lbl_img_np = imageio.v2.imread(Path("sample_data/test_labels.tif"))
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
