@@ -1,7 +1,7 @@
-""" Tests for 3 core dock widgets to see if their initialization generates errors"""
+""" Tests for classifier widget initialization"""
 import numpy as np
 from napari_feature_classifier.classifier_widget import (
-    ClassifierWidget, 
+    ClassifierWidget,
 )
 
 # Define a simple test label image for all widgets
@@ -27,13 +27,13 @@ lbl_img_np[0, 35:40, 35:40] = 16
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
-def test_classifier_widgets(make_napari_viewer, capsys):
+def test_classifier_widgets(make_napari_viewer):
     """
     Tests if the main widget launches
     """
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
-    label_layer = viewer.add_labels(lbl_img_np)
+    _ = viewer.add_labels(lbl_img_np)
 
     # Start init widget
     classifier_widget = ClassifierWidget(viewer)

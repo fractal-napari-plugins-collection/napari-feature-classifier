@@ -14,10 +14,12 @@ from napari.utils.notifications import show_info
 def join_index_columns(df: pd.DataFrame, index_columns: Sequence[str]) -> pd.Series:
     orig_index = df.index
     return pd.Series(
-        (df.reset_index()
-         .loc[:, list(index_columns)]
-         .apply(lambda x: "_".join(map(str, x)), axis=1)).values,
-        index=orig_index
+        (
+            df.reset_index()
+            .loc[:, list(index_columns)]
+            .apply(lambda x: "_".join(map(str, x)), axis=1)
+        ).values,
+        index=orig_index,
     ).rename("object_id")
 
 
@@ -74,8 +76,7 @@ def get_input_and_internal_schemas(
     )
 
     internal_schema = input_schema.set_index(list(index_columns)).add_columns(
-        {"hash": pa.Column(pa.Float32, coerce=True,
-                           checks=pa.Check.between(0.0, 1.0))}
+        {"hash": pa.Column(pa.Float32, coerce=True, checks=pa.Check.between(0.0, 1.0))}
     )
     return input_schema, internal_schema
 
@@ -93,8 +94,7 @@ class Classifier:
         # TODO: `self._schema.example(0)` does not return correct datatypes for
         # MultiIndex (issue: https://github.com/unionai-oss/pandera/issues/1049).
         # Can remove `self._schema.validate` call once fixed.
-        self._data: pd.DataFrame = self._schema.validate(
-            self._schema.example(0))
+        self._data: pd.DataFrame = self._schema.validate(self._schema.example(0))
 
     def train(self):
         # TODO: Train the classifier
@@ -131,19 +131,20 @@ class Classifier:
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
         # Drop rows that don't have annotations
-        df_annotated = df.dropna(subset='annotations')
+        df_annotated = df.dropna(subset="annotations")
 
         # Drop rows that have features with `NA`s, notify the user.
         df_no_nans = df_annotated.dropna()
         if len(df_no_nans) != len(df):
             print(
-                f"Dropped {len(df)-len(df_no_nans)}/{len(df)} objects because of features that contained `NA`s")
+                f"Dropped {len(df)-len(df_no_nans)}/{len(df)} "
+                "objects because of features that contained `NA`s"
+            )
 
         # Validat the dataframe according to the schemas
         df_valid_input = self._input_schema.validate(df_no_nans)
         df_valid_internal = df_valid_input.assign(
-            hash=get_normalized_hash_column(
-                df_valid_input, self._index_columns)
+            hash=get_normalized_hash_column(df_valid_input, self._index_columns)
         ).set_index(self._index_columns)
         return df_valid_internal
 
