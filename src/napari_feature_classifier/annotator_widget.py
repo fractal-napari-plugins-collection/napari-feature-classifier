@@ -1,3 +1,4 @@
+"""Annotator container widget for napari"""
 import math
 import warnings
 from enum import Enum
@@ -20,9 +21,12 @@ from magicgui.widgets import (
 )
 from napari.utils.notifications import show_info
 
-from napari_feature_classifier.utils import get_colormap, reset_display_colormaps, get_valid_label_layers, get_selected_or_valid_label_layer
-from napari_feature_classifier.label_layer_selector import LabelLayerSelector
-
+from napari_feature_classifier.utils import (
+    get_colormap,
+    reset_display_colormaps,
+    get_valid_label_layers,
+    get_selected_or_valid_label_layer,
+)
 
 def get_class_selection(
     n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
@@ -35,7 +39,9 @@ def get_class_selection(
         n_classes = len(class_names)
     if n_classes != len(class_names):
         warnings.warn(
-            f"Value provided for `n_classes` ({n_classes}) does not match the length of `class_names` ({len(class_names)}). Setting n_classes to {len(class_names)}"
+            f"Value provided for `n_classes` ({n_classes}) does not match "
+            f"the length of `class_names` ({len(class_names)}). "
+            f"Setting n_classes to {len(class_names)}."
         )
     assert len(class_names) == len(
         set(class_names)
@@ -50,8 +56,8 @@ def get_class_selection(
 
 class LabelAnnotator(Container):
     """
-    The `LabelAnnotator` widget manages the annotation of a label layer by 
-    monitoring clicks on the selected label layer, adding annotations to the 
+    The `LabelAnnotator` widget manages the annotation of a label layer by
+    monitoring clicks on the selected label layer, adding annotations to the
     layer.features df and coloring an annotation layer accordingly.
 
     Paramters
@@ -66,25 +72,26 @@ class LabelAnnotator(Container):
     viewer: napari.Viewer
         The current napari.Viewer instance
     _label_column: str
-        The column name of the label column in the layer.features dataframe, 
+        The column name of the label column in the layer.features dataframe,
         hard-coded to "label"
     _last_selected_label_layer: napari.layers.Labels
         The last selected valid label layer
     last_selected_layer_label: magicgui.widgets.Label
         The Label widget for displaying the last selected label layer
     _annotations_layer: napari.layers.Labels
-        The layer to on which annotations are displayed. This layer is not 
+        The layer to on which annotations are displayed. This layer is not
         editable by the user.
     ClassSelection: Enum
-        The class selection to use for the annotation. 
+        The class selection to use for the annotation.
     nb_classes: int
         The number of classes in the class selection (not counting deselection)
     cmap: matplotlib.colors.Colormap
         The colormap to use for the annotation layer
     _class_selector: magicgui.widgets.RadioButtons
-        The RadioButtons widget for selecting the class to annotate. 
+        The RadioButtons widget for selecting the class to annotate.
         Can also be controlled via the number keys.
     """
+
     # TODO: Do we need to keep the annotation layer on top when new annotations are made?
     def __init__(
         self,
@@ -94,9 +101,13 @@ class LabelAnnotator(Container):
         self._viewer = viewer
         self._label_column = "label"
 
-        self._last_selected_label_layer = get_selected_or_valid_label_layer(viewer=self._viewer)
+        self._last_selected_label_layer = get_selected_or_valid_label_layer(
+            viewer=self._viewer
+        )
 
-        self.last_selected_layer_label = Label(label = "Last selected label layer:", value=self._last_selected_label_layer)
+        self.last_selected_layer_label = Label(
+            label="Last selected label layer:", value=self._last_selected_label_layer
+        )
 
         self._annotations_layer = self._viewer.add_labels(
             self._last_selected_label_layer.data,
@@ -122,7 +133,9 @@ class LabelAnnotator(Container):
             ),
         )
         self._init_annotation(self._last_selected_label_layer)
-        self._save_destination = FileEdit(label = "Save Path", value=f"annotation.csv", mode="r")
+        self._save_destination = FileEdit(
+            label="Save Path", value="annotation.csv", mode="r"
+        )
         self._save_annotation = PushButton(label="Save Annotations")
         self._update_save_destination(self._last_selected_label_layer)
         super().__init__(
@@ -138,15 +151,19 @@ class LabelAnnotator(Container):
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
 
     def selection_changed(self, event):
-        # Check if the selection change results in a valid label layer being 
+        # Check if the selection change results in a valid label layer being
         # selected. If so, initialize the annotator for it.
         if self._viewer.layers.selection.active:
-            if self._viewer.layers.selection.active in get_valid_label_layers(viewer=self._viewer):
+            if self._viewer.layers.selection.active in get_valid_label_layers(
+                viewer=self._viewer
+            ):
                 self._init_annotation(self._viewer.layers.selection.active)
                 self._save_annotation.enabled = True
                 self._save_destination.enabled = True
                 self._class_selector.enabled = True
-                self.last_selected_layer_label.value = self._viewer.layers.selection.active
+                self.last_selected_layer_label.value = (
+                    self._viewer.layers.selection.active
+                )
                 self._last_selected_label_layer = self._viewer.layers.selection.active
             else:
                 self._save_annotation.enabled = False
