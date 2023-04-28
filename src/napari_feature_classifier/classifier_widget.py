@@ -20,7 +20,7 @@ from magicgui.widgets import (
 from napari.utils.notifications import show_info
 
 
-from feature_loader_widget import LoadFeaturesContainer, make_features
+from napari_feature_classifier.feature_loader_widget import LoadFeaturesContainer, make_features
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
