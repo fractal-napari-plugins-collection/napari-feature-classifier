@@ -82,6 +82,7 @@ class Classifier:
     def add_dict_of_features(self, dict_of_features):
         # Add features for each roi
         # dict_of_features is a dict with roi as key & df as value
+        print(f"Adding {dict_of_features}")
         for roi in dict_of_features:
             if "roi_id" not in dict_of_features[roi]:
                 df = dict_of_features[roi]["roid_id"] = roi
