@@ -47,9 +47,10 @@ def get_class_selection(
         set(class_names)
     ), f"{class_names=} contains duplicate entries!"
 
+    # Setting NoClass to -1.0 => Deselection that is sent to the classifier
     ClassSelection = Enum(
         "ClassSelection",
-        {"NoClass": np.nan, **{c: i + 1 for i, c in enumerate(class_names)}},
+        {"NoClass": -1.0, **{c: i + 1 for i, c in enumerate(class_names)}},
     )
     return ClassSelection
 
