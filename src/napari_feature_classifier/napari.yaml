@@ -2,34 +2,19 @@ name: napari-feature-classifier
 display_name: napari feature classifier
 contributions:
   commands:
-    - id: napari-feature-classifier.initialize_classifier
-      python_name: napari_feature_classifier.classifier_widgets:initialize_classifier
-      title: Initialize a Classifier
-    - id: napari-feature-classifier.load_classifier
-      python_name: napari_feature_classifier.classifier_widgets:load_classifier
-      title: Load a Classifier
     - id: napari-feature-classifier.annotator_init_widget
       python_name: napari_feature_classifier.annotator_init_widget:InitializeLabelAnnotatorWidget
       title: Annotator
     - id: napari-feature-classifier.initialize_classifier_new
       python_name: napari_feature_classifier.classifier_widget:ClassifierWidget
-      title: Initialize a Classifier (new)
+      title: Initialize a Classifier
     - id: napari-feature-classifier.load_classifier_new
       python_name: napari_feature_classifier.classifier_widget:LoadClassifierContainer
-      title: Load a Classifier (new)
-    - id: napari-feature-classifier.layer_selection_plugin
-      python_name: napari_feature_classifier.layer_selection_plugin:LabelSelector
-      title: Layer selection Test
+      title: Load a Classifier
   widgets:
-    - command: napari-feature-classifier.initialize_classifier
-      display_name: Initialize a Classifier
-    - command: napari-feature-classifier.load_classifier
-      display_name: Load Classifier
     - command: napari-feature-classifier.annotator_init_widget
       display_name: Annotator
     - command: napari-feature-classifier.initialize_classifier_new
-      display_name: Initialize a Classifier (new)
+      display_name: Initialize a Classifier
     - command: napari-feature-classifier.load_classifier_new
-      display_name: Load Classifier (new)
-    - command: napari-feature-classifier.layer_selection_plugin
-      display_name: Layer selection Test
+      display_name: Load Classifier
