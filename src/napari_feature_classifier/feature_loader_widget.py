@@ -1,6 +1,6 @@
 # %%
 from os import PathLike
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union
 from typing_extensions import TypeAlias
 
 import napari
@@ -19,7 +19,7 @@ class LabelFeatureSchema(pa.SchemaModel):
 
 @pa.check_types
 def load_features_csv(
-    fn: PathLike, index_column_or_columns: str | list[str] = "label"
+    fn: PathLike, index_column_or_columns: Union[str, list[str]] = "label"
 ) -> DataFrame[LabelFeatureSchema]:
     df = pd.read_csv(fn)
     if isinstance(index_column_or_columns, str):
