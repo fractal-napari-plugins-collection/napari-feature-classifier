@@ -48,8 +48,44 @@ def get_class_selection(
     return ClassSelection
 
 
-# TODO: Think about what happens when the widget is closed.
 class LabelAnnotator(Container):
+    """
+    The `LabelAnnotator` widget manages the annotation of a label layer by 
+    monitoring clicks on the selected label layer, adding annotations to the 
+    layer.features df and coloring an annotation layer accordingly.
+
+    Paramters
+    ---------
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+    ClassSelection: Enum
+        The class selection to use for the annotation. Defaults to a 4 class selection.
+
+    Attributes
+    ----------
+    viewer: napari.Viewer
+        The current napari.Viewer instance
+    _label_column: str
+        The column name of the label column in the layer.features dataframe, 
+        hard-coded to "label"
+    _last_selected_label_layer: napari.layers.Labels
+        The last selected valid label layer
+    last_selected_layer_label: magicgui.widgets.Label
+        The Label widget for displaying the last selected label layer
+    _annotations_layer: napari.layers.Labels
+        The layer to on which annotations are displayed. This layer is not 
+        editable by the user.
+    ClassSelection: Enum
+        The class selection to use for the annotation. 
+    nb_classes: int
+        The number of classes in the class selection (not counting deselection)
+    cmap: matplotlib.colors.Colormap
+        The colormap to use for the annotation layer
+    _class_selector: magicgui.widgets.RadioButtons
+        The RadioButtons widget for selecting the class to annotate. 
+        Can also be controlled via the number keys.
+    """
+    # TODO: Do we need to keep the annotation layer on top when new annotations are made?
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
@@ -185,11 +221,6 @@ class LabelAnnotator(Container):
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
-
-    # def _on_label_layer_changed(self):
-    #     label_layer = self._lbl_combo.get_selected_label_layer()
-    #     self._init_annotation(label_layer)
-    #     self._update_save_destination(label_layer)
 
     def update_single_color(self, label_layer, label):
         color = self.cmap(
