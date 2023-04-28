@@ -8,7 +8,15 @@ import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
-from magicgui.widgets import Container, ComboBox, FileEdit, LineEdit, PushButton, Select, create_widget
+from magicgui.widgets import (
+    Container,
+    Label,
+    FileEdit,
+    LineEdit,
+    PushButton,
+    Select,
+    create_widget,
+)
 from napari.utils.notifications import show_info
 
 
@@ -19,7 +27,12 @@ from napari_feature_classifier.annotator_widget import (
     get_class_selection,
 )
 from napari_feature_classifier.classifier_new import Classifier
-from napari_feature_classifier.utils import get_colormap, reset_display_colormaps, get_valid_label_layers, get_selected_or_valid_label_layer
+from napari_feature_classifier.utils import (
+    get_colormap,
+    reset_display_colormaps,
+    get_valid_label_layers,
+    get_selected_or_valid_label_layer,
+)
 
 
 def main():
@@ -47,24 +60,61 @@ def main():
 
 
 class ClassifierInitContainer(Container):
-    def __init__(self, feature_options: list[str]):
+    def __init__(self, viewer: napari.viewer.Viewer):
+        self._viewer = viewer
         self._name_edit = LineEdit(value="classifier", label="Classifier Name:")
-        self._feature_combobox = Select(
-            choices=feature_options, allow_multiple=True, label="Feature Selection:"
+        try:
+            self._last_selected_label_layer = get_selected_or_valid_label_layer(
+                viewer=self._viewer
+            )
+        except NotImplementedError:
+            self._last_selected_label_layer = None
+        # TODO: Make this label left-aligned, not centered
+        self.last_selected_layer_label = Label(
+            label="Selecting features from:", value=self._last_selected_label_layer
         )
+        self._feature_combobox = Select(
+            choices=self.get_feature_options(self._last_selected_label_layer),
+            allow_multiple=True,
+            label="Feature Selection:",
+        )
+        self._label = 1
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         self._initialize_button = PushButton(text="Initialize")
         super().__init__(
             widgets=[
                 self._name_edit,
+                self.last_selected_layer_label,
                 self._feature_combobox,
                 self._annotation_name_selector,
                 self._initialize_button,
             ]
         )
+        self._viewer.layers.selection.events.changed.connect(
+            self.update_layer_selection
+        )
 
     def get_selected_features(self):
         return self._feature_combobox.value
+
+    def get_feature_options(self, layer):
+        # Get the feature options of the currently selected layer
+        # Only works if a label layer is selected (we don't load features from other layers)
+        if isinstance(layer, napari.layers.Labels):
+            return list(layer.features.columns)
+        else:
+            return []
+
+    def update_layer_selection(self):
+        if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
+            self._last_selected_label_layer = self._viewer.layers.selection.active
+            self.last_selected_layer_label.value = self._last_selected_label_layer
+            self._feature_combobox.choices = self.get_feature_options(
+                self._last_selected_label_layer
+            )
+            self._feature_combobox._default_choices = self.get_feature_options(
+                self._last_selected_label_layer
+            )
 
 
 class ClassifierRunContainer(Container):
@@ -76,7 +126,9 @@ class ClassifierRunContainer(Container):
         feature_names: Optional[list[str]] = None,
     ):
         self._viewer = viewer
-        self._last_selected_label_layer = get_selected_or_valid_label_layer(viewer=self._viewer)
+        self._last_selected_label_layer = get_selected_or_valid_label_layer(
+            viewer=self._viewer
+        )
         # Initialize the classifier
         if classifier:
             self._classifier = classifier
@@ -126,16 +178,39 @@ class ClassifierRunContainer(Container):
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
         self._init_prediction_layer(self._last_selected_label_layer)
 
-
     def run(self):
+        # Generate a dict of features: Key are roi_ids, values are dataframes from layer.features.
+        dict_of_features = {}
+        for layer in self._viewer.layers:
+            if (
+                isinstance(layer, napari.layers.Labels)
+                and len(layer.features) > 0
+                and "annotations" in layer.features.columns
+            ):
+                # TODO: Add extra checks that it contains valid features?
+                if "roi_id" in layer.features.columns:
+                    roi_ids = layer.features["roi_id"].unique()
+                    if len(roi_ids) > 1:
+                        raise NotImplementedError(
+                            f"{layer=} contained no-unique roi_ids: {roi_ids}"
+                        )
+                    else:
+                        roi_id = roi_ids[0]
+                        dict_of_features[roi_id] = layer.features
+                else:
+                    # TODO: Consider label-layer hashing here instead of using the layer name as roi_id
+                    dict_of_features[layer.name] = layer.features
+        self._classifier.add_dict_of_features(dict_of_features)
+
         # TODO:
         # 1. Scan all open label layers for annotation & features [ignore annotation layer and predict layer]
-        # => label layer hashing for unique IDs if roi_id does not exist yet
+        # => (label layer hashing for unique IDs if roi_id does not exist yet) => later, start with layer name as roi_id
         # 2. Update classifier internal feature store
         # 3. Train the classifier
         # 4. Update the prediction layer (create if non-existent) [for one label image => which one]
-        new_df = pd.DataFrame()
-        self._classifier.add_features(new_df)
+        # new_df = pd.DataFrame()
+        # Provides a dict with ROI id as key and df as value
+        # self._classifier.add_features(new_df)
         self._classifier.train()  # Show performance of training
         self.make_predictions()
 
@@ -158,13 +233,13 @@ class ClassifierRunContainer(Container):
             roi_id = self.get_layer_roi_id(label_layer)
             # Merge the predictions back into the layer.features dataframe
             # TODO: Check that this merge is robust, never drops rows etc.
-            if 'predict' in label_layer.features.columns:
-                label_layer.features.drop(columns=['predict'], inplace=True)
+            if "predict" in label_layer.features.columns:
+                label_layer.features.drop(columns=["predict"], inplace=True)
             label_layer.features = label_layer.features.merge(
                 prediction_results_dict[roi_id],
                 left_on=[self._label_column, self._roi_id_colum],
                 right_index=True,
-                how='outer'
+                how="outer",
             )
 
         # TODO: Create/update the prediction layer for the currently selected label layer
@@ -174,12 +249,14 @@ class ClassifierRunContainer(Container):
         # TODO: Make the selection change to the label layer with the features
         # TODO: Make the prediction layer change based on selection of label layer
         # TODO: Turn off the annotation layer? Or ok like that?
-        
+
     def selection_changed(self):
-        # Check if the selection change results in a valid label layer being 
+        # Check if the selection change results in a valid label layer being
         # selected. If so, initialize the prediction layer for it.
         if self._viewer.layers.selection.active:
-            if self._viewer.layers.selection.active in get_valid_label_layers(viewer=self._viewer):
+            if self._viewer.layers.selection.active in get_valid_label_layers(
+                viewer=self._viewer
+            ):
                 self._last_selected_layer = self._viewer.layers.selection.active
                 self._init_prediction_layer(self._viewer.layers.selection.active)
 
@@ -312,15 +389,7 @@ class ClassifierWidget(Container):
         self.initialize_init_widget()
 
     def initialize_init_widget(self):
-        # Extract features for first label layer
-        # TODO: Handle case where there's no layers.features in the first Labels layer.
-        # TODO: Handle the case where there is no label layer
-        # TODO: Handle the case where the second label layer has the features
-        label_layer = [
-            l for l in self._viewer.layers if isinstance(l, napari.layers.Labels)
-        ][0]
-        feature_names = list(label_layer.features.columns)
-        self._init_container = ClassifierInitContainer(feature_names)
+        self._init_container = ClassifierInitContainer(self._viewer)
         self.append(self._init_container)
         self._init_container._initialize_button.clicked.connect(
             self.initialize_run_widget
