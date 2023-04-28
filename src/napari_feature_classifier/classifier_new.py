@@ -50,8 +50,6 @@ class Classifier:
 
     def add_features(self, df_raw: pd.DataFrame):
         # TODO: make sure objects with `annotation` == np.na get removed.
-        show_info("Adding features...")
-
         df_valid = self._validate_input_features(df_raw.reset_index())
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
@@ -65,10 +63,10 @@ class Classifier:
         df_annotated = df.dropna(subset="annotations")
 
         # Drop rows that have features with `NA`s, notify the user.
-        df_no_nans = df_annotated.dropna()
-        if len(df_no_nans) != len(df):
+        df_no_nans = df_annotated.dropna(subset=self._feature_names)
+        if len(df_no_nans) != len(df_annotated):
             print(
-                f"Dropped {len(df)-len(df_no_nans)}/{len(df)} "
+                f"Dropped {len(df_annotated)-len(df_no_nans)}/{len(df_annotated)} "
                 "objects because of features that contained `NA`s"
             )
 
@@ -82,7 +80,6 @@ class Classifier:
     def add_dict_of_features(self, dict_of_features):
         # Add features for each roi
         # dict_of_features is a dict with roi as key & df as value
-        print(f"Adding {dict_of_features}")
         for roi in dict_of_features:
             if "roi_id" not in dict_of_features[roi]:
                 df = dict_of_features[roi]["roid_id"] = roi
