@@ -183,6 +183,17 @@ class Classifier:
         index = self._data.index.difference(df_valid_internal.index)
         self._data = pd.concat([self._data.loc[index], df_valid_internal]).sort_index()
 
+    def add_dict_of_features(self, dict_of_features):
+        # Add features for each roi
+        # dict_of_features is a dict with roi as key & df as value
+        for roi in dict_of_features:
+            if 'roi_id' not in dict_of_features[roi]:
+                df = dict_of_features[roi]['roid_id'] = roi
+            else:
+                df = df = dict_of_features[roi]
+            show_info(f"Adding features for {roi=}...")
+            self.add_features(df)
+
     def get_class_names(self):
         return self._class_names
 
