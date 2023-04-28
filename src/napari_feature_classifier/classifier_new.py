@@ -11,11 +11,6 @@ import xxhash
 import numpy as np
 import pandas as pd
 from napari.utils.notifications import show_info
-from napari_feature_classifier.classifier_utils import (
-    get_input_and_internal_schemas,
-    get_normalized_hash_column,
-)
-
 
 class Classifier:
     def __init__(self, feature_names, class_names):
@@ -56,7 +51,7 @@ class Classifier:
     def add_features(self, df_raw: pd.DataFrame):
         # TODO: make sure objects with `annotation` == np.na get removed.
         show_info("Adding features...")
-
+        print(df_raw)
         df_valid = self._validate_input_features(df_raw)
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
