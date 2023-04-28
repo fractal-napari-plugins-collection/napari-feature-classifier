@@ -15,7 +15,7 @@ from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
 
 
-
+#TODO: define an interface for compatible classifiers (m.b. a subset of sklearn Estimators?)
 class Classifier:
     def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
         self._feature_names: list[str] = list(feature_names)
