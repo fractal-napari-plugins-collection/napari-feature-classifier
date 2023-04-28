@@ -1,10 +1,8 @@
-""" Tests for 3 core dock widgets to see if their initialization generates errors"""
-from pathlib import Path
+""" Tests for annotator widget initialization"""
 import numpy as np
-import pandas as pd
-from napari_feature_classifier.annotator_init_widget import InitializeLabelAnnotator
+from napari_feature_classifier.annotator_init_widget import InitializeLabelAnnotatorWidget
 from napari_feature_classifier.annotator_widget import (
-    LabelAnnotator, 
+    LabelAnnotator,
     get_class_selection
 )
 
@@ -31,7 +29,7 @@ lbl_img_np[0, 35:40, 35:40] = 16
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
-def test_annotator_widgets(make_napari_viewer, capsys):
+def test_annotator_widgets(make_napari_viewer):
     """
     Tests if the AnnotatorInit & Annotator widget can be initialized
     """
@@ -40,7 +38,7 @@ def test_annotator_widgets(make_napari_viewer, capsys):
     label_layer = viewer.add_labels(lbl_img_np)
 
     # Start init widget
-    _ = InitializeLabelAnnotator(viewer)
+    _ = InitializeLabelAnnotatorWidget(viewer)
 
     # Start the annotator widget
     annotator_widget = LabelAnnotator(viewer)
@@ -50,7 +48,7 @@ def test_annotator_widgets(make_napari_viewer, capsys):
     annotator_widget._init_annotation(label_layer)
 
 
-def test_custom_class_selection(make_napari_viewer, capsys):
+def test_custom_class_selection(make_napari_viewer):
     """
     Tests the custom class selection
     """
@@ -65,7 +63,7 @@ def test_custom_class_selection(make_napari_viewer, capsys):
         ClassSelection = get_class_selection(class_names = class_names)
     )
 
-def test_numbered_class_selection(make_napari_viewer, capsys):
+def test_numbered_class_selection(make_napari_viewer):
     """
     Tests the custom class selection
     """

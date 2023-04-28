@@ -1,6 +1,7 @@
 # %%
 from os import PathLike
-from typing import Callable, Sequence, TypeAlias
+from typing import Callable, Sequence
+from typing_extensions import TypeAlias
 
 import napari
 import numpy as np
