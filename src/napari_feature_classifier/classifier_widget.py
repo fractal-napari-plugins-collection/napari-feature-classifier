@@ -206,7 +206,6 @@ class ClassifierRunContainer(Container):
     _save_button: magicgui.widgets.PushButton
         The PushButton widget for saving the classifier
     """
-    # TODO: When adding new annotations, hide the prediction layer
 
     def __init__(
         self,
