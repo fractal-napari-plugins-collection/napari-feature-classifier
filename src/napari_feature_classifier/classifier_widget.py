@@ -66,7 +66,6 @@ class ClassifierInitContainer(Container):
     def get_selected_features(self):
         return self._feature_combobox.value
 
-<<<<<<< HEAD
     def get_class_names(self):
         return self._annotation_name_selector.get_class_names()
 
@@ -88,8 +87,6 @@ class ClassifierInitContainer(Container):
                 self._last_selected_label_layer
             )
 
-=======
->>>>>>> e577ae6fee690d568039f2ff7ab31f82926a16ed
 
 class ClassifierRunContainer(Container):
     def __init__(
@@ -163,7 +160,6 @@ class ClassifierRunContainer(Container):
         self._classifier.train()  # Show performance of training
         self.make_predictions()
 
-<<<<<<< HEAD
     def add_features_to_classifier(self):
         # Generate a dict of features: Key are roi_ids, values are
         # dataframes from layer.features.
@@ -190,8 +186,6 @@ class ClassifierRunContainer(Container):
                     dict_of_features[layer.name] = layer.features
         self._classifier.add_dict_of_features(dict_of_features)
 
-=======
->>>>>>> e577ae6fee690d568039f2ff7ab31f82926a16ed
     def make_predictions(self):
         # Get all the label layers that have fitting features
         relevant_label_layers = self.get_relevant_label_layers()
@@ -333,7 +327,6 @@ class ClassifierRunContainer(Container):
 
 
 class LoadClassifierContainer(Container):
-<<<<<<< HEAD
     """
     The `LoadClassifierContainer` is a second entry-way to the classifier and
     can launch an appropriate `ClassifierRunContainer`.
@@ -355,8 +348,6 @@ class LoadClassifierContainer(Container):
         The `ClassifierRunContainer` that is launched by the `_load_button`
     """
 
-=======
->>>>>>> e577ae6fee690d568039f2ff7ab31f82926a16ed
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
         self._clf_destination = FileEdit(mode="r", filter="*.clf")
