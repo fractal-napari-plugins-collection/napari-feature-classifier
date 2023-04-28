@@ -129,14 +129,16 @@ class ClassifierInitContainer(Container):
 
     def get_selected_features(self):
         return self._feature_combobox.value
+    
+    def get_class_names(self):
+         return self._annotation_name_selector.get_class_names()
 
     def get_feature_options(self, layer):
         # Get the feature options of the currently selected layer
         # Only works if a label layer is selected (we don't load features from other layers)
         if isinstance(layer, napari.layers.Labels):
             return list(layer.features.columns)
-        else:
-            return []
+        return []
 
     def update_layer_selection(self):
         if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
@@ -276,7 +278,8 @@ class ClassifierRunContainer(Container):
         self.make_predictions()
 
     def add_features_to_classifier(self):
-        # Generate a dict of features: Key are roi_ids, values are dataframes from layer.features.
+        # Generate a dict of features: Key are roi_ids, values are dataframes 
+        # from layer.features.
         dict_of_features = {}
         for layer in self._viewer.layers:
             if (
@@ -295,7 +298,8 @@ class ClassifierRunContainer(Container):
                         roi_id = roi_ids[0]
                         dict_of_features[roi_id] = layer.features
                 else:
-                    # TODO: Consider label-layer hashing here instead of using the layer name as roi_id
+                    # TODO: Consider label-layer hashing here instead of 
+                    # using the layer name as roi_id
                     dict_of_features[layer.name] = layer.features
         self._classifier.add_dict_of_features(dict_of_features)
 
@@ -443,14 +447,18 @@ class LoadClassifierContainer(Container):
         The file edit widget that allows the user to select a classifier file
     _load_button: magicgui.widgets.PushButton
         The button that launches the `ClassifierRunContainer`
+    _run_container: ClassifierRunContainer
+         The `ClassifierRunContainer` that is launched by the `_load_button`
     """
 
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
         self._clf_destination = FileEdit(mode="r", filter="*.clf")
         self._load_button = PushButton(label="Load Classifier")
+        self._run_container = None
         super().__init__(widgets=[self._clf_destination, self._load_button])
         self._load_button.clicked.connect(self.load)
+        
 
     def load(self):
         show_info("loading classifier")
@@ -508,7 +516,7 @@ class ClassifierWidget(Container):
         )
 
     def initialize_run_widget(self):
-        class_names = self._init_container._annotation_name_selector.get_class_names()
+        class_names = self._init_container.get_class_names()
         feature_names = self._init_container.get_selected_features()
         if not feature_names:
             show_info("No features selected")
