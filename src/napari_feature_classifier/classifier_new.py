@@ -1,4 +1,5 @@
 # FIXME: Get rid of show_info in classifier class
+import pickle
 import random
 import string
 from typing import Sequence
@@ -164,8 +165,10 @@ class Classifier:
         return self._feature_names
 
     def save(self, output_path):
-        # TODO: Implement saving
+        # TODO: Check that pickle dump works once helper functions become part of the class
         show_info(f"Saving classifier at {output_path}...")
+        with open(output_path, "wb") as f:
+            f.write(pickle.dumps(self))
 
     def __repr__(self):
         return f"{self.__class__.__name__}\n{repr(self._data)}"
