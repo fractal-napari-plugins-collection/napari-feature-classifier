@@ -4,81 +4,17 @@ import random
 import string
 from typing import Sequence
 
-import numpy as np
 import pandas as pd
 import pandera as pa
 import xxhash
+
+import numpy as np
+import pandas as pd
 from napari.utils.notifications import show_info
-
-
-def join_index_columns(df: pd.DataFrame, index_columns: Sequence[str]) -> pd.Series:
-    orig_index = df.index
-    return pd.Series(
-        (
-            df.reset_index()
-            .loc[:, list(index_columns)]
-            .apply(lambda x: "_".join(map(str, x)), axis=1)
-        ).values,
-        index=orig_index,
-    ).rename("object_id")
-
-
-def hash_single_object_id(object_id: str) -> float:
-    max_value = 2**32
-    return xxhash.xxh32(object_id).intdigest() / max_value
-
-
-def get_normalized_hash_column(
-    df: pd.DataFrame, index_columns: Sequence[str] = ("roi_id", "label")
-) -> pd.Series:
-    return join_index_columns(df, index_columns=index_columns).apply(
-        hash_single_object_id
-    )
-
-
-def get_random_object_id(n_chars=10):
-    return "".join(random.choice(string.ascii_lowercase) for i in range(n_chars))
-
-
-# TODO: This is cursed, annotations is supposed to be a nullable pandas int type but
-# those don't seem to be recognized by pa.Check(ignore_na=True) when doing the checks :(
-def get_input_and_internal_schemas(
-    feature_names: Sequence[str],
-    class_names: Sequence[str],
-    index_columns: Sequence[str] = ("roi_id", "label"),
-) -> tuple[pa.DataFrameSchema, pa.DataFrameSchema]:
-    assert len(index_columns) == 2
-    input_schema = pa.DataFrameSchema(
-        columns={
-            index_columns[0]: pa.Column(pa.String, coerce=True),
-            index_columns[1]: pa.Column(pa.UInt64, coerce=True),
-            "annotations": pa.Column(
-                pa.Int64,
-                # pd.Int64Dtype(),
-                coerce=True,
-                # checks=pa.Check.between(1, len(class_names) + 1),
-                checks=[
-                    pa.Check(
-                        lambda x: 1 <= x <= len(class_names) or x == -1,
-                        element_wise=True,
-                        ignore_na=True,
-                    ),
-                ],
-                nullable=True,
-            ),
-            **{
-                feature_name: pa.Column(pa.Float32, coerce=True)
-                for feature_name in feature_names
-            },
-        },
-        strict="filter",
-        unique=list(index_columns),
-    )
-
-    internal_schema = input_schema.set_index(list(index_columns)).add_columns(
-        {"hash": pa.Column(pa.Float32, coerce=True, checks=pa.Check.between(0.0, 1.0))}
-    )
-    return input_schema, internal_schema
+from napari_feature_classifier.classifier_utils import (
+    get_input_and_internal_schemas,
+    get_normalized_hash_column,
+)
 
 
 class Classifier:
@@ -173,3 +109,72 @@ class Classifier:
 
     def __repr__(self):
         return f"{self.__class__.__name__}\n{repr(self._data)}"
+
+def join_index_columns(df: pd.DataFrame, index_columns: Sequence[str]) -> pd.Series:
+    orig_index = df.index
+    return pd.Series(
+        (
+            df.reset_index()
+            .loc[:, list(index_columns)]
+            .apply(lambda x: "_".join(map(str, x)), axis=1)
+        ).values,
+        index=orig_index,
+    ).rename("object_id")
+
+
+def hash_single_object_id(object_id: str) -> float:
+    max_value = 2**32
+    return xxhash.xxh32(object_id).intdigest() / max_value
+
+
+def get_normalized_hash_column(
+    df: pd.DataFrame, index_columns: Sequence[str] = ("roi_id", "label")
+) -> pd.Series:
+    return join_index_columns(df, index_columns=index_columns).apply(
+        hash_single_object_id
+    )
+
+
+def get_random_object_id(n_chars=10):
+    return "".join(random.choice(string.ascii_lowercase) for i in range(n_chars))
+
+
+# TODO: This is cursed, annotations is supposed to be a nullable pandas int type but
+# those don't seem to be recognized by pa.Check(ignore_na=True) when doing the checks :(
+def get_input_and_internal_schemas(
+    feature_names: Sequence[str],
+    class_names: Sequence[str],
+    index_columns: Sequence[str] = ("roi_id", "label"),
+) -> tuple[pa.DataFrameSchema, pa.DataFrameSchema]:
+    assert len(index_columns) == 2
+    input_schema = pa.DataFrameSchema(
+        columns={
+            index_columns[0]: pa.Column(pa.String, coerce=True),
+            index_columns[1]: pa.Column(pa.UInt64, coerce=True),
+            "annotations": pa.Column(
+                pa.Int64,
+                # pd.Int64Dtype(),
+                coerce=True,
+                # checks=pa.Check.between(1, len(class_names) + 1),
+                checks=[
+                    pa.Check(
+                        lambda x: 1 <= x <= len(class_names) or x == -1,
+                        element_wise=True,
+                        ignore_na=True,
+                    ),
+                ],
+                nullable=True,
+            ),
+            **{
+                feature_name: pa.Column(pa.Float32, coerce=True)
+                for feature_name in feature_names
+            },
+        },
+        strict="filter",
+        unique=list(index_columns),
+    )
+
+    internal_schema = input_schema.set_index(list(index_columns)).add_columns(
+        {"hash": pa.Column(pa.Float32, coerce=True, checks=pa.Check.between(0.0, 1.0))}
+    )
+    return input_schema, internal_schema
