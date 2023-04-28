@@ -206,6 +206,7 @@ class ClassifierRunContainer(Container):
     _save_button: magicgui.widgets.PushButton
         The PushButton widget for saving the classifier
     """
+    # TODO: When adding new annotations, hide the prediction layer
 
     def __init__(
         self,
@@ -271,11 +272,15 @@ class ClassifierRunContainer(Container):
         self._save_button.clicked.connect(self.save)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
         self._init_prediction_layer(self._last_selected_label_layer)
+        # Whenever the label layer is clicked, hide the prediction layer 
+        # (e.g. new annotations are made)
+        self._last_selected_label_layer.mouse_drag_callbacks.append(self.hide_prediction_layer)
 
     def run(self):
         self.add_features_to_classifier()
         self._classifier.train()  # Show performance of training
         self.make_predictions()
+        self._prediction_layer.visible = True
 
     def add_features_to_classifier(self):
         # Generate a dict of features: Key are roi_ids, values are dataframes 
@@ -344,8 +349,10 @@ class ClassifierRunContainer(Container):
             if self._viewer.layers.selection.active in get_valid_label_layers(
                 viewer=self._viewer
             ):
-                self._last_selected_layer = self._viewer.layers.selection.active
+                self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._init_prediction_layer(self._viewer.layers.selection.active)
+                self._last_selected_label_layer.mouse_drag_callbacks.append(self.hide_prediction_layer)
+
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
         # Check if the predict column already exists in the layer.features
@@ -375,6 +382,9 @@ class ClassifierRunContainer(Container):
             label_column=self._label_column,
             cmap=get_colormap(),
         )
+    
+    def hide_prediction_layer(self, labels_layer, event):
+        self._prediction_layer.visible = False
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []
