@@ -74,7 +74,7 @@ def reset_display_colormaps(
     label_layer.features['annotation'] and sends the updated colormap
     to the annotation label layer
     """
-    colors = cmap(label_layer.features[feature_col] / len(cmap.colors))
+    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
     colordict = dict(zip(label_layer.features[label_column], colors))
     display_layer.color = colordict
     display_layer.opacity = 1.0

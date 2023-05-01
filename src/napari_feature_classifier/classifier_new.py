@@ -79,7 +79,7 @@ class Classifier:
         # Make a prediction on each of the dataframes provided
         predicted_dicts = {}
         for roi in dict_of_dfs:
-            show_info(f"Making a prediction for {roi=}...")
+            # show_info(f"Making a prediction for {roi=}...")
             predicted_dicts[roi] = self.predict(dict_of_dfs[roi])
         return predicted_dicts
 
