@@ -328,10 +328,9 @@ class ClassifierRunContainer(Container):
         # Append the predictions to each open label layer ("predict" column)
         for label_layer in relevant_label_layers:
             roi_id = self.get_layer_roi_id(label_layer)
-            # Merge the predictions back into the layer.features dataframe
-            # TODO: Check that this merge is robust, never drops rows etc.
             if "predict" in label_layer.features.columns:
                 label_layer.features.drop(columns=["predict"], inplace=True)
+            # Merge the predictions back into the layer.features dataframe
             label_layer.features = label_layer.features.merge(
                 prediction_results_dict[roi_id],
                 left_on=[self._label_column, self._roi_id_colum],
@@ -360,6 +359,8 @@ class ClassifierRunContainer(Container):
             predict_df = pd.DataFrame(
                 {self._label_column: unique_labels, "predict": np.NaN}
             )
+            # TODO: New output will be series with index = label_column
+            # => Make df with predict + label column, then merge that
             if self._label_column in label_layer.features.columns:
                 label_layer.features = label_layer.features.merge(
                     predict_df, on=self._label_column, how="outer"
