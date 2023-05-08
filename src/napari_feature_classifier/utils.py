@@ -116,7 +116,7 @@ def napari_info(message):
     try:
         show_info(message)
     except:  # pylint: disable=bare-except
-        pass
+        print(message)
     # TODO: Would be better to check if it's running in napari and print in all
     # other cases (e.g. if someone runs the classifier form a script).
     # But can't make that work at the moment
