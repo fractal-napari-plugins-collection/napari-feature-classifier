@@ -1,10 +1,13 @@
+"""Helper script to open napari with 2 test label layers with features"""
+
+import imageio
+import napari
+from pathlib import Path
+
 import numpy as np
 from napari_feature_classifier.feature_loader_widget import (
     make_features,
 )
-import imageio
-import napari
-from pathlib import Path
 
 
 def main():
@@ -26,6 +29,7 @@ def main():
 
     # viewer.window.add_dock_widget(classifier_widget)
     viewer.show(block=True)
+
 
 if __name__ == "__main__":
     main()

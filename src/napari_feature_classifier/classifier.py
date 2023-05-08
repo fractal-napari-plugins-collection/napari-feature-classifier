@@ -1,4 +1,4 @@
-# FIXME: Get rid of napari_info in classifier class
+"""Core classifier class and helper functions."""
 import pickle
 import random
 import string
@@ -14,15 +14,57 @@ from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
 
 
-#TODO: define an interface for compatible classifiers (m.b. a subset of sklearn Estimators?)
+# TODO: define an interface for compatible classifiers (m.b. a subset of sklearn Estimators?)
 class Classifier:
+    """Classifier class for napari-feature-classifier.
+
+    Paramters
+    ---------
+    feature_names: Sequence[str]
+        The names of the features that are used for classification
+    class_names: Sequence[str]
+        The names of the classes. It's an ordered list that is matched to 
+        annotations [1, 2, 3, ...]
+    classifier: sklearn classifier
+        The classifier that is used for classification. Default is a
+        RandomForestClassifier.
+
+    Attributes
+    ----------
+    _feature_names: list[str]
+        The names of the features that are used for classification
+    _class_names: list[str]
+        The names of the classes. It's an ordered list that is matched to
+        annotations [1, 2, 3, ...]
+    _classifier: sklearn classifier
+        The classifier that is used for classification.
+    _training_data_perc: float
+        The percentage of the data that is used for training. The rest is used
+        for testing.
+    _index_columns: list[str]
+        The columns that are used for indexing the data. 
+        Hard-coded to roi_id and label
+    _input_schema: pandera.SchemaModel
+        The schema for the input data. It's used for validation.
+    _schema: pandera.SchemaModel
+        Use?
+    _predict_schema: pandera.SchemaModel
+        The schema for the prediction data.
+    _data: pd.DataFrame
+        The internal data storage of the classifier. Contains both annotations 
+        as well as feature measurements for all rows (annotated objects)
+    """
     def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
         self._feature_names: list[str] = list(feature_names)
         self._class_names: list[str] = list(class_names)
         self._classifier = classifier
         self._training_data_perc: float = 0.8
         self._index_columns: list[str] = ["roi_id", "label"]
-        self._input_schema, self._schema, self._predict_schema = get_input_internal_and_predict_schemas(
+        (
+            self._input_schema,
+            self._schema,
+            self._predict_schema,
+        ) = get_input_internal_and_predict_schemas(
             feature_names=feature_names,
             index_columns=self._index_columns,
             class_names=self._class_names,
@@ -34,15 +76,18 @@ class Classifier:
 
     # TODO: Add tests.
     def train(self):
+        """
+        Train the classifier on the data it already has in self._data.
+        """
         napari_info("Training classifier...")
         train_data = self._data[self._data.hash < self._training_data_perc]
         test_data = self._data[self._data.hash >= self._training_data_perc]
-        
-        X_train = train_data.drop(['hash', 'annotations'], axis=1)
-        X_test = test_data.drop(['hash', 'annotations'], axis=1)
-        
-        y_train = train_data['annotations']
-        y_test = test_data['annotations']
+
+        X_train = train_data.drop(["hash", "annotations"], axis=1)
+        X_test = test_data.drop(["hash", "annotations"], axis=1)
+
+        y_train = train_data["annotations"]
+        y_test = test_data["annotations"]
 
         self._classifier.fit(X_train, y_train)
 
@@ -56,25 +101,30 @@ class Classifier:
             f"Test set contains {self.get_counts_per_class(y_test)}."
         )
         return f1
-    
+
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
         return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
 
     def predict(self, df):
-        # FIXME: SettingWithCopyWarning => check if the actual run still
-        # generates one, when we actually predict something
+        """
+        Run prediction on a single dataframe
+        """
         df_valid = self._validate_predict_features(df)
         prediction = self._classifier.predict(df_valid)
-        prediction = pd.Series(data=prediction, index=df_valid.index, dtype=pd.Int64Dtype()).rename('prediction')
+        prediction = pd.Series(
+            data=prediction, index=df_valid.index, dtype=pd.Int64Dtype()
+        ).rename("prediction")
         aligned_prediction = (
-            df
-            .reset_index()
+            df.reset_index()
             .set_index(self._index_columns)
-            .merge(prediction, left_index=True, right_index=True, how='outer')
-        )['prediction']
+            .merge(prediction, left_index=True, right_index=True, how="outer")
+        )["prediction"]
         return aligned_prediction
 
     def predict_on_dict(self, dict_of_dfs):
+        """
+        Loop prediction over a dictionary of dataframes
+        """
         # Make a prediction on each of the dataframes provided
         predicted_dicts = {}
         for roi in dict_of_dfs:
@@ -83,6 +133,9 @@ class Classifier:
         return predicted_dicts
 
     def add_features(self, df_raw: pd.DataFrame):
+        """
+        Add features to the classifier and validate them.
+        """
         df_valid = self._validate_input_features(df_raw.reset_index())
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
@@ -91,19 +144,28 @@ class Classifier:
         index_delete = df_valid[df_valid.annotations == -1].index
         self._data = merged_data.drop(index=index_delete)
         return self
-    
+
     def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
+        """
+        Validate the features that are received for prediction using 
+        self._predict_schema.
+        """
         df_no_nans = df.dropna(subset=self._feature_names)
         if len(df) != len(df_no_nans):
             napari_info(
                 f"Could not do predictions for {len(df)-len(df_no_nans)}/{len(df)} "
                 "objects because of features that contained `NA`s."
             )
-        
-        df_valid = self._predict_schema.validate(df_no_nans).set_index(self._index_columns)
+
+        df_valid = self._predict_schema.validate(df_no_nans).set_index(
+            self._index_columns
+        )
         return df_valid
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Validate the newly received training data using self._input_schema.
+        """
         # Drop rows that don't have annotations
         df_annotated = df.dropna(subset="annotations")
 
@@ -123,8 +185,15 @@ class Classifier:
         return df_valid_internal
 
     def add_dict_of_features(self, dict_of_features):
-        # Add features for each roi
-        # dict_of_features is a dict with roi as key & df as value
+        """
+        Add features for each roi
+
+        Parameters
+        ----------
+        dict_of_features : dict
+            Dictionary with roi as key and dataframe with feature measurements 
+            and annotations as value
+        """
         for roi in dict_of_features:
             if "roi_id" not in dict_of_features[roi]:
                 df = dict_of_features[roi]["roid_id"] = roi
@@ -140,13 +209,13 @@ class Classifier:
         return self._feature_names
 
     def save(self, output_path):
-        # TODO: Check that pickle dump works once helper functions become part of the class
         napari_info(f"Saving classifier at {output_path}...")
         with open(output_path, "wb") as f:
             f.write(pickle.dumps(self))
 
     def __repr__(self):
         return f"{self.__class__.__name__}\n{repr(self._data)}"
+
 
 def join_index_columns(df: pd.DataFrame, index_columns: Sequence[str]) -> pd.Series:
     orig_index = df.index
@@ -212,5 +281,5 @@ def get_input_internal_and_predict_schemas(
         {"hash": pa.Column(pa.Float32, coerce=True, checks=pa.Check.between(0.0, 1.0))}
     )
 
-    predict_schema = input_schema.remove_columns(['annotations'])
+    predict_schema = input_schema.remove_columns(["annotations"])
     return input_schema, internal_schema, predict_schema

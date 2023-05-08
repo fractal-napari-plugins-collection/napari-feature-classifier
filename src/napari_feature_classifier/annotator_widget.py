@@ -61,10 +61,11 @@ def get_class_selection(
     ), f"{class_names=} contains duplicate entries!"
 
     # Setting NoClass to -1.0 => Deselection that is sent to the classifier
+    # pylint: disable=C0103
     ClassSelection = Enum(
         "ClassSelection",
         {"NoClass": -1.0, **{c: i + 1 for i, c in enumerate(class_names)}},
-    )  # pylint: disable=C0103
+    )  
     return ClassSelection
 
 

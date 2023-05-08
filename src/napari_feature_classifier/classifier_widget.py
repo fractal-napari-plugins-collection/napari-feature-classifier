@@ -1,14 +1,14 @@
 """Classifier container widget for napari"""
-from pathlib import Path
+import pickle
 
-from typing import Optional, Sequence, cast
+from pathlib import Path
+from typing import Optional
 
 import napari
 import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
-import pickle
 from magicgui.widgets import (
     Container,
     Label,
@@ -16,7 +16,7 @@ from magicgui.widgets import (
     PushButton,
     Select,
 )
-from qtpy.QtWidgets import QMessageBox # pylint: disable=E0611
+from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
@@ -85,6 +85,7 @@ class ClassifierInitContainer(Container):
             label="Feature Selection:",
         )
         self._annotation_name_selector = LabelAnnotatorTextSelector()
+        # pylint: disable=W0212
         self._initialize_button = PushButton(text="Initialize")
         super().__init__(
             widgets=[
@@ -121,7 +122,7 @@ class ClassifierInitContainer(Container):
 
     def update_layer_selection(self):
         """
-        Update the layer selection and the feature options if the newly 
+        Update the layer selection and the feature options if the newly
         selected layer is a label layer
         """
         if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
@@ -130,6 +131,7 @@ class ClassifierInitContainer(Container):
             self._feature_combobox.choices = self.get_feature_options(
                 self._last_selected_label_layer
             )
+            # pylint: disable=W0212
             self._feature_combobox._default_choices = self.get_feature_options(
                 self._last_selected_label_layer
             )
@@ -198,6 +200,7 @@ class ClassifierRunContainer(Container):
         The PushButton widget for saving the classifier
     """
 
+    # pylint: disable=R0913
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
@@ -275,7 +278,7 @@ class ClassifierRunContainer(Container):
 
     def run(self):
         """
-        Run method that adds features to the classifier, trains it, triggers 
+        Run method that adds features to the classifier, trains it, triggers
         predictions & saves the classifier
         """
 
@@ -319,7 +322,7 @@ class ClassifierRunContainer(Container):
 
     def make_predictions(self):
         """
-        Make predictions for all relevant label layers and add them to the 
+        Make predictions for all relevant label layers and add them to the
         layer.features `prediction` column of each layer
         """
         # Get all the label layers that have fitting features
@@ -373,7 +376,7 @@ class ClassifierRunContainer(Container):
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
         """
-        Initialize the prediction layer and reset its data (to fit the input 
+        Initialize the prediction layer and reset its data (to fit the input
         label_layer) and its colormap
         """
         # Check if the predict column already exists in the layer.features
@@ -514,7 +517,7 @@ class LoadClassifierContainer(Container):
 
     def load(self):
         """
-        Load a classifier from a file and start the run container with the 
+        Load a classifier from a file and start the run container with the
         correct options(already set classifier_save_path and turn on auto_save)
         """
         clf_path = Path(self._clf_destination.value)
@@ -579,9 +582,8 @@ class ClassifierWidget(Container):
         if not feature_names:
             napari_info("No features selected")
             return
-        else:
-            self._run_container = ClassifierRunContainer(
-                self._viewer, class_names=class_names, feature_names=feature_names
-            )
-            self.clear()
-            self.append(self._run_container)
+        self._run_container = ClassifierRunContainer(
+            self._viewer, class_names=class_names, feature_names=feature_names
+        )
+        self.clear()
+        self.append(self._run_container)
