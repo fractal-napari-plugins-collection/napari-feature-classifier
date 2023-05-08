@@ -26,7 +26,7 @@ from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
     get_class_selection,
 )
-from napari_feature_classifier.classifier_new import Classifier
+from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.utils import (
     get_colormap,
     reset_display_colormaps,
