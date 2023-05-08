@@ -8,13 +8,18 @@ contributions:
     - id: napari-feature-classifier.initialize_classifier_new
       python_name: napari_feature_classifier.classifier_widget:ClassifierWidget
       title: Initialize a Classifier
-    - id: napari-feature-classifier.load_classifier_new
+    - id: napari-feature-classifier.load_classifier
       python_name: napari_feature_classifier.classifier_widget:LoadClassifierContainer
       title: Load a Classifier
+    - id: napari-feature-classifier.load_csv_features
+      python_name: napari_feature_classifier.feature_loader_widget:load_features_factory
+      title: CSV Feature loader
   widgets:
     - command: napari-feature-classifier.annotator_init_widget
       display_name: Annotator
     - command: napari-feature-classifier.initialize_classifier_new
       display_name: Initialize a Classifier
-    - command: napari-feature-classifier.load_classifier_new
+    - command: napari-feature-classifier.load_classifier
       display_name: Load Classifier
+    - command: napari-feature-classifier.load_csv_features
+      display_name: CSV Feature loader
