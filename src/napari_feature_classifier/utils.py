@@ -124,7 +124,9 @@ def napari_info(message):
         print(message)
 
 def get_valid_label_layers(viewer) -> list[str]:
-    # Get a list of label layers that are not `Annotations` or `Predictions`.
+    """
+    Get a list of label layers that are not `Annotations` or `Predictions`.
+    """
     return [
         layer
         for layer in viewer.layers
@@ -134,8 +136,10 @@ def get_valid_label_layers(viewer) -> list[str]:
 
 
 def get_selected_or_valid_label_layer(viewer) -> napari.layers.Labels:
-    # Get the selected label layer, or the first valid label layer
-    # This is None if no layer or multiple layers are selected
+    """
+    Get the selected label layer, or the first valid label layer.
+    This is None if no layer or multiple layers are selected.
+    """
     selected_layer = viewer.layers.selection.active
     valid_layers = get_valid_label_layers(viewer=viewer)
     if selected_layer and selected_layer in valid_layers:

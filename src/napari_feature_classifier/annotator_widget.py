@@ -19,18 +19,31 @@ from magicgui.widgets import (
     RadioButtons,
     create_widget,
 )
-from napari.utils.notifications import show_info
 
 from napari_feature_classifier.utils import (
     get_colormap,
     reset_display_colormaps,
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
+    napari_info
 )
+
 
 def get_class_selection(
     n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
 ) -> Enum:
+    """
+    Create a class selection enum for the annotator widget.
+
+    Parameters:
+    -----------
+    n_classes: int, optional
+        Number of classes to create the enum for. If not provided, the length of
+        `class_names` is used.
+    class_names: Sequence[str], optional
+        List of class names to create the enum for. If not provided, the enum
+        values will be `Class_1`, `Class_2`, etc., based on n_classes
+    """
     if n_classes is None and class_names is None:
         raise ValueError("Provide either `n_classes` or a list of `class_names`")
     if class_names is None:
@@ -51,10 +64,11 @@ def get_class_selection(
     ClassSelection = Enum(
         "ClassSelection",
         {"NoClass": -1.0, **{c: i + 1 for i, c in enumerate(class_names)}},
-    )
+    )  # pylint: disable=C0103
     return ClassSelection
 
 
+# pylint: disable=R0902
 class LabelAnnotator(Container):
     """
     The `LabelAnnotator` widget manages the annotation of a label layer by
@@ -121,7 +135,7 @@ class LabelAnnotator(Container):
         self._viewer.layers.selection.active = self._last_selected_label_layer
 
         # Class selection
-        self.ClassSelection = ClassSelection
+        self.ClassSelection = ClassSelection  # pylint: disable=C0103
         self.nb_classes = len(self.ClassSelection) - 1
         self.cmap = get_colormap()
         self._class_selector = cast(
@@ -152,6 +166,10 @@ class LabelAnnotator(Container):
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
 
     def selection_changed(self, event):
+        """
+        Callback for when the selection changes. If the selection change results
+        in a valid label layer being selected, initialize the annotator for it.
+        """
         # Check if the selection change results in a valid label layer being
         # selected. If so, initialize the annotator for it.
         if self._viewer.layers.selection.active:
@@ -176,6 +194,10 @@ class LabelAnnotator(Container):
             self._class_selector.enabled = False
 
     def toggle_label(self, labels_layer, event):
+        """
+        Callback for when a label is clicked. It then updates the color of that 
+        label in the annotation layer.
+        """
         # Need to scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
@@ -186,7 +208,7 @@ class LabelAnnotator(Container):
         )
         label = labels_layer.get_value(scaled_position)
         if label == 0 or not label:
-            show_info("No label clicked.")
+            napari_info("No label clicked.")
             return
 
         labels_layer.features.loc[
@@ -196,12 +218,15 @@ class LabelAnnotator(Container):
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
 
-    def set_class_n(self, event, n: int):
+    def set_class_n(self, event, n: int):  # pylint: disable=C0103
         self._class_selector.value = self.ClassSelection[
             list(self.ClassSelection.__members__)[n]
         ]
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
+        """
+        Initializes the annotation layer for the given label layer.
+        """
         label_layer.editable = False
         if "annotations" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
@@ -234,13 +259,14 @@ class LabelAnnotator(Container):
             set_class = partial(self.set_class_n, n=i)
             set_class.__name__ = f"set_class_{i}"
             label_layer.bind_key(str(i), set_class, overwrite=True)
-        #     set_class = partial(set_class_n, n=i)
-        #     self.label_layer.bind_key(str(i), set_class)
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
     def update_single_color(self, label_layer, label):
+        """
+        Update the color of a single object in the annotations layer.
+        """
         color = self.cmap(
             float(
                 label_layer.features.loc[
@@ -255,8 +281,11 @@ class LabelAnnotator(Container):
         self._annotations_layer.color_mode = "direct"
 
     def _on_save_clicked(self):
+        """
+        Save annotations to a csv file.
+        """
         annotations = self._last_selected_label_layer.features["annotations"]
-        df = pd.DataFrame(annotations)
+        df = pd.DataFrame(annotations)  # pylint: disable=C0103
         class_names = []
         for annotation in annotations:
             if math.isnan(annotation):
@@ -266,4 +295,4 @@ class LabelAnnotator(Container):
 
         df["annotation_names"] = class_names
         df.to_csv(self._save_destination.value)
-        show_info(f"Annotations were saved at {self._save_destination.value}")
+        napari_info(f"Annotations were saved at {self._save_destination.value}")
