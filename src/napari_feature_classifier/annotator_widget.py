@@ -5,7 +5,7 @@ from enum import Enum
 from functools import partial
 from typing import Optional, Sequence, cast
 
-# from matplotlib.cm import get_cmap
+# pylint: disable=R0801
 import napari
 import napari.layers
 import napari.viewer
@@ -20,6 +20,7 @@ from magicgui.widgets import (
     create_widget,
 )
 
+# pylint: disable=R0801
 from napari_feature_classifier.utils import (
     get_colormap,
     reset_display_colormaps,

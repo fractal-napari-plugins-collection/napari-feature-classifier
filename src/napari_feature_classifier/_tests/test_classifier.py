@@ -1,21 +1,25 @@
-# %%
+# pylint: disable=C0103
+"""Tests for core classifier class"""
 import numpy as np
 import pandas as pd
 import pytest
 
 from napari_feature_classifier.classifier import Classifier
 
+# pylint: disable=C0103
 CLASSIFIER_FEATURE_NAMES = ["feature1", "feature2", "feature3"]
-DROP_COLUMNS = ['feature6', 'feature7']
+DROP_COLUMNS = ["feature6", "feature7"]
 TABLE_FEATURE_NAMES = CLASSIFIER_FEATURE_NAMES + DROP_COLUMNS
-TABLE_FEATURES = {feature_name: np.random.randn(5) for feature_name in TABLE_FEATURE_NAMES}
+TABLE_FEATURES = {
+    feature_name: np.random.randn(5) for feature_name in TABLE_FEATURE_NAMES
+}
 CLASS_NAMES = ["s", "m"]
-INDEX_COLUMNS = ['roi_id', 'label']
+INDEX_COLUMNS = ["roi_id", "label"]
 
 
 def get_classifier():
-    return Classifier(feature_names=CLASSIFIER_FEATURE_NAMES,
-                      class_names=CLASS_NAMES)
+    return Classifier(feature_names=CLASSIFIER_FEATURE_NAMES, class_names=CLASS_NAMES)
+
 
 def get_train_predict_dfs():
     df_train = pd.DataFrame(
@@ -23,8 +27,10 @@ def get_train_predict_dfs():
             "roi_id": ["site1"] * 50,
             "label": range(1, 50 + 1),
             "annotations": [1, 2, 1, 1, 2] * 10,
-            **{feature_name: np.random.randn(50) for feature_name in TABLE_FEATURE_NAMES},
-
+            **{
+                feature_name: np.random.randn(50)
+                for feature_name in TABLE_FEATURE_NAMES
+            },
         }
     )
     df_predict = pd.DataFrame(
@@ -32,17 +38,20 @@ def get_train_predict_dfs():
             "roi_id": ["site2"] * 50,
             "label": range(1, 50 + 1),
             # "annotations": [1, 2, 1, 1, 2] * 10,
-            **{feature_name: np.random.randn(50) for feature_name in TABLE_FEATURE_NAMES},
-
+            **{
+                feature_name: np.random.randn(50)
+                for feature_name in TABLE_FEATURE_NAMES
+            },
         }
     )
     return df_train, df_predict
+
 
 # TODO: Add a real test.
 def test_prediction():
     df_train, df_predict = get_train_predict_dfs()
     df_predict_with_nans = df_predict.copy()
-    df_predict_with_nans.loc[[5, 10, 23], 'feature1'] = np.nan
+    df_predict_with_nans.loc[[5, 10, 23], "feature1"] = np.nan
     c = get_classifier()
     c.add_features(df_train)
     c.train()
@@ -58,7 +67,6 @@ def get_df():
             "label": range(1, n + 1),
             "annotations": [1, 2, 1, 1, 2],
             **TABLE_FEATURES,
-
         }
     )
 
@@ -69,28 +77,31 @@ def get_df_index_set():
 
 def get_df_with_changed_annotations():
     df_with_changed_annotations = get_df()
-    df_with_changed_annotations.loc[df_with_changed_annotations.index[:3], 'annotations'] = [2, 1, 2]
+    df_with_changed_annotations.loc[
+        df_with_changed_annotations.index[:3], "annotations"
+    ] = [2, 1, 2]
     return df_with_changed_annotations
 
 
 def get_df_nan_in_annotations():
     df_nan_in_annotations = get_df()
-    df_nan_in_annotations.loc[[1, 4], 'annotations'] = np.nan
-    df_nan_in_annotations.loc[:, 'roi_id'] = 'site2'
+    df_nan_in_annotations.loc[[1, 4], "annotations"] = np.nan
+    df_nan_in_annotations.loc[:, "roi_id"] = "site2"
     return df_nan_in_annotations
 
 
 def get_df_nan_in_features():
     df_nan_in_features = get_df()
-    df_nan_in_features.loc[[0, 1, 3], 'feature1'] = np.nan
-    df_nan_in_features.loc[:, 'roi_id'] = 'site3'
+    df_nan_in_features.loc[[0, 1, 3], "feature1"] = np.nan
+    df_nan_in_features.loc[:, "roi_id"] = "site3"
     return df_nan_in_features
 
 
 def get_df_with_columns_to_delete():
     df_with_columns_to_delete = get_df()
-    df_with_columns_to_delete.loc[df_with_columns_to_delete.index[:3],
-                                  'annotations'] = -1
+    df_with_columns_to_delete.loc[
+        df_with_columns_to_delete.index[:3], "annotations"
+    ] = -1
     return df_with_columns_to_delete
 
 
@@ -107,7 +118,7 @@ def test_can_add_feature_table(df):
     assert len(c._data) == len(df)
     assert all(feature in c._data for feature in CLASSIFIER_FEATURE_NAMES)
     assert not any(feature in c._data for feature in DROP_COLUMNS)
-    assert 'hash' in c._data
+    assert "hash" in c._data
 
 
 def test_adding_the_same_table_multiple_times_has_no_effect():
@@ -147,12 +158,13 @@ def test_can_change_annotations():
     c = get_classifier()
     df = get_df()
     df2 = get_df_with_changed_annotations()
-    assert np.any(df.annotations != df2.annotations) 
+    assert np.any(df.annotations != df2.annotations)
 
     c.add_features(df)
     assert np.all(c._data.annotations.values == df.annotations.values)
     c.add_features(df2)
     assert np.all(c._data.annotations.values == df2.annotations.values)
+
 
 def test_can_delete_annotations():
     c = get_classifier()
@@ -163,6 +175,7 @@ def test_can_delete_annotations():
     assert len(c._data) == 5
     c.add_features(df2)
     assert len(c._data) == 2
+
 
 def test_add_multi_site_with_changes_and_deletes():
     c = get_classifier()
@@ -183,13 +196,14 @@ def test_add_multi_site_with_changes_and_deletes():
     c.add_features(df_delete)
     assert len(c._data) == 7
 
+
 def test_nans_in_non_classifier_features_have_no_effect():
     c = get_classifier()
     c2 = get_classifier()
     df = get_df()
     df_nans = df.copy()
-    df_nans.loc[[1, 3, 4], 'feature6'] = np.nan
-    
+    df_nans.loc[[1, 3, 4], "feature6"] = np.nan
+
     c.add_features(df)
     c2.add_features(df_nans)
-    assert np.all(c._data==c2._data)
+    assert np.all(c._data == c2._data)

@@ -311,7 +311,7 @@ class ClassifierRunContainer(Container):
                         raise NotImplementedError(
                             f"{layer=} contained no-unique roi_ids: {roi_ids}"
                         )
-                    
+
                     roi_id = roi_ids[0]
                     dict_of_features[roi_id] = layer.features
                 else:
