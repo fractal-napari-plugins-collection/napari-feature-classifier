@@ -1,8 +1,8 @@
 """Helper script to open napari with 2 test label layers with features"""
+from pathlib import Path
 
 import imageio
 import napari
-from pathlib import Path
 
 import numpy as np
 from napari_feature_classifier.feature_loader_widget import (
@@ -11,6 +11,7 @@ from napari_feature_classifier.feature_loader_widget import (
 
 
 def main():
+    """Main function that opens napari with 2 test label layers with features"""
     lbls = imageio.v2.imread(Path("sample_data/test_labels.tif"))
     lbls2 = np.zeros_like(lbls)
     lbls2[:, 3:, 2:] = lbls[:, :-3, :-2]

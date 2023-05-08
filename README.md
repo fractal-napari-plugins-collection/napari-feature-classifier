@@ -12,8 +12,14 @@ An interactive classifier plugin that allows the user to assign objects in a lab
 
 ## Usage
 <p align="center"><img src="https://user-images.githubusercontent.com/18033446/153727595-60380204-f299-485f-b762-d2030b75e7d3.gif" /></p>
-To use the napari-feature-classifier, you need to have a label image and a csv file containing measurements that correspond to the object in the label image. The csv file needs to contain a column with integer values corresponding to the label values in the label image.
+To use the napari-feature-classifier, you need to have a label image and corresponding measurements (as a csv file, loaded to layer.features or in an [OME-Zarr Anndata table loaded with another plugin](https://github.com/jluethi/napari-ome-zarr-roi-loader)). Your feature measurements need to contain a `label` column that matches the label objects in the label image.
 These interactive classification workflows are well suited to visually define cell types, find mitotic cells in images, do quality control by automatically detecting missegmented cells and other tasks where a user can easily assign objects to groups.
+
+#### Prepare the label layer:
+- Load your label layer into napari and add the features measurements to layer.features of the corresponding label layer. You can have multiple label layers with their features open at the same time
+    - To load features from a CSV file: `Plugins -> napari-feature-classifier -> CSV Feature Loader`, then load the features for the correct label image.
+    - To load features from an OME-Zarr file: Get both the label layer into memory as a normal label layer (not a pyramidal label layer, currently untested) and the corresponding features. If your OME-Zarr file is created by [Fractal](https://fractal-analytics-platform.github.io/), you can use [this ROI loader plugin](https://github.com/jluethi/napari-ome-zarr-roi-loader).
+
 
 #### Initialize a classifier:
 - Start the classifier in napari by going to `Plugins -> napari-feature-classifier -> Initialize a Classifier`  

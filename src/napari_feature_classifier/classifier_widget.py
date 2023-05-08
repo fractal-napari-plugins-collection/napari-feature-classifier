@@ -311,9 +311,9 @@ class ClassifierRunContainer(Container):
                         raise NotImplementedError(
                             f"{layer=} contained no-unique roi_ids: {roi_ids}"
                         )
-                    else:
-                        roi_id = roi_ids[0]
-                        dict_of_features[roi_id] = layer.features
+                    
+                    roi_id = roi_ids[0]
+                    dict_of_features[roi_id] = layer.features
                 else:
                     # TODO: Consider label-layer hashing here instead of
                     # using the layer name as roi_id
@@ -408,6 +408,9 @@ class ClassifierRunContainer(Container):
         )
 
     def hide_prediction_layer(self, labels_layer, event):
+        """
+        Hide the prediction layer
+        """
         self._prediction_layer.visible = False
 
     def get_relevant_label_layers(self):
@@ -432,6 +435,7 @@ class ClassifierRunContainer(Container):
             )
         return roi_ids[0]
 
+    # pylint: disable=C0103
     def get_relevant_features(
         self, df, filter_annotations: bool = False, set_index=False
     ):
@@ -521,7 +525,7 @@ class LoadClassifierContainer(Container):
         correct options(already set classifier_save_path and turn on auto_save)
         """
         clf_path = Path(self._clf_destination.value)
-        with open(clf_path, "rb") as f:
+        with open(clf_path, "rb") as f: # pylint: disable=C0103
             clf = pickle.load(f)
 
         self._run_container = ClassifierRunContainer(

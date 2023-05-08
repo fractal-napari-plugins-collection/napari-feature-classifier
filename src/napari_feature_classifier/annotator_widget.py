@@ -65,7 +65,7 @@ def get_class_selection(
     ClassSelection = Enum(
         "ClassSelection",
         {"NoClass": -1.0, **{c: i + 1 for i, c in enumerate(class_names)}},
-    )  
+    )
     return ClassSelection
 
 

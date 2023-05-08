@@ -8,10 +8,10 @@ import pandas as pd
 import pandera as pa
 import xxhash
 
-from napari_feature_classifier.utils import napari_info
-
 from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
+
+from napari_feature_classifier.utils import napari_info
 
 
 # TODO: define an interface for compatible classifiers (m.b. a subset of sklearn Estimators?)
@@ -83,7 +83,9 @@ class Classifier:
         train_data = self._data[self._data.hash < self._training_data_perc]
         test_data = self._data[self._data.hash >= self._training_data_perc]
 
+         # pylint: disable=C0103
         X_train = train_data.drop(["hash", "annotations"], axis=1)
+         # pylint: disable=C0103
         X_test = test_data.drop(["hash", "annotations"], axis=1)
 
         y_train = train_data["annotations"]
