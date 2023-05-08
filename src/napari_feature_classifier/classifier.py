@@ -1,4 +1,4 @@
-# FIXME: Get rid of show_info in classifier class
+# FIXME: Get rid of napari_info in classifier class
 import pickle
 import random
 import string
@@ -8,7 +8,7 @@ import pandas as pd
 import pandera as pa
 import xxhash
 
-from napari.utils.notifications import show_info
+from napari_feature_classifier.utils import napari_info
 
 from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
@@ -34,7 +34,7 @@ class Classifier:
 
     # TODO: Add tests.
     def train(self):
-        show_info("Training classifier...")
+        napari_info("Training classifier...")
         train_data = self._data[self._data.hash < self._training_data_perc]
         test_data = self._data[self._data.hash >= self._training_data_perc]
         
@@ -48,7 +48,7 @@ class Classifier:
 
         f1 = f1_score(y_test, self._classifier.predict(X_test), average="macro")
         # napari_info("F1 score on test set: {}".format(f1))
-        show_info(
+        napari_info(
             f"F1 score on test set: {f1} \n"
             f"Annotations split into {len(X_train)} training and {len(X_test)} "
             "test samples. \n"
@@ -78,7 +78,7 @@ class Classifier:
         # Make a prediction on each of the dataframes provided
         predicted_dicts = {}
         for roi in dict_of_dfs:
-            # show_info(f"Making a prediction for {roi=}...")
+            # napari_info(f"Making a prediction for {roi=}...")
             predicted_dicts[roi] = self.predict(dict_of_dfs[roi])
         return predicted_dicts
 
@@ -95,7 +95,7 @@ class Classifier:
     def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
         df_no_nans = df.dropna(subset=self._feature_names)
         if len(df) != len(df_no_nans):
-            print(
+            napari_info(
                 f"Could not do predictions for {len(df)-len(df_no_nans)}/{len(df)} "
                 "objects because of features that contained `NA`s."
             )
@@ -110,7 +110,7 @@ class Classifier:
         # Drop rows that have features with `NA`s, notify the user.
         df_no_nans = df_annotated.dropna(subset=self._feature_names)
         if len(df_no_nans) != len(df_annotated):
-            print(
+            napari_info(
                 f"Dropped {len(df_annotated)-len(df_no_nans)}/{len(df_annotated)} "
                 "objects because of features that contained `NA`s."
             )
@@ -130,7 +130,7 @@ class Classifier:
                 df = dict_of_features[roi]["roid_id"] = roi
             else:
                 df = df = dict_of_features[roi]
-            show_info(f"Adding features for {roi=}...")
+            napari_info(f"Adding features for {roi=}...")
             self.add_features(df)
 
     def get_class_names(self):
@@ -141,7 +141,7 @@ class Classifier:
 
     def save(self, output_path):
         # TODO: Check that pickle dump works once helper functions become part of the class
-        show_info(f"Saving classifier at {output_path}...")
+        napari_info(f"Saving classifier at {output_path}...")
         with open(output_path, "wb") as f:
             f.write(pickle.dumps(self))
 
