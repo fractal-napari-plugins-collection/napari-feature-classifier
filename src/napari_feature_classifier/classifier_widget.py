@@ -3,7 +3,6 @@ from pathlib import Path
 
 from typing import Optional, Sequence, cast
 
-import imageio
 import napari
 import napari.layers
 import napari.viewer
@@ -14,17 +13,11 @@ from magicgui.widgets import (
     Container,
     Label,
     FileEdit,
-    LineEdit,
     PushButton,
     Select,
 )
 from qtpy.QtWidgets import QMessageBox
 
-
-from napari_feature_classifier.feature_loader_widget import (
-    LoadFeaturesContainer,
-    make_features,
-)
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
     LabelAnnotator,
@@ -38,29 +31,6 @@ from napari_feature_classifier.utils import (
     get_selected_or_valid_label_layer,
     napari_info,
 )
-
-
-def main():
-    lbls = imageio.v2.imread(Path("sample_data/test_labels.tif"))
-    lbls2 = np.zeros_like(lbls)
-    lbls2[:, 3:, 2:] = lbls[:, :-3, :-2]
-    lbls2 = lbls2 * 20
-
-    labels = np.unique(lbls)[1:]
-    labels_2 = np.unique(lbls2)[1:]
-
-    viewer = napari.Viewer()
-    lbls_layer = viewer.add_labels(lbls)
-    lbls_layer2 = viewer.add_labels(lbls2)
-
-    lbls_layer.features = make_features(labels, roi_id="ROI1", n_features=6)
-    lbls_layer2.features = make_features(labels_2, roi_id="ROI2", n_features=6)
-    # classifier_widget = ClassifierWidget(viewer)
-    # load_widget = LoadFeaturesContainer(lbls_layer2)
-
-    # viewer.window.add_dock_widget(classifier_widget)
-    # viewer.window.add_dock_widget(load_widget)
-    viewer.show(block=True)
 
 
 class ClassifierInitContainer(Container):
@@ -576,7 +546,3 @@ class ClassifierWidget(Container):
             )
             self.clear()
             self.append(self._run_container)
-
-
-if __name__ == "__main__":
-    main()
