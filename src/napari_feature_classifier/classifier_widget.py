@@ -16,7 +16,7 @@ from magicgui.widgets import (
     PushButton,
     Select,
 )
-from qtpy.QtWidgets import QMessageBox
+from qtpy.QtWidgets import QMessageBox # pylint: disable=E0611
 
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
@@ -99,19 +99,31 @@ class ClassifierInitContainer(Container):
         )
 
     def get_selected_features(self):
+        """
+        Returns the currently selected features (0-n features)
+        """
         return self._feature_combobox.value
 
     def get_class_names(self):
+        """
+        Returns the available class names of the classifier
+        """
         return self._annotation_name_selector.get_class_names()
 
     def get_feature_options(self, layer):
-        # Get the feature options of the currently selected layer
-        # Only works if a label layer is selected (we don't load features from other layers)
+        """
+        Get the feature options of the currently selected layer
+        Only works if a label layer is selected (we don't load features from other layers)
+        """
         if isinstance(layer, napari.layers.Labels):
             return list(layer.features.columns)
         return []
 
     def update_layer_selection(self):
+        """
+        Update the layer selection and the feature options if the newly 
+        selected layer is a label layer
+        """
         if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
             self._last_selected_label_layer = self._viewer.layers.selection.active
             self.last_selected_layer_label.value = self._last_selected_label_layer
@@ -123,6 +135,7 @@ class ClassifierInitContainer(Container):
             )
 
 
+# pylint: disable=R0902
 class ClassifierRunContainer(Container):
     """
     The `ClassifierRunContainer` manages all the options needed to do
@@ -261,6 +274,11 @@ class ClassifierRunContainer(Container):
         )
 
     def run(self):
+        """
+        Run method that adds features to the classifier, trains it, triggers 
+        predictions & saves the classifier
+        """
+
         self.add_features_to_classifier()
         try:
             self._classifier.train()
@@ -272,8 +290,10 @@ class ClassifierRunContainer(Container):
             self.save()
 
     def add_features_to_classifier(self):
-        # Generate a dict of features: Key are roi_ids, values are dataframes
-        # from layer.features.
+        """
+        Generate a dict of features: Key are roi_ids, values are dataframes
+        from layer.features.
+        """
         dict_of_features = {}
         for layer in self._viewer.layers:
             if (
@@ -298,6 +318,10 @@ class ClassifierRunContainer(Container):
         self._classifier.add_dict_of_features(dict_of_features)
 
     def make_predictions(self):
+        """
+        Make predictions for all relevant label layers and add them to the 
+        layer.features `prediction` column of each layer
+        """
         # Get all the label layers that have fitting features
         relevant_label_layers = self.get_relevant_label_layers()
 
@@ -333,8 +357,10 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
 
     def selection_changed(self):
-        # Check if the selection change results in a valid label layer being
-        # selected. If so, initialize the prediction layer for it.
+        """
+        Check if the selection change results in a valid label layer being
+        selected. If so, initialize the prediction layer for it.
+        """
         if self._viewer.layers.selection.active:
             if self._viewer.layers.selection.active in get_valid_label_layers(
                 viewer=self._viewer
@@ -346,6 +372,10 @@ class ClassifierRunContainer(Container):
                 )
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
+        """
+        Initialize the prediction layer and reset its data (to fit the input 
+        label_layer) and its colormap
+        """
         # Check if the predict column already exists in the layer.features
         if "prediction" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
@@ -402,9 +432,11 @@ class ClassifierRunContainer(Container):
     def get_relevant_features(
         self, df, filter_annotations: bool = False, set_index=False
     ):
-        # Get the relevant features from the pandas table
-        # Creates double-indexing with label & roi_id?
-        # filter_annotations: Only return rows that contain annotations?
+        """
+        Get the relevant features from the pandas table
+        Can optionally create a double-indexing with label & roi_id
+        filter_annotations: Only return rows that contain annotations?
+        """
         if not filter_annotations:
             df_relevant = df[
                 [*self.feature_names, self._label_column, self._roi_id_colum]
@@ -426,6 +458,9 @@ class ClassifierRunContainer(Container):
         return df_relevant
 
     def save(self):
+        """
+        Save the classifier and handle overwriting of existing classifier file
+        """
         if not self.auto_save:
             # Handle existing classifier file => ask for overwrite
             if Path(self._save_destination.value).exists():
@@ -478,6 +513,10 @@ class LoadClassifierContainer(Container):
         self._load_button.clicked.connect(self.load)
 
     def load(self):
+        """
+        Load a classifier from a file and start the run container with the 
+        correct options(already set classifier_save_path and turn on auto_save)
+        """
         clf_path = Path(self._clf_destination.value)
         with open(clf_path, "rb") as f:
             clf = pickle.load(f)
