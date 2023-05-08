@@ -68,5 +68,5 @@ def test_running_classification_through_widget(make_napari_viewer):
 
     # TODO: Assert something
     assert classifier_widget._run_container._prediction_layer.visible
-    assert "predict" in label_layer.features.columns
-    assert pd.notna(label_layer.features["predict"]).all().all()
+    assert "prediction" in label_layer.features.columns
+    assert pd.notna(label_layer.features["prediction"]).all().all()

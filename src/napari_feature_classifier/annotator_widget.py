@@ -246,7 +246,7 @@ class LabelAnnotator(Container):
                 label_layer.features.loc[
                     label_layer.features[self._label_column] == label,
                     "annotations",
-                ]
+                ].iloc[0]
             )
             / len(self.cmap.colors)
         )

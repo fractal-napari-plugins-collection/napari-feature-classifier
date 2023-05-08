@@ -320,21 +320,20 @@ class ClassifierRunContainer(Container):
                     f"Duplicate roi_id {roi_id} found in {label_layer.name}. "
                     "It's already present as the roi_id of another label layer. "
                 )
-            prediction_dfs[roi_id] = self.get_relevant_features(label_layer.features)
+            prediction_dfs[roi_id] = self.get_relevant_features(label_layer.features, set_index=False)
 
         # Get the classifier predictions
         prediction_results_dict = self._classifier.predict_on_dict(prediction_dfs)
 
-        # Append the predictions to each open label layer ("predict" column)
+        # Append the predictions to each open label layer ("prediction" column)
         for label_layer in relevant_label_layers:
             roi_id = self.get_layer_roi_id(label_layer)
+            if "prediction" in label_layer.features.columns:
+                label_layer.features.drop(columns=["prediction"], inplace=True)
             # Merge the predictions back into the layer.features dataframe
-            # TODO: Check that this merge is robust, never drops rows etc.
-            if "predict" in label_layer.features.columns:
-                label_layer.features.drop(columns=["predict"], inplace=True)
             label_layer.features = label_layer.features.merge(
                 prediction_results_dict[roi_id],
-                left_on=[self._label_column, self._roi_id_colum],
+                left_on=[self._roi_id_colum, self._label_column],
                 right_index=True,
                 how="outer",
             )
@@ -355,10 +354,10 @@ class ClassifierRunContainer(Container):
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
         # Check if the predict column already exists in the layer.features
-        if "predict" not in label_layer.features:
+        if "prediction" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
             predict_df = pd.DataFrame(
-                {self._label_column: unique_labels, "predict": np.NaN}
+                {self._label_column: unique_labels, "prediction": np.NaN}
             )
             if self._label_column in label_layer.features.columns:
                 label_layer.features = label_layer.features.merge(
@@ -376,7 +375,7 @@ class ClassifierRunContainer(Container):
         # Update the colormap of the prediction layer
         reset_display_colormaps(
             label_layer,
-            feature_col="predict",
+            feature_col="prediction",
             display_layer=self._prediction_layer,
             label_column=self._label_column,
             cmap=get_colormap(),
@@ -407,7 +406,7 @@ class ClassifierRunContainer(Container):
             )
         return roi_ids[0]
 
-    def get_relevant_features(self, df, filter_annotations: bool = False):
+    def get_relevant_features(self, df, filter_annotations: bool = False, set_index=False):
         # Get the relevant features from the pandas table
         # Creates double-indexing with label & roi_id?
         # filter_annotations: Only return rows that contain annotations?
@@ -415,9 +414,6 @@ class ClassifierRunContainer(Container):
             df_relevant = df[
                 [*self.feature_names, self._label_column, self._roi_id_colum]
             ]
-            df_relevant.set_index(
-                [self._label_column, self._roi_id_colum], inplace=True
-            )
         else:
             df_relevant = df.loc[
                 df["annotations"].notna(),
@@ -428,8 +424,9 @@ class ClassifierRunContainer(Container):
                     "annotations",
                 ],
             ]
+        if set_index:
             df_relevant.set_index(
-                [self._label_column, self._roi_id_colum], inplace=True
+                [self._roi_id_colum, self._label_column], inplace=True
             )
         return df_relevant
 
