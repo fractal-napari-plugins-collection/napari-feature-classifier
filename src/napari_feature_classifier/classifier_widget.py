@@ -9,6 +9,7 @@ import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
+import pickle
 from magicgui.widgets import (
     Container,
     Label,
@@ -467,14 +468,11 @@ class LoadClassifierContainer(Container):
         
 
     def load(self):
-        show_info("loading classifier")
-        # FIXME: Load the actual classifier & pass it as an input
-        # No more tmp class_names & feature_names
-        class_names_tmp = ["Class 1", "Class 2", "Class 3"]
-        feature_names_tmp = ["feature_1", "feature_2", "feature_3"]
-        classifier = Classifier(feature_names_tmp, class_names_tmp)
+        clf_path = Path(self._clf_destination.value)
+        with open(clf_path, "rb") as f:
+            clf = pickle.load(f)
 
-        self._run_container = ClassifierRunContainer(self._viewer, classifier)
+        self._run_container = ClassifierRunContainer(self._viewer, clf)
         self.clear()
         self.append(self._run_container)
 
