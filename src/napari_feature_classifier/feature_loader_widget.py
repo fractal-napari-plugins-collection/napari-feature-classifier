@@ -1,19 +1,22 @@
-# %%
 from os import PathLike
 from typing import Callable, Sequence, Union
 from typing_extensions import TypeAlias
-
+import warnings
 import napari
+
 import numpy as np
 import pandas as pd
 import pandera as pa
-from magicgui.widgets import Container, FileEdit, PushButton
+from magicgui import magic_factory
+from napari.layers import Labels
 from napari.utils.notifications import show_info
+from napari.types import LayerDataTuple
 from pandera.typing import DataFrame, Series
+from pathlib import Path
 
 
 class LabelFeatureSchema(pa.SchemaModel):
-    roi_id: Series[str] = pa.Field(coerce=True, unique=False)
+    # roi_id: Series[str] = pa.Field(coerce=True, unique=False)
     label: Series[int] = pa.Field(coerce=True, unique=True)
 
 
@@ -26,7 +29,7 @@ def load_features_csv(
         assert (
             index_column_or_columns in df
         ), f"missing index column `{index_column_or_columns}` in csv file."
-        return DataFrame[LabelFeaturesSchema](
+        return DataFrame[LabelFeatureSchema](
             df.rename(columns={index_column_or_columns: "label"})
         )
     # return pd.DataFrame(data=np.random.rand(5, 5), columns=list("abcde"), index=list(range(1, 10, 2)))
@@ -49,25 +52,13 @@ def make_features(
 
 FeatureLoaderFn: TypeAlias = Callable[[PathLike[str]], DataFrame[LabelFeatureSchema]]
 
-
-class LoadFeaturesContainer(Container):
-    def __init__(
-        self,
-        labels_layer: napari.viewer.Viewer,
-        loader: FeatureLoaderFn = load_features_csv,
-    ):
-        self._labels_layer = labels_layer
-        self._loader = loader
-        self._load_destination = FileEdit(value="sample_data/test_df.csv", mode="r")
-        self._load_button = PushButton(label="Load Features")
-        super().__init__(widgets=[self._load_destination, self._load_button])
-        self._load_button.clicked.connect(self.load)
-
-    def load(self):
-        show_info("loading csv...")
-        fn = self._load_destination.value
-        df = self._loader(fn)
-        if self._labels_layer.features.index.empty:
-            self._labels_layer.features.index = np.unique(self._label_layer.data)[1:]
-        self._label_layer.features = self._label_layer.features.join(df, how="left")
-        print(self._label_layer.features)
+@magic_factory(call_button="load features")
+def load_features_factory(layer: Labels, path: Path, loader: FeatureLoaderFn=load_features_csv) -> LayerDataTuple:
+    df = loader(path)
+    image_labels = np.unique(layer.data)[1:]
+    feature_labels = df['label'].values
+    if len(set(image_labels).symmetric_difference(feature_labels)) != 0:
+        warn_str = f"Label image labels do not match with feature table.\nLabel objects with no features: {sorted(set(image_labels).difference(feature_labels))}\nFeatures with no label objects: {sorted(set(feature_labels).difference(image_labels))}"
+        show_info(warn_str)
+        warnings.warn(warn_str)
+    return (layer.data, {'name': layer.name, 'features': df}, 'labels')
