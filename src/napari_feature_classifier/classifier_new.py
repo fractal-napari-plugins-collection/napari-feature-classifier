@@ -8,7 +8,6 @@ import pandas as pd
 import pandera as pa
 import xxhash
 
-import numpy as np
 from napari.utils.notifications import show_info
 
 from sklearn.metrics import f1_score
@@ -184,23 +183,19 @@ def get_input_internal_and_predict_schemas(
     feature_names: Sequence[str],
     class_names: Sequence[str],
     index_columns: Sequence[str] = ("roi_id", "label"),
-) -> tuple[pa.DataFrameSchema, pa.DataFrameSchema]:
+) -> tuple[pa.DataFrameSchema, pa.DataFrameSchema, pa.DataFrameSchema]:
     assert len(index_columns) == 2
     input_schema = pa.DataFrameSchema(
         columns={
             index_columns[0]: pa.Column(pa.String, coerce=True),
             index_columns[1]: pa.Column(pa.UInt64, coerce=True),
             "annotations": pa.Column(
-                pa.Int64,
-                # pd.Int64Dtype(),
+                # pa.Int64,
+                pd.Int64Dtype(),
                 coerce=True,
-                # checks=pa.Check.between(1, len(class_names) + 1),
                 checks=[
-                    pa.Check(
-                        lambda x: 1 <= x <= len(class_names) or x == -1,
-                        element_wise=True,
-                        ignore_na=True,
-                    ),
+                    pa.Check.between(-1, len(class_names)),
+                    pa.Check.not_equal_to(0),
                 ],
                 nullable=True,
             ),
