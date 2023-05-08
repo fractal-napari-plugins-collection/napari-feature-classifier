@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from napari_feature_classifier.classifier_new import Classifier
+from napari_feature_classifier.classifier import Classifier
 
 CLASSIFIER_FEATURE_NAMES = ["feature1", "feature2", "feature3"]
 DROP_COLUMNS = ['feature6', 'feature7']
