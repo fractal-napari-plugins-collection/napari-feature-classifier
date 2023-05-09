@@ -30,6 +30,7 @@ from napari_feature_classifier.utils import (
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
     napari_info,
+    overwrite_check_passed,
 )
 
 
@@ -258,16 +259,27 @@ class ClassifierRunContainer(Container):
         if classifier_save_path:
             self._save_destination.value = classifier_save_path
         self._save_button = PushButton(text="Save Classifier")
+
+        # Export options
+        self._export_destination = FileEdit(
+            label="Prediction Export Path",
+            value=f"{self._last_selected_label_layer}_prediction.csv",
+            mode="w",
+        )
+        self._export_button = PushButton(text="Export Classifier Result")
         super().__init__(
             widgets=[
                 self._annotator,
                 self._save_destination,
                 self._run_button,
                 self._save_button,
+                self._export_destination,
+                self._export_button,
             ]
         )
         self._run_button.clicked.connect(self.run)
         self._save_button.clicked.connect(self.save)
+        self._export_button.clicked.connect(self.export_results)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
         self._init_prediction_layer(self._last_selected_label_layer)
         # Whenever the label layer is clicked, hide the prediction layer
@@ -470,23 +482,25 @@ class ClassifierRunContainer(Container):
         """
         if not self.auto_save:
             # Handle existing classifier file => ask for overwrite
-            if Path(self._save_destination.value).exists():
-                msg_box = QMessageBox()
-                msg_box.setText(
-                    "Do you you want to overwrite the "
-                    "existing classifier: "
-                    f"{self._save_destination.value}?"
-                )
-                msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.Cancel)
-                msg_box.setDefaultButton(QMessageBox.Yes)
-
-                response = msg_box.exec_()
-                if not response == QMessageBox.Yes:
-                    return
+            if not overwrite_check_passed(
+                file_path=self._save_destination.value, output_type="classifier"
+            ):
+                return
 
         self.auto_save = True
         output_path = Path(self._save_destination.value)
         self._classifier.save(output_path)
+
+    def export_results(self):
+        """
+        Export classifier results for the current layer if available
+        """
+        if not overwrite_check_passed(
+            file_path=self._export_destination.value, output_type="predictions"
+        ):
+            return
+        print(f"{self._last_selected_label_layer.features}")
+        pass
 
 
 class LoadClassifierContainer(Container):

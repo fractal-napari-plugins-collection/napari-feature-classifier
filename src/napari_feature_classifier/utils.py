@@ -1,5 +1,6 @@
 """Utils function for the classifier"""
 from functools import lru_cache
+from pathlib import Path
 
 # import warnings
 import pandas as pd
@@ -8,6 +9,7 @@ from matplotlib.colors import ListedColormap
 import matplotlib
 import numpy as np
 import napari
+from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
 # from napari._qt.dialogs.qt_notification import NapariQtNotification
 # from napari._qt.qt_event_loop import _ipython_has_eventloop
@@ -147,3 +149,23 @@ def get_selected_or_valid_label_layer(viewer) -> napari.layers.Labels:
     if len(valid_layers) > 0:
         return valid_layers[0]
     raise NotImplementedError("No valid label layers were found")
+
+
+def overwrite_check_passed(file_path, output_type: str = ""):
+    """
+    If a file already exists, ask whether it should be overwritten.
+    """
+    if Path(file_path).exists():
+        msg_box = QMessageBox()
+        msg_box.setText(
+            "Do you you want to overwrite the "
+            f"existing {output_type}: "
+            f"{file_path}?"
+        )
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.Cancel)
+        msg_box.setDefaultButton(QMessageBox.Yes)
+
+        response = msg_box.exec_()
+        if not response == QMessageBox.Yes:
+            return False
+    return True

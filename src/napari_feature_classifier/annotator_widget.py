@@ -20,13 +20,15 @@ from magicgui.widgets import (
     create_widget,
 )
 
+
 # pylint: disable=R0801
 from napari_feature_classifier.utils import (
     get_colormap,
     reset_display_colormaps,
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
-    napari_info
+    napari_info,
+    overwrite_check_passed,
 )
 
 
@@ -197,7 +199,7 @@ class LabelAnnotator(Container):
 
     def toggle_label(self, labels_layer, event):
         """
-        Callback for when a label is clicked. It then updates the color of that 
+        Callback for when a label is clicked. It then updates the color of that
         label in the annotation layer.
         """
         # Need to scale position that event.position returns by the
@@ -263,6 +265,7 @@ class LabelAnnotator(Container):
             label_layer.bind_key(str(i), set_class, overwrite=True)
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
+        # TODO: Improve: maintain base path if available
         self._save_destination.value = f"annotation_{label_layer.name}.csv"
 
     def update_single_color(self, label_layer, label):
@@ -286,15 +289,22 @@ class LabelAnnotator(Container):
         """
         Save annotations to a csv file.
         """
-        annotations = self._last_selected_label_layer.features["annotations"]
+        # Check whether annotations should be overwritten.
+        if not overwrite_check_passed(
+            file_path=self._save_destination.value, output_type="annotation export"
+        ):
+            return
+        annotations = self._last_selected_label_layer.features.loc[
+            :, [self._label_column, "annotations"]
+        ]
         df = pd.DataFrame(annotations)  # pylint: disable=C0103
         class_names = []
-        for annotation in annotations:
+        for annotation in annotations["annotations"]:
             if math.isnan(annotation):
-                class_names.append(self.ClassSelection(np.NaN).name)
+                class_names.append(np.NaN)
             else:
                 class_names.append(self.ClassSelection(annotation).name)
-
         df["annotation_names"] = class_names
+
         df.to_csv(self._save_destination.value)
         napari_info(f"Annotations were saved at {self._save_destination.value}")
