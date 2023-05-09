@@ -502,7 +502,7 @@ class ClassifierRunContainer(Container):
 
         """
         base_path = Path(self._export_destination.value).parent
-        self._export_destination.value = base_path / f"annotation_{label_layer.name}.csv"
+        self._export_destination.value = base_path / f"{label_layer.name}_predictions.csv"
 
     def export_results(self):
         """
