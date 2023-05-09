@@ -9,9 +9,8 @@
 
 An interactive classifier plugin that allows the user to assign objects in a label image to multiple classes and train a classifier to learn those classes based on a feature dataframe.
 
-
 ## Usage
-<p align="center"><img src="https://user-images.githubusercontent.com/18033446/153727595-60380204-f299-485f-b762-d2030b75e7d3.gif" /></p>
+<p align="center"><img src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/1ebf0890-1a7b-4e4b-a21c-88ca8f1dd800" /></p>
 To use the napari-feature-classifier, you need to have a label image and corresponding measurements (as a csv file, loaded to layer.features or in an [OME-Zarr Anndata table loaded with another plugin](https://github.com/jluethi/napari-ome-zarr-roi-loader)). Your feature measurements need to contain a `label` column that matches the label objects in the label image.
 These interactive classification workflows are well suited to visually define cell types, find mitotic cells in images, do quality control by automatically detecting missegmented cells and other tasks where a user can easily assign objects to groups.
 
@@ -29,31 +28,36 @@ These interactive classification workflows are well suited to visually define ce
 - Start the classifier in napari by going to `Plugins -> napari-feature-classifier -> Initialize a Classifier`  
 - Select the features you want to use for the classifier (you need to do the feature selection before initializing. The feature selection can't be changed after initialization anymore). Hold the command key to select multiple features. Feature options are always shown for the features available in the last selected label layer, based on layer.features available features.
 - (Optional) Give your classes recognizable names (e.g. Mitotic & Interphase, Cell Type a, b and c etc.)
-<img width="1831" alt="Initialize Classifier" src="https://user-images.githubusercontent.com/18033446/153727784-d7b7d44b-a7b1-479f-a4af-34e0e280c8d6.png">
+<img width="1606" alt="Screenshot 2023-05-09 at 11 46 35" src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/452c0d6a-98a3-4e2d-9233-33bfd5bcad19">
+
 
 
 
 #### Classify objects:
+<img width="1802" alt="Classifier_annotation" src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/556739b8-972b-4570-9da4-637738fc6a75">
 - Make sure you have the label layer selected on which you want to classify
 - Select the current class with the radio buttons or by pressing 0, 1, 2, etc.
 - Click on label objects in the viewer to assign them to the currently selected class
 - Once you have trained enough examples, click "Run Classifier" to run the classifier and have it make a prediction for all objects. Aim for at least a dozen annotations per class, as the classifier divides your annotations 80/20 in training and test sets. 
 - Once you get predictions, correct mistakes the classifier made and retrain it to improve its performance.
 - You can save the classifier under a different name or in a different location. Define the new output location and then click `Save Classifier` (you need to click the Save Classifier button. Just defining the new output path does not save it yet. But every run of the classifier triggers an autosave)
-<img width="1831" alt="trainClassifier" src="https://user-images.githubusercontent.com/18033446/153727960-daae2955-4368-4081-88da-1a1cdbda6e69.png">
+<img width="1802" alt="Classifier_prediction" src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/69cff600-4585-4a66-9274-d2e7caeb335f">
+
 
 
 #### Apply the classifier to additional images:
 - You can apply a classifier trained on one image to additional label images. Use `Plugins -> napari-feature-classifier -> Load Classifier`  
 - Select the classifier (.clf file with the name you gave above) while already having the label images ready (see `Prepare the label layer` above).
 - Click Load Classifier, proceed as above.
-<img width="1831" alt="LoadClassifier" src="https://user-images.githubusercontent.com/18033446/153728100-dd60918d-c9a4-4de8-8f0e-8fd8c6a51700.png">
+<img width="1606" alt="Screenshot 2023-05-09 at 12 01 00" src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/e1143f9f-9729-4f8e-979c-2ab195e0aaca">
+
 
 
 #### Export classifier results
 - To export the training data and the results of the classifier, define an Export Name (full path to an output file or just a filename ending in .csv) where the results of the classifier shall be saved. It defaults to the layer name for the selected layer in the last directory you chose (or the current working directory if none was chosen so far)
 - Click `Export Classifier Result` (Just selecting a filename is not enough, you need to click the export button). This will export the predictions for the currently selected layer.
 - The results of the classifier are save in a csv file. The label is an integer of the label object within that image. The prediction column contains predictions of the classifier for all objects (except those that contained NaNs in their feature data) and the annotation column contains the annotations you made (NaN for unclassified objects, -1 for objects you deselected, 1 - 9 for the classes)
+<img width="1802" alt="Classifier_prediction" src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/e8f6f7b7-d88b-44f8-b43e-8a2fa81e18d4">
 
 
 #### Batch mode result export
