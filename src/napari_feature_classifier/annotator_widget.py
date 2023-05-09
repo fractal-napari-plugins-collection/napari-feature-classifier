@@ -1,8 +1,8 @@
 """Annotator container widget for napari"""
-import math
 import warnings
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from typing import Optional, Sequence, cast
 
 # pylint: disable=R0801
@@ -29,6 +29,7 @@ from napari_feature_classifier.utils import (
     get_selected_or_valid_label_layer,
     napari_info,
     overwrite_check_passed,
+    add_annotation_names,
 )
 
 
@@ -153,7 +154,7 @@ class LabelAnnotator(Container):
         )
         self._init_annotation(self._last_selected_label_layer)
         self._save_destination = FileEdit(
-            label="Save Path", value="annotation.csv", mode="r"
+            label="Save Path", value="annotation.csv", mode="w"
         )
         self._save_annotation = PushButton(label="Save Annotations")
         self._update_save_destination(self._last_selected_label_layer)
@@ -166,6 +167,11 @@ class LabelAnnotator(Container):
             ]
         )
         self._save_annotation.clicked.connect(self._on_save_clicked)
+        # TODO: Connect to the user clicking save in the file dialog. I can
+        # trigger an event that the user clicked the button to open the
+        # file dialog (see below), but don't get the info whether the user
+        # clicked confirm or cancel.
+        # self._save_destination.choose_btn.changed.connect(self.user_accepted)
         # Connect to label layer change, potentially call init
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
 
@@ -188,6 +194,7 @@ class LabelAnnotator(Container):
                     self._viewer.layers.selection.active
                 )
                 self._last_selected_label_layer = self._viewer.layers.selection.active
+                self._update_save_destination(self._last_selected_label_layer)
             else:
                 self._save_annotation.enabled = False
                 self._save_destination.enabled = False
@@ -265,8 +272,13 @@ class LabelAnnotator(Container):
             label_layer.bind_key(str(i), set_class, overwrite=True)
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
-        # TODO: Improve: maintain base path if available
-        self._save_destination.value = f"annotation_{label_layer.name}.csv"
+        """
+        Update the default save destination to the name of the label layer.
+        If a base_path was already set, keep it on that base path.
+        
+        """
+        base_path = Path(self._save_destination.value).parent
+        self._save_destination.value = base_path / f"annotation_{label_layer.name}.csv"
 
     def update_single_color(self, label_layer, label):
         """
@@ -294,17 +306,14 @@ class LabelAnnotator(Container):
             file_path=self._save_destination.value, output_type="annotation export"
         ):
             return
+
         annotations = self._last_selected_label_layer.features.loc[
             :, [self._label_column, "annotations"]
         ]
-        df = pd.DataFrame(annotations)  # pylint: disable=C0103
-        class_names = []
-        for annotation in annotations["annotations"]:
-            if math.isnan(annotation):
-                class_names.append(np.NaN)
-            else:
-                class_names.append(self.ClassSelection(annotation).name)
-        df["annotation_names"] = class_names
+        # pylint: disable=C0103
+        df = add_annotation_names(
+            df=pd.DataFrame(annotations), ClassSelection=self.ClassSelection
+        )
 
         df.to_csv(self._save_destination.value)
         napari_info(f"Annotations were saved at {self._save_destination.value}")

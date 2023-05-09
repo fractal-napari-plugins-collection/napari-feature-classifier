@@ -1,5 +1,6 @@
 """Utils function for the classifier"""
 from functools import lru_cache
+import math
 from pathlib import Path
 
 # import warnings
@@ -169,3 +170,29 @@ def overwrite_check_passed(file_path, output_type: str = ""):
         if not response == QMessageBox.Yes:
             return False
     return True
+
+
+# pylint: disable=C0103
+def add_annotation_names(df, ClassSelection):
+    """
+    Add a column with the actual annotation names to the dataframe.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe with annotations column.
+    ClassSelection : Enum
+        Enum with the class names.
+    
+    Returns
+    -------
+    pd.DataFrame
+    """
+    class_names = []
+    for annotation in df["annotations"]:
+        if math.isnan(annotation):
+            class_names.append(np.NaN)
+        else:
+            class_names.append(ClassSelection(annotation).name)
+    df["annotation_names"] = class_names
+    return df

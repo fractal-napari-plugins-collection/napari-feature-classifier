@@ -31,6 +31,7 @@ from napari_feature_classifier.utils import (
     get_selected_or_valid_label_layer,
     napari_info,
     overwrite_check_passed,
+    add_annotation_names,
 )
 
 
@@ -385,6 +386,7 @@ class ClassifierRunContainer(Container):
                 self._last_selected_label_layer.mouse_drag_callbacks.append(
                     self.hide_prediction_layer
                 )
+                self._update_export_destination(self._last_selected_label_layer)
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
         """
@@ -486,10 +488,21 @@ class ClassifierRunContainer(Container):
                 file_path=self._save_destination.value, output_type="classifier"
             ):
                 return
-
+        # If the user confirms overwriting the classifier once, keep
+        # overwriting it going forward. We want classifier auto-save, just not
+        # overwriting of other existing classifiers with the same name.
         self.auto_save = True
         output_path = Path(self._save_destination.value)
         self._classifier.save(output_path)
+
+    def _update_export_destination(self, label_layer: napari.layers.Labels):
+        """
+        Update the default export destination to the name of the label layer.
+        If a base_path was already set, keep it on that base path.
+
+        """
+        base_path = Path(self._export_destination.value).parent
+        self._export_destination.value = base_path / f"annotation_{label_layer.name}.csv"
 
     def export_results(self):
         """
@@ -499,8 +512,17 @@ class ClassifierRunContainer(Container):
             file_path=self._export_destination.value, output_type="predictions"
         ):
             return
-        print(f"{self._last_selected_label_layer.features}")
-        pass
+
+        predictions = self._last_selected_label_layer.features.loc[
+            :, [self._label_column, "prediction", "annotations"]
+        ]
+        # pylint: disable=C0103
+        df = add_annotation_names(
+            df=pd.DataFrame(predictions), ClassSelection=self._annotator.ClassSelection
+        )
+
+        df.to_csv(self._export_destination.value)
+        napari_info(f"Annotations were saved at {self._export_destination.value}")
 
 
 class LoadClassifierContainer(Container):
@@ -539,7 +561,7 @@ class LoadClassifierContainer(Container):
         correct options(already set classifier_save_path and turn on auto_save)
         """
         clf_path = Path(self._clf_destination.value)
-        with open(clf_path, "rb") as f: # pylint: disable=C0103
+        with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
 
         self._run_container = ClassifierRunContainer(
