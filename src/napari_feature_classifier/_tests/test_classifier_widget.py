@@ -1,6 +1,8 @@
 """ Tests for classifier widget initialization"""
 import numpy as np
 import pandas as pd
+import pytest
+import os
 
 import imageio
 from pathlib import Path
@@ -31,17 +33,19 @@ def test_classifier_widgets_initialization_no_features_selected(make_napari_view
     assert classifier_widget._run_container is None
 
 
+
+features = make_features(np.unique(lbl_img_np)[1:], roi_id="ROI1", n_features=6)
+features_no_roi_id = features.drop(columns=["roi_id"])
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
-# TODO: Verify the actual results of the classification
-def test_running_classification_through_widget(make_napari_viewer):
+@pytest.mark.parametrize("features", [features, features_no_roi_id])
+def test_running_classification_through_widget(features, make_napari_viewer):
     """
     Tests if the main widget launches
     """
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
     label_layer = viewer.add_labels(lbl_img_np)
-    labels = np.unique(lbl_img_np)[1:]
-    label_layer.features = make_features(labels, roi_id="ROI1", n_features=6)
+    label_layer.features = features
 
     # Start init widget
     classifier_widget = ClassifierWidget(viewer)
@@ -66,7 +70,16 @@ def test_running_classification_through_widget(make_napari_viewer):
     # Run the classifier
     classifier_widget._run_container.run()
 
-    # TODO: Assert something
+    # Assert something that the layer is visible, predictions exist and are not NaN
     assert classifier_widget._run_container._prediction_layer.visible
     assert "prediction" in label_layer.features.columns
     assert pd.notna(label_layer.features["prediction"]).all().all()
+
+    # Check that the classifier file was saved
+    assert Path("lbl_img_np_classifier.clf").exists()
+
+    # Delete the classifier file (cleanup to avoid overwriting confirmation)
+    os.remove("lbl_img_np_classifier.clf")
+
+# TODO: Add a test to check the overwrite confirmations working correctly
+# For classifier files, for annotations and for exported predictions
