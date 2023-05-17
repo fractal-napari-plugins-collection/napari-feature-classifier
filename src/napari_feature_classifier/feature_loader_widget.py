@@ -70,4 +70,5 @@ def load_features_factory(
         f"{sorted(set(feature_labels).difference(image_labels))}"
         napari_info(warn_str)
         warnings.warn(warn_str)
+    napari_info(f"Loaded features and attached them to \"{layer}\" layer")
     return (layer.data, {"name": layer.name, "features": df}, "labels")
