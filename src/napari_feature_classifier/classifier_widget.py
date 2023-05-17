@@ -298,8 +298,12 @@ class ClassifierRunContainer(Container):
         self.add_features_to_classifier()
         try:
             self._classifier.train()
-        except ValueError:
-            napari_info("Not enough annotations made. Please make more annotations.")
+        except ValueError as e:
+            napari_info(
+                "Training failed. A typical reason are not having "
+                "enough annotations. \nThe error message was: "
+                f"{e}"
+            )
         else:
             self.make_predictions()
             self._prediction_layer.visible = True
@@ -502,7 +506,9 @@ class ClassifierRunContainer(Container):
 
         """
         base_path = Path(self._export_destination.value).parent
-        self._export_destination.value = base_path / f"{label_layer.name}_predictions.csv"
+        self._export_destination.value = (
+            base_path / f"{label_layer.name}_predictions.csv"
+        )
 
     def export_results(self):
         """
