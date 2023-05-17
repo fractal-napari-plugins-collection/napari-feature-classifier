@@ -198,9 +198,8 @@ class Classifier:
         """
         for roi in dict_of_features:
             if "roi_id" not in dict_of_features[roi]:
-                df = dict_of_features[roi]["roid_id"] = roi
-            else:
-                df = df = dict_of_features[roi]
+                dict_of_features[roi]["roi_id"] = roi
+            df = dict_of_features[roi]
             napari_info(f"Adding features for {roi=}...")
             self.add_features(df)
 
