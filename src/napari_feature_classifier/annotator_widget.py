@@ -278,7 +278,7 @@ class LabelAnnotator(Container):
         
         """
         base_path = Path(self._save_destination.value).parent
-        self._save_destination.value = base_path / f"annotation_{label_layer.name}.csv"
+        self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"
 
     def update_single_color(self, label_layer, label):
         """
