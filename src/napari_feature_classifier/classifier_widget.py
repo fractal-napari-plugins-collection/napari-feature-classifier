@@ -201,6 +201,9 @@ class ClassifierRunContainer(Container):
     _save_button: magicgui.widgets.PushButton
         The PushButton widget for saving the classifier
     """
+    _labels_layer_opacity_values = (0.0, 0.4)
+    _annotations_layer_opacity_values = (0.0, 0.8)
+    _predictions_layer_opacity_values = (0.0, 1.0)
 
     # pylint: disable=R0913
     def __init__(
@@ -247,6 +250,7 @@ class ClassifierRunContainer(Container):
             scale=self._last_selected_label_layer.scale,
             name="Predictions",
         )
+        self._prediction_layer.contour = 2
 
         # Set the label selection to a valid label layer => Running into proxy bug
         self._viewer.layers.selection.active = self._last_selected_label_layer
@@ -285,9 +289,30 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
         # Whenever the label layer is clicked, hide the prediction layer
         # (e.g. new annotations are made)
-        self._last_selected_label_layer.mouse_drag_callbacks.append(
-            self.hide_prediction_layer
-        )
+        # self._last_selected_label_layer.mouse_drag_callbacks.append(
+            # self.hide_prediction_layer
+        # )
+        self.init_layer_keybindings()
+
+    def init_layer_keybindings(self):
+        label_layer = self._last_selected_label_layer
+
+        @label_layer.bind_key('q', overwrite=True)
+        def toggle_labels_callback(layer):
+            self.toggle_labels_layer()
+            
+        @label_layer.bind_key('w', overwrite=True)
+        def toggle_annotations_callback(layer):
+            self.toggle_annotations_layer()
+
+        @label_layer.bind_key('e', overwrite=True)
+        def toggle_predictions_callback(layer):
+            self.toggle_predictions_layer()
+
+        @label_layer.bind_key('r', overwrite=True)
+        def toggle_all_callback(layer):
+            self.toggle_all_layers()
+
 
     def run(self):
         """
@@ -387,9 +412,9 @@ class ClassifierRunContainer(Container):
             ):
                 self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._init_prediction_layer(self._viewer.layers.selection.active)
-                self._last_selected_label_layer.mouse_drag_callbacks.append(
-                    self.hide_prediction_layer
-                )
+                # self._last_selected_label_layer.mouse_drag_callbacks.append(
+                    # self.hide_prediction_layer
+                # )
                 self._update_export_destination(self._last_selected_label_layer)
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
@@ -425,11 +450,47 @@ class ClassifierRunContainer(Container):
             cmap=get_colormap(),
         )
 
-    def hide_prediction_layer(self, labels_layer, event):
-        """
-        Hide the prediction layer
-        """
-        self._prediction_layer.visible = False
+    def toggle_labels_layer(self):
+        off_value, on_value = self._labels_layer_opacity_values
+        if self._last_selected_label_layer.opacity == off_value:
+            self._last_selected_label_layer.opacity = on_value
+        else:
+            self._last_selected_label_layer.opacity = off_value
+            
+    def toggle_annotations_layer(self):
+        off_value, on_value = self._annotations_layer_opacity_values
+        if self._annotator._annotations_layer.opacity == off_value:
+            self._annotator._annotations_layer.opacity = on_value
+        else:
+            self._annotator._annotations_layer.opacity = off_value
+            
+    def toggle_predictions_layer(self):
+        off_value, on_value = self._predictions_layer_opacity_values
+        if self._prediction_layer.opacity == off_value:
+            self._prediction_layer.opacity = on_value
+        else:
+            self._prediction_layer.opacity = off_value
+
+    def toggle_all_layers(self):
+        """Toggle the annotations layer and set labels and predictions to the same state."""
+        labels_off_value, labels_on_value = self._labels_layer_opacity_values
+        annotations_off_value, annotations_on_value = self._annotations_layer_opacity_values
+        predictions_off_value, predictions_on_value = self._predictions_layer_opacity_values
+        if self._annotator._annotations_layer.opacity == annotations_off_value:
+            self._last_selected_label_layer.opacity = labels_on_value
+            self._annotator._annotations_layer.opacity = annotations_on_value
+            self._prediction_layer.opacity = predictions_on_value
+        else:
+            self._last_selected_label_layer.opacity = labels_off_value
+            self._annotator._annotations_layer.opacity = annotations_off_value
+            self._prediction_layer.opacity = predictions_off_value
+
+    # def hide_prediction_layer(self, labels_layer, event):
+        # """
+        # Hide the prediction layer
+        # """
+        # self._prediction_layer.visible = False
+        # pass
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []
