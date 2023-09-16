@@ -13,6 +13,7 @@ from magicgui.widgets import (
     Container,
     Label,
     FileEdit,
+    RadioButtons,
     PushButton,
     Select,
 )
@@ -555,11 +556,23 @@ class LoadClassifierContainer(Container):
 
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
-        self._clf_destination = FileEdit(mode="r", filter="*.clf")
+        self._clf_destination = FileEdit(mode="r", filter=None)
+        self._filter = RadioButtons(
+            value="*.clf",
+            choices=["*.clf", "*.pkl", "*"],
+            orientation="horizontal",
+            label="Filter",
+        )
         self._load_button = PushButton(label="Load Classifier")
         self._run_container = None
-        super().__init__(widgets=[self._clf_destination, self._load_button])
+        super().__init__(
+            widgets=[self._clf_destination, self._filter, self._load_button]
+        )
         self._load_button.clicked.connect(self.load)
+        self._filter.changed.connect(self.set_filter)
+
+    def set_filter(self):
+        self._clf_destination.filter = self._filter.value
 
     def load(self):
         """
