@@ -223,7 +223,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels"
     )
     assert (
-        str(classifier_widget._run_container._export_destination.value).split("/")[-1]
+        classifier_widget._run_container._export_destination.value.name
         == "test_labels_predictions.csv"
     )
 
