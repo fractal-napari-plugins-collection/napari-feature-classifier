@@ -37,7 +37,6 @@ def test_classifier_widgets_initialization_no_features_selected(make_napari_view
     assert classifier_widget._run_container is None
 
 
-
 features = make_features(np.unique(lbl_img_np)[1:], roi_id="ROI1", n_features=6)
 features_no_roi_id = features.drop(columns=["roi_id"])
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
@@ -108,4 +107,16 @@ def test_load_classifier_widget(make_napari_viewer, capsys):
     # Some basic checks that loading looks to have worked
     assert loading_widget._run_container._prediction_layer.visible
     assert "prediction" in label_layer.features.columns
+
+def test_change_of_loader_filter(make_napari_viewer, capsys):
+    viewer = make_napari_viewer()
+    loading_widget = LoadClassifierContainer(viewer)
+    assert loading_widget._filter.value == "*.clf"
+    assert loading_widget._clf_destination.filter == None
+    loading_widget._filter.value = "*.pkl"
+    assert loading_widget._clf_destination.filter == "*.pkl"
+    assert loading_widget._filter.value == "*.pkl"
+
+
+
 
