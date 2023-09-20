@@ -30,6 +30,6 @@ def test_feature_loading_csv(make_napari_viewer, capsys):
     assert (labels_layer.features == features).all().all()
 
     # Assert that this message is logged
-    expected = 'INFO: Loaded features and attached them " \
-        "to "lbl_img_np" layer\n'
+    expected = "INFO: Loaded features and attached them "
+    expected += 'to "lbl_img_np" layer\n'
     assert expected in capsys.readouterr().out
