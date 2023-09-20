@@ -10,8 +10,12 @@ from napari_feature_classifier.feature_loader_widget import make_features
 from napari_feature_classifier.classifier_widget import (
     ClassifierWidget,
 )
+from napari_feature_classifier.classifier_widget import (
+    LoadClassifierContainer,
+)
 
 lbl_img_np = imageio.v2.imread(Path("src/napari_feature_classifier/sample_data/test_labels.tif"))
+clf_path = Path("src/napari_feature_classifier/sample_data/test_labels_classifier.clf")
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
@@ -83,3 +87,25 @@ def test_running_classification_through_widget(features, make_napari_viewer):
 
 # TODO: Add a test to check the overwrite confirmations working correctly
 # For classifier files, for annotations and for exported predictions
+
+# make_napari_viewer is a pytest fixture that returns a napari viewer object
+# capsys is a pytest fixture that captures stdout and stderr output streams
+def test_load_classifier_widget(make_napari_viewer, capsys):
+    """
+    Tests if the load classifier widget launches
+    """
+    # make viewer and add an image layer using our fixture
+    viewer = make_napari_viewer()
+    label_layer = viewer.add_labels(lbl_img_np)
+    label_layer.features = features
+
+    # Start init widget
+    loading_widget = LoadClassifierContainer(viewer)
+
+    loading_widget._clf_destination.value = clf_path
+    loading_widget.load()
+
+    # Some basic checks that loading looks to have worked
+    assert loading_widget._run_container._prediction_layer.visible
+    assert "prediction" in label_layer.features.columns
+
