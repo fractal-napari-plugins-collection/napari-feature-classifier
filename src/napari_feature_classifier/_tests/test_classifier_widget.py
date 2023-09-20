@@ -98,6 +98,53 @@ def test_running_classification_through_widget(features, make_napari_viewer):
     os.remove("lbl_img_np_classifier.clf")
 
 
+# Test classifier results export
+def test_prediction_export(make_napari_viewer, capsys):
+    """
+    Tests if the main widget launches
+    """
+    # make viewer and add an image layer using our fixture
+    viewer = make_napari_viewer()
+    label_layer = viewer.add_labels(lbl_img_np)
+    label_layer.features = features
+
+    # Start init widget
+    classifier_widget = ClassifierWidget(viewer)
+
+    # Select relevant features
+    classifier_widget._init_container._feature_combobox.value = [
+        "feature_1",
+        "feature_2",
+        "feature_3",
+    ]
+
+    classifier_widget.initialize_run_widget()
+
+    # Check that the run widget is initialized
+    assert classifier_widget._run_container is not None
+
+    # Add some annotations manually
+    label_layer.features.loc[0, "annotations"] = 1.0
+    label_layer.features.loc[1, "annotations"] = 1.0
+    label_layer.features.loc[3, "annotations"] = 3.0
+
+    # Run the classifier
+    classifier_widget._run_container.run()
+
+    # Test result export
+    classifier_widget._run_container.export_results()
+    df = pd.read_csv(classifier_widget._run_container._export_destination.value)
+    assert df.shape == (16, 5)
+    assert df["prediction"].isna().sum() == 0
+
+    # Delete the classifier file (cleanup to avoid overwriting confirmation)
+    os.remove("lbl_img_np_classifier.clf")
+    os.remove("lbl_img_np_predictions.csv")
+
+    message = "INFO: Annotations were saved at lbl_img_np_predictions.csv"
+    assert message in capsys.readouterr().out
+
+
 # TODO: Add a test to check the overwrite confirmations working correctly
 # For classifier files, for annotations and for exported predictions
 
