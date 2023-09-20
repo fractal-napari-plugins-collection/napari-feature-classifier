@@ -55,7 +55,7 @@ jobs:
         run: |
           pip install .
           # stop the build if there are Python syntax errors, undefined symbols or failed code style checks
-          python -m pylint --ignore=test_* --fail-under=8 -f parseable src
+          python -m pylint --ignore-patterns=test_.*.py --fail-under=8 -f parseable src
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Test with tox
