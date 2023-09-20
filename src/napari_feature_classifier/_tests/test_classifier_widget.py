@@ -139,6 +139,48 @@ def test_classifier_fails_running_without_annotation(make_napari_viewer, capsys)
     assert expected_message in capsys.readouterr().out
 
 
+def test_layer_selection_changes(make_napari_viewer):
+    """
+    Tests if the main widget launches
+    """
+    # make viewer and add an image layer using our fixture
+    viewer = make_napari_viewer()
+    label_layer1 = viewer.add_labels(lbl_img_np, name="test_labels")
+    label_layer2 = viewer.add_labels(lbl_img_np, name="test_labels_2")
+    label_layer2.features = features
+    label_layer1.features = features
+
+    # Start init widget
+    classifier_widget = ClassifierWidget(viewer)
+
+    # Select relevant features
+    classifier_widget._init_container._feature_combobox.value = [
+        "feature_1",
+        "feature_2",
+        "feature_3",
+    ]
+
+    classifier_widget.initialize_run_widget()
+
+    assert (
+        classifier_widget._run_container._last_selected_label_layer.name
+        == "test_labels_2"
+    )
+    assert (
+        str(classifier_widget._run_container._export_destination.value)
+        == "test_labels_2_predictions.csv"
+    )
+    viewer.layers.selection.active = label_layer1
+    assert (
+        classifier_widget._run_container._last_selected_label_layer.name
+        == "test_labels"
+    )
+    assert (
+        str(classifier_widget._run_container._export_destination.value).split("/")[-1]
+        == "test_labels_predictions.csv"
+    )
+
+
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 # capsys is a pytest fixture that captures stdout and stderr output streams
 def test_load_classifier_widget(make_napari_viewer, capsys):

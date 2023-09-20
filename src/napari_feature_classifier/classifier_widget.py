@@ -17,7 +17,6 @@ from magicgui.widgets import (
     PushButton,
     Select,
 )
-from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
@@ -117,7 +116,9 @@ class ClassifierInitContainer(Container):
     def get_feature_options(self, layer):
         """
         Get the feature options of the currently selected layer
-        Only works if a label layer is selected (we don't load features from other layers)
+
+        Only works if a label layer is selected (we don't load features from
+        other layers)
         """
         if isinstance(layer, napari.layers.Labels):
             return list(layer.features.columns)
@@ -265,7 +266,7 @@ class ClassifierRunContainer(Container):
         # Export options
         self._export_destination = FileEdit(
             label="Prediction Export Path",
-            value=f"{self._last_selected_label_layer}_prediction.csv",
+            value=f"{self._last_selected_label_layer}_predictions.csv",
             mode="w",
         )
         self._export_button = PushButton(text="Export Classifier Result")
@@ -552,7 +553,7 @@ class LoadClassifierContainer(Container):
         The button that launches the `ClassifierRunContainer`
     _filter: magicgui.widgets.RadioButtons
         The radio button widget that allows the user to select the file filter
-        to use for selecting the classifier file. See 
+        to use for selecting the classifier file. See
         https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/issues/36
         for more details.
     _run_container: ClassifierRunContainer
