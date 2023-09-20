@@ -550,6 +550,11 @@ class LoadClassifierContainer(Container):
         The file edit widget that allows the user to select a classifier file
     _load_button: magicgui.widgets.PushButton
         The button that launches the `ClassifierRunContainer`
+    _filter: magicgui.widgets.RadioButtons
+        The radio button widget that allows the user to select the file filter
+        to use for selecting the classifier file. See 
+        https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/issues/36
+        for more details.
     _run_container: ClassifierRunContainer
          The `ClassifierRunContainer` that is launched by the `_load_button`
     """
@@ -572,6 +577,9 @@ class LoadClassifierContainer(Container):
         self._filter.changed.connect(self.set_filter)
 
     def set_filter(self):
+        """
+        Updates the filter that is applied to the file edit widget
+        """
         self._clf_destination.filter = self._filter.value
 
     def load(self):
