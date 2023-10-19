@@ -35,6 +35,11 @@ def test_annotator_widgets(make_napari_viewer):
     # my_widget._on_click()
     annotator_widget._init_annotation(label_layer)
 
+    # TODO: Test toggle_label
+
+
+# TODO: Test saving annotations
+
 
 def test_custom_class_selection(make_napari_viewer):
     """
