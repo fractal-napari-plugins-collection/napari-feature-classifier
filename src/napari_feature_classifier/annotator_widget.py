@@ -4,6 +4,7 @@ from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import Optional, Sequence, cast
+from napari.utils.colormaps import DirectLabelColormap
 
 # pylint: disable=R0801
 import napari
@@ -294,7 +295,15 @@ class LabelAnnotator(Container):
             )
             / len(self.cmap.colors)
         )
-        self._annotations_layer.colormap.color_dict[label] = color
+        napari_info(f"Updating {label} to new color {color}")
+        colordict = self._annotations_layer.colormap.color_dict
+        colordict[label] = color
+        self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)
+
+        # self._annotations_layer.colormap.color_dict[label] = color
+        # self._annotations_layer.colormap.update(
+        #     {"color_dict": {label: color, None: [0, 0, 0, 0]}}
+        # )
         self._annotations_layer.opacity = 1.0
 
     def _on_save_clicked(self):
