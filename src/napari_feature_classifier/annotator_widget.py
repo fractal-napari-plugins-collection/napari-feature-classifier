@@ -112,7 +112,8 @@ class LabelAnnotator(Container):
         Can also be controlled via the number keys.
     """
 
-    # TODO: Do we need to keep the annotation layer on top when new annotations are made?
+    # TODO: Do we need to keep the annotation layer on top when new
+    # annotations are made?
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
@@ -275,7 +276,7 @@ class LabelAnnotator(Container):
         """
         Update the default save destination to the name of the label layer.
         If a base_path was already set, keep it on that base path.
-        
+
         """
         base_path = Path(self._save_destination.value).parent
         self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"
@@ -293,9 +294,8 @@ class LabelAnnotator(Container):
             )
             / len(self.cmap.colors)
         )
-        self._annotations_layer.color[label] = color
+        self._annotations_layer.colormap.color_dict[label] = color
         self._annotations_layer.opacity = 1.0
-        self._annotations_layer.color_mode = "direct"
 
     def _on_save_clicked(self):
         """
