@@ -295,12 +295,22 @@ class LabelAnnotator(Container):
             )
             / len(self.cmap.colors)
         )
-        napari_info(f"Updating {label} to new color {color}")
         colordict = self._annotations_layer.colormap.color_dict
         colordict[label] = color
         self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)
 
-        # self._annotations_layer.colormap.color_dict[label] = color
+        # self._annotations_layer.colormap.color_dict[label] = \
+        #     np.array(color, dtype=np.float32)
+        # self._annotations_layer.refresh()
+        # invalidate the cached color mapping
+        # self._annotations_layer._cached_labels = None
+        # self._annotations_layer._selected_color = \
+        #     self._annotations_layer.get_color(
+        #         self._annotations_layer.selected_label
+        # )
+        # self._annotations_layer.events.colormap()
+        # self._annotations_layer.events.selected_label()
+        # self._annotations_layer.refresh()
         # self._annotations_layer.colormap.update(
         #     {"color_dict": {label: color, None: [0, 0, 0, 0]}}
         # )
