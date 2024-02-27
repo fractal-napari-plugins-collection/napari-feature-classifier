@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 from napari.utils.notifications import show_info
 from matplotlib.colors import ListedColormap
+from napari.utils.colormaps import DirectLabelColormap
 import matplotlib
 import numpy as np
 import napari
@@ -79,9 +80,9 @@ def reset_display_colormaps(
     """
     colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
     colordict = dict(zip(label_layer.features[label_column], colors))
-    display_layer.color = colordict
+    colordict[None] = [0, 0, 0, 0]
+    display_layer.colormap = DirectLabelColormap(color_dict=colordict)
     display_layer.opacity = 1.0
-    display_layer.color_mode = "direct"
 
 
 #     # Check if it runs in napari
@@ -118,13 +119,14 @@ def napari_info(message):
     """
     try:
         show_info(message)
-    except:  # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except # noqa: E722
         print(message)
     # TODO: Would be better to check if it's running in napari and print in all
     # other cases (e.g. if someone runs the classifier form a script).
     # But can't make that work at the moment
     if in_notebook():
         print(message)
+
 
 def get_valid_label_layers(viewer) -> list[str]:
     """
@@ -183,7 +185,7 @@ def add_annotation_names(df, ClassSelection):
         Dataframe with annotations column.
     ClassSelection : Enum
         Enum with the class names.
-    
+
     Returns
     -------
     pd.DataFrame
