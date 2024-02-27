@@ -11,25 +11,25 @@ import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
+from magicgui.types import FileDialogMode
 from magicgui.widgets import (
-    Label,
     Container,
     FileEdit,
+    Label,
     PushButton,
     RadioButtons,
     create_widget,
 )
 
-
 # pylint: disable=R0801
 from napari_feature_classifier.utils import (
+    add_annotation_names,
     get_colormap,
-    reset_display_colormaps,
-    get_valid_label_layers,
     get_selected_or_valid_label_layer,
+    get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
-    add_annotation_names,
+    reset_display_colormaps,
 )
 
 
@@ -72,7 +72,7 @@ def get_class_selection(
     )
     return ClassSelection
 
-
+# TODO: Add colors to the class selection.
 # pylint: disable=R0902
 class LabelAnnotator(Container):
     """
@@ -111,6 +111,8 @@ class LabelAnnotator(Container):
         The RadioButtons widget for selecting the class to annotate.
         Can also be controlled via the number keys.
     """
+    _labels_layer_opacity_values = (0.0, 0.4)
+    _annotations_layer_opacity_values = (0.0, 0.8)
 
     # TODO: Do we need to keep the annotation layer on top when new annotations are made?
     def __init__(
@@ -154,19 +156,26 @@ class LabelAnnotator(Container):
         )
         self._init_annotation(self._last_selected_label_layer)
         self._save_destination = FileEdit(
-            label="Save Path", value="annotation.csv", mode="w"
+            label="Save Path", value="annotation.csv", mode=FileDialogMode.OPTIONAL_FILE,
         )
         self._save_annotation = PushButton(label="Save Annotations")
         self._update_save_destination(self._last_selected_label_layer)
+        self._load_destination = FileEdit(
+            label="Load Path", value="", mode=FileDialogMode.EXISTING_FILE, filter="*.csv",
+        )
+        self._load_annotation = PushButton(label="Load Annotations")
         super().__init__(
             widgets=[
                 self.last_selected_layer_label,
                 self._class_selector,
+                self._load_destination,
+                self._load_annotation,
                 self._save_destination,
                 self._save_annotation,
             ]
         )
         self._save_annotation.clicked.connect(self._on_save_clicked)
+        self._load_annotation.clicked.connect(self._on_load_clicked)
         # TODO: Connect to the user clicking save in the file dialog. I can
         # trigger an event that the user clicked the button to open the
         # file dialog (see below), but don't get the info whether the user
@@ -253,9 +262,10 @@ class LabelAnnotator(Container):
                     [label_layer.features, annotation_df], axis=1
                 )
 
-        label_layer.opacity = 0.4
+        label_layer.opacity = self._labels_layer_opacity_values[1]
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
+        self._annotations_layer.opacity = self._annotations_layer_opacity_values[1]
         reset_display_colormaps(
             label_layer,
             feature_col="annotations",
@@ -294,7 +304,7 @@ class LabelAnnotator(Container):
             / len(self.cmap.colors)
         )
         self._annotations_layer.color[label] = color
-        self._annotations_layer.opacity = 1.0
+        self._annotations_layer.opacity = self._annotations_layer_opacity_values[1]
         self._annotations_layer.color_mode = "direct"
 
     def _on_save_clicked(self):
@@ -317,3 +327,40 @@ class LabelAnnotator(Container):
 
         df.to_csv(self._save_destination.value)
         napari_info(f"Annotations were saved at {self._save_destination.value}")
+    
+    def _on_load_clicked(self):
+        """
+        Load annotations from a csv file.
+        """
+        annotations = pd.read_csv(self._load_destination.value)
+        if self._check_validity_of_loaded_annotations(annotations):
+            self._last_selected_label_layer.features['annotations'] = annotations['annotations']
+            self.selection_changed(None)
+            napari_info(f"Annotations were loaded from {self._load_destination.value}")
+        else:
+            napari_info("Annotations could not be loaded.")
+
+
+    def _check_validity_of_loaded_annotations(self, annotations: pd.DataFrame, label_column: str = 'label') -> bool:
+        features = self._last_selected_label_layer.features
+
+        if not len(annotations) == len(features):
+            napari_info(f"Inconsistent size of annotation table. Can not add {len(annotations)} annotations to {len(features)} objects in the feature table.")
+            return False
+        
+        if not label_column in annotations and label_column in features:
+            napari_info(f"Make sure the annotations file contains `{label_column}` column.")
+            return False
+
+        if not np.all(annotations[label_column] == features[label_column]):
+            napari_info(f"Inconsistent `{label_column}` columns. Check that you selected the correct file.")
+            return False
+        
+        unique_annotations = list(annotations.dropna()[['annotation_names', 'annotations']].value_counts(['annotation_names', 'annotations']).index)
+        allowed_annotations = [(e.name, float(e.value)) for e in self.ClassSelection]
+        for annotation in unique_annotations:
+            if annotation not in allowed_annotations:
+                napari_info(f"Inconsistent annotation: `{annotation}` is not in `{allowed_annotations}`. Set class names of the classifier in the correct order.")
+                return False
+            
+        return True

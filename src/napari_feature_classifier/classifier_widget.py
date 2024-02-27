@@ -201,8 +201,6 @@ class ClassifierRunContainer(Container):
     _save_button: magicgui.widgets.PushButton
         The PushButton widget for saving the classifier
     """
-    _labels_layer_opacity_values = (0.0, 0.4)
-    _annotations_layer_opacity_values = (0.0, 0.8)
     _predictions_layer_opacity_values = (0.0, 1.0)
 
     # pylint: disable=R0913
@@ -311,7 +309,7 @@ class ClassifierRunContainer(Container):
 
         @label_layer.bind_key('r', overwrite=True)
         def toggle_all_callback(layer):
-            self.toggle_all_layers()
+            self.toggle_all_layers_off()
 
 
     def run(self):
@@ -450,15 +448,16 @@ class ClassifierRunContainer(Container):
             cmap=get_colormap(),
         )
 
+    # TODO: Move keybindings for labels and annotations to `LabelAnnotator`
     def toggle_labels_layer(self):
-        off_value, on_value = self._labels_layer_opacity_values
+        off_value, on_value = self._annotator._labels_layer_opacity_values
         if self._last_selected_label_layer.opacity == off_value:
             self._last_selected_label_layer.opacity = on_value
         else:
             self._last_selected_label_layer.opacity = off_value
             
     def toggle_annotations_layer(self):
-        off_value, on_value = self._annotations_layer_opacity_values
+        off_value, on_value = self._annotator._annotations_layer_opacity_values
         if self._annotator._annotations_layer.opacity == off_value:
             self._annotator._annotations_layer.opacity = on_value
         else:
@@ -471,19 +470,14 @@ class ClassifierRunContainer(Container):
         else:
             self._prediction_layer.opacity = off_value
 
-    def toggle_all_layers(self):
+    def toggle_all_layers_off(self):
         """Toggle the annotations layer and set labels and predictions to the same state."""
-        labels_off_value, labels_on_value = self._labels_layer_opacity_values
-        annotations_off_value, annotations_on_value = self._annotations_layer_opacity_values
+        labels_off_value, labels_on_value = self._annotator._labels_layer_opacity_values
+        annotations_off_value, annotations_on_value = self._annotator._annotations_layer_opacity_values
         predictions_off_value, predictions_on_value = self._predictions_layer_opacity_values
-        if self._annotator._annotations_layer.opacity == annotations_off_value:
-            self._last_selected_label_layer.opacity = labels_on_value
-            self._annotator._annotations_layer.opacity = annotations_on_value
-            self._prediction_layer.opacity = predictions_on_value
-        else:
-            self._last_selected_label_layer.opacity = labels_off_value
-            self._annotator._annotations_layer.opacity = annotations_off_value
-            self._prediction_layer.opacity = predictions_off_value
+        self._last_selected_label_layer.opacity = labels_off_value
+        self._annotator._annotations_layer.opacity = annotations_off_value
+        self._prediction_layer.opacity = predictions_off_value
 
     # def hide_prediction_layer(self, labels_layer, event):
         # """
@@ -509,7 +503,7 @@ class ClassifierRunContainer(Container):
     def get_layer_roi_id(self, label_layer):
         roi_ids = label_layer.features[self._roi_id_colum].unique()
         if len(roi_ids) > 1:
-            raise NotImplementedError(
+            raise ValueError(
                 f"{label_layer=} contained no-unique roi_ids: {roi_ids}"
             )
         return roi_ids[0]
@@ -622,6 +616,7 @@ class LoadClassifierContainer(Container):
         super().__init__(widgets=[self._clf_destination, self._load_button])
         self._load_button.clicked.connect(self.load)
 
+    # TODO: This should be a classmethod of i. e. `Classifier.from_file(...)`
     def load(self):
         """
         Load a classifier from a file and start the run container with the

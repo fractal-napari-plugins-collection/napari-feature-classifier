@@ -2,7 +2,7 @@
 import pickle
 import random
 import string
-from typing import Sequence
+from typing import Sequence, Hashable
 
 import pandas as pd
 import pandera as pa
@@ -107,7 +107,7 @@ class Classifier:
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
         return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
 
-    def predict(self, df):
+    def predict(self, df: pd.DataFrame) -> pd.Series:
         """
         Run prediction on a single dataframe
         """
@@ -123,7 +123,7 @@ class Classifier:
         )["prediction"]
         return aligned_prediction
 
-    def predict_on_dict(self, dict_of_dfs):
+    def predict_on_dict(self, dict_of_dfs: dict[Hashable, pd.DataFrame]):
         """
         Loop prediction over a dictionary of dataframes
         """
@@ -147,7 +147,7 @@ class Classifier:
         self._data = merged_data.drop(index=index_delete)
         return self
 
-    def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
+    def _validate_predict_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Validate the features that are received for prediction using 
         self._predict_schema.
@@ -161,7 +161,7 @@ class Classifier:
 
         df_valid = self._predict_schema.validate(df_no_nans).set_index(
             self._index_columns
-        )
+        ).loc[:, self._feature_names]
         return df_valid
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
