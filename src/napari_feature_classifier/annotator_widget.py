@@ -215,17 +215,22 @@ class LabelAnnotator(Container):
         Callback for when a label is clicked. It then updates the color of that
         label in the annotation layer.
         """
-        # Need to scale position that event.position returns by the
+        # Need to translate & scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
+        # If translate is (0, 0, 0)
         # If scale is anything else, this makes the click still match the
         # correct label
+        # translate before scale
         scaled_position = tuple(
-            pos / scale for pos, scale in zip(event.position, labels_layer.scale)
+            (pos - trans) / scale
+            for pos, trans, scale in zip(
+                event.position, labels_layer.translate, labels_layer.scale
+            )
         )
         label = labels_layer.get_value(scaled_position)
         if label == 0 or not label:
-            napari_info("No label clicked.")
+            napari_info(f"No label clicked on the {labels_layer} label layer.")
             return
 
         # Left click: add annotation
@@ -269,6 +274,8 @@ class LabelAnnotator(Container):
         # label_layer.opacity = 0.4
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
+        self._annotations_layer.translate = label_layer.translate
+
         reset_display_colormaps(
             label_layer,
             feature_col="annotations",

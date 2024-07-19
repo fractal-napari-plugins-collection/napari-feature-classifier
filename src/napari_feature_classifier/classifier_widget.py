@@ -424,6 +424,7 @@ class ClassifierRunContainer(Container):
         # Update the label data in the prediction layer
         self._prediction_layer.data = label_layer.data
         self._prediction_layer.scale = label_layer.scale
+        self._prediction_layer.translate = label_layer.translate
 
         # Update the colormap of the prediction layer
         reset_display_colormaps(
