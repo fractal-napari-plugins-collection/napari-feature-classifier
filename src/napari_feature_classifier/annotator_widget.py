@@ -138,6 +138,7 @@ class LabelAnnotator(Container):
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
             name="Annotations",
+            translate=self._last_selected_label_layer.translate,
         )
         self._annotations_layer.editable = False
 

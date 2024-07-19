@@ -254,6 +254,7 @@ class ClassifierRunContainer(Container):
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
             name="Predictions",
+            translate=self._last_selected_label_layer.translate,
         )
 
         # Set the label selection to a valid label layer => Running into proxy bug
