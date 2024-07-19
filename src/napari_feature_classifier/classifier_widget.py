@@ -1,4 +1,5 @@
 """Classifier container widget for napari"""
+import logging
 import pickle
 
 from pathlib import Path
@@ -32,6 +33,7 @@ from napari_feature_classifier.utils import (
     napari_info,
     overwrite_check_passed,
     add_annotation_names,
+    NapariHandler,
 )
 
 
@@ -636,10 +638,26 @@ class ClassifierWidget(Container):
         self._init_container = None
         self._run_container = None
         self._init_container = None
+        self.setup_logging()
 
         super().__init__(widgets=[])
 
         self.initialize_init_widget()
+
+    def setup_logging(self):
+        # Create a custom handler for napari
+        napari_handler = NapariHandler()
+        napari_handler.setLevel(logging.INFO)
+
+        # Optionally, set a formatter for the handler
+        # formatter = logging.Formatter(
+        #     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        # )
+        # napari_handler.setFormatter(formatter)
+
+        # Get the classifier's logger and add the napari handler to it
+        classifier_logger = logging.getLogger("classifier")
+        classifier_logger.addHandler(napari_handler)
 
     def initialize_init_widget(self):
         self._init_container = ClassifierInitContainer(self._viewer)

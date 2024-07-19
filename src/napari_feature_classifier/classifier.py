@@ -1,4 +1,5 @@
 """Core classifier class and helper functions."""
+import logging
 import pickle
 import random
 import string
@@ -11,10 +12,9 @@ import xxhash
 from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
 
-from napari_feature_classifier.utils import napari_info
 
-
-# TODO: define an interface for compatible classifiers (m.b. a subset of sklearn Estimators?)
+# TODO: define an interface for compatible classifiers (m.b. a subset of
+# sklearn Estimators?)
 class Classifier:
     """Classifier class for napari-feature-classifier.
 
@@ -23,7 +23,7 @@ class Classifier:
     feature_names: Sequence[str]
         The names of the features that are used for classification
     class_names: Sequence[str]
-        The names of the classes. It's an ordered list that is matched to 
+        The names of the classes. It's an ordered list that is matched to
         annotations [1, 2, 3, ...]
     classifier: sklearn classifier
         The classifier that is used for classification. Default is a
@@ -42,7 +42,7 @@ class Classifier:
         The percentage of the data that is used for training. The rest is used
         for testing.
     _index_columns: list[str]
-        The columns that are used for indexing the data. 
+        The columns that are used for indexing the data.
         Hard-coded to roi_id and label
     _input_schema: pandera.SchemaModel
         The schema for the input data. It's used for validation.
@@ -51,10 +51,13 @@ class Classifier:
     _predict_schema: pandera.SchemaModel
         The schema for the prediction data.
     _data: pd.DataFrame
-        The internal data storage of the classifier. Contains both annotations 
+        The internal data storage of the classifier. Contains both annotations
         as well as feature measurements for all rows (annotated objects)
     """
+
     def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
+        self.logger = logging.getLogger("classifier")
+        self.logger.setLevel(logging.INFO)
         self._feature_names: list[str] = list(feature_names)
         self._class_names: list[str] = list(class_names)
         self._classifier = classifier
@@ -79,13 +82,13 @@ class Classifier:
         """
         Train the classifier on the data it already has in self._data.
         """
-        napari_info("Training classifier...")
+        self.logger.info("Training classifier...")
         train_data = self._data[self._data.hash < self._training_data_perc]
         test_data = self._data[self._data.hash >= self._training_data_perc]
 
-         # pylint: disable=C0103
+        # pylint: disable=C0103
         X_train = train_data.drop(["hash", "annotations"], axis=1)
-         # pylint: disable=C0103
+        # pylint: disable=C0103
         X_test = test_data.drop(["hash", "annotations"], axis=1)
 
         y_train = train_data["annotations"]
@@ -94,8 +97,7 @@ class Classifier:
         self._classifier.fit(X_train, y_train)
 
         f1 = f1_score(y_test, self._classifier.predict(X_test), average="macro")
-        # napari_info("F1 score on test set: {}".format(f1))
-        napari_info(
+        self.logger.info(
             f"F1 score on test set: {f1} \n"
             f"Annotations split into {len(X_train)} training and {len(X_test)} "
             "test samples. \n"
@@ -130,7 +132,6 @@ class Classifier:
         # Make a prediction on each of the dataframes provided
         predicted_dicts = {}
         for roi in dict_of_dfs:
-            # napari_info(f"Making a prediction for {roi=}...")
             predicted_dicts[roi] = self.predict(dict_of_dfs[roi])
         return predicted_dicts
 
@@ -149,12 +150,12 @@ class Classifier:
 
     def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
         """
-        Validate the features that are received for prediction using 
+        Validate the features that are received for prediction using
         self._predict_schema.
         """
         df_no_nans = df.dropna(subset=self._feature_names)
         if len(df) != len(df_no_nans):
-            napari_info(
+            self.logger.info(
                 f"Could not do predictions for {len(df)-len(df_no_nans)}/{len(df)} "
                 "objects because of features that contained `NA`s."
             )
@@ -174,7 +175,7 @@ class Classifier:
         # Drop rows that have features with `NA`s, notify the user.
         df_no_nans = df_annotated.dropna(subset=self._feature_names)
         if len(df_no_nans) != len(df_annotated):
-            napari_info(
+            self.logger.info(
                 f"Dropped {len(df_annotated)-len(df_no_nans)}/{len(df_annotated)} "
                 "objects because of features that contained `NA`s."
             )
@@ -193,14 +194,14 @@ class Classifier:
         Parameters
         ----------
         dict_of_features : dict
-            Dictionary with roi as key and dataframe with feature measurements 
+            Dictionary with roi as key and dataframe with feature measurements
             and annotations as value
         """
         for roi in dict_of_features:
             if "roi_id" not in dict_of_features[roi]:
                 dict_of_features[roi]["roi_id"] = roi
             df = dict_of_features[roi]
-            napari_info(f"Adding features for {roi=}...")
+            self.logger.info(f"Adding features for {roi=}...")
             self.add_features(df)
 
     def get_class_names(self):
@@ -210,7 +211,7 @@ class Classifier:
         return self._feature_names
 
     def save(self, output_path):
-        napari_info(f"Saving classifier at {output_path}...")
+        self.logger.info(f"Saving classifier at {output_path}...")
         with open(output_path, "wb") as f:
             f.write(pickle.dumps(self))
 
