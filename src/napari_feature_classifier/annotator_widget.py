@@ -236,7 +236,7 @@ class LabelAnnotator(Container):
         elif event.button == 2:
             labels_layer.features.loc[
                 labels_layer.features[self._label_column] == label, "annotations"
-            ] = 0.0
+            ] = np.NaN
 
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
