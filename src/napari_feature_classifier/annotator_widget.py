@@ -112,7 +112,8 @@ class LabelAnnotator(Container):
         Can also be controlled via the number keys.
     """
 
-    # TODO: Do we need to keep the annotation layer on top when new annotations are made?
+    # TODO: Do we need to keep the annotation layer on top when new
+    # annotations are made?
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
@@ -129,6 +130,10 @@ class LabelAnnotator(Container):
             label="Last selected label layer:", value=self._last_selected_label_layer
         )
 
+        # Handle existing predictions layer
+        for layer in self._viewer.layers:
+            if type(layer) == napari.layers.Labels and layer.name == "Annotations":
+                self._viewer.layers.remove(layer)
         self._annotations_layer = self._viewer.add_labels(
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
@@ -253,7 +258,7 @@ class LabelAnnotator(Container):
                     [label_layer.features, annotation_df], axis=1
                 )
 
-        label_layer.opacity = 0.4
+        # label_layer.opacity = 0.4
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
         reset_display_colormaps(
@@ -265,7 +270,7 @@ class LabelAnnotator(Container):
         )
         label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
-        # # keybindings for the available classes (0 = deselect)
+        # keybindings for the available classes (0 = deselect)
         for i in range(len(self.ClassSelection)):
             set_class = partial(self.set_class_n, n=i)
             set_class.__name__ = f"set_class_{i}"
@@ -275,7 +280,7 @@ class LabelAnnotator(Container):
         """
         Update the default save destination to the name of the label layer.
         If a base_path was already set, keep it on that base path.
-        
+
         """
         base_path = Path(self._save_destination.value).parent
         self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"

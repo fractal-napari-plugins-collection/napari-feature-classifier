@@ -244,6 +244,10 @@ class ClassifierRunContainer(Container):
             self._viewer, get_class_selection(class_names=self.class_names)
         )
 
+        # Handle existing predictions layer
+        for layer in self._viewer.layers:
+            if type(layer) == napari.layers.Labels and layer.name == "Predictions":
+                self._viewer.layers.remove(layer)
         self._prediction_layer = self._viewer.add_labels(
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
