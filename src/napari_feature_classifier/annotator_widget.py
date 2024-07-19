@@ -227,9 +227,16 @@ class LabelAnnotator(Container):
             napari_info("No label clicked.")
             return
 
-        labels_layer.features.loc[
-            labels_layer.features[self._label_column] == label, "annotations"
-        ] = self._class_selector.value.value
+        # Left click: add annotation
+        if event.button == 1:
+            labels_layer.features.loc[
+                labels_layer.features[self._label_column] == label, "annotations"
+            ] = self._class_selector.value.value
+        # Right click: Remove annotation
+        elif event.button == 2:
+            labels_layer.features.loc[
+                labels_layer.features[self._label_column] == label, "annotations"
+            ] = 0.0
 
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
