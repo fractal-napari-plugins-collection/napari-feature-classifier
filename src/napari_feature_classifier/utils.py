@@ -1,5 +1,6 @@
 """Utils function for the classifier"""
 from functools import lru_cache
+import logging
 import math
 from pathlib import Path
 
@@ -119,7 +120,7 @@ def napari_info(message):
     """
     try:
         show_info(message)
-    except:  # pylint: disable=bare-except # noqa: E722
+    except:  # pylint: disable=bare-except # noqa #E722
         print(message)
     # TODO: Would be better to check if it's running in napari and print in all
     # other cases (e.g. if someone runs the classifier form a script).
@@ -127,6 +128,11 @@ def napari_info(message):
     if in_notebook():
         print(message)
 
+
+class NapariHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        napari_info(log_entry)
 
 def get_valid_label_layers(viewer) -> list[str]:
     """

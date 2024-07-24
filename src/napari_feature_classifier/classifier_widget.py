@@ -1,4 +1,5 @@
 """Classifier container widget for napari"""
+import logging
 import pickle
 
 from pathlib import Path
@@ -32,6 +33,7 @@ from napari_feature_classifier.utils import (
     napari_info,
     overwrite_check_passed,
     add_annotation_names,
+    NapariHandler,
 )
 
 
@@ -244,10 +246,15 @@ class ClassifierRunContainer(Container):
             self._viewer, get_class_selection(class_names=self.class_names)
         )
 
+        # Handle existing predictions layer
+        for layer in self._viewer.layers:
+            if type(layer) == napari.layers.Labels and layer.name == "Predictions":
+                self._viewer.layers.remove(layer)
         self._prediction_layer = self._viewer.add_labels(
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
             name="Predictions",
+            translate=self._last_selected_label_layer.translate,
         )
 
         # Set the label selection to a valid label layer => Running into proxy bug
@@ -417,6 +424,7 @@ class ClassifierRunContainer(Container):
         # Update the label data in the prediction layer
         self._prediction_layer.data = label_layer.data
         self._prediction_layer.scale = label_layer.scale
+        self._prediction_layer.translate = label_layer.translate
 
         # Update the colormap of the prediction layer
         reset_display_colormaps(
@@ -632,10 +640,26 @@ class ClassifierWidget(Container):
         self._init_container = None
         self._run_container = None
         self._init_container = None
+        self.setup_logging()
 
         super().__init__(widgets=[])
 
         self.initialize_init_widget()
+
+    def setup_logging(self):
+        # Create a custom handler for napari
+        napari_handler = NapariHandler()
+        napari_handler.setLevel(logging.INFO)
+
+        # Optionally, set a formatter for the handler
+        # formatter = logging.Formatter(
+        #     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        # )
+        # napari_handler.setFormatter(formatter)
+
+        # Get the classifier's logger and add the napari handler to it
+        classifier_logger = logging.getLogger("classifier")
+        classifier_logger.addHandler(napari_handler)
 
     def initialize_init_widget(self):
         self._init_container = ClassifierInitContainer(self._viewer)

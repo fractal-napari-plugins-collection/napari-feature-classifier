@@ -131,10 +131,15 @@ class LabelAnnotator(Container):
             label="Last selected label layer:", value=self._last_selected_label_layer
         )
 
+        # Handle existing predictions layer
+        for layer in self._viewer.layers:
+            if type(layer) == napari.layers.Labels and layer.name == "Annotations":
+                self._viewer.layers.remove(layer)
         self._annotations_layer = self._viewer.add_labels(
             self._last_selected_label_layer.data,
             scale=self._last_selected_label_layer.scale,
             name="Annotations",
+            translate=self._last_selected_label_layer.translate,
         )
         self._annotations_layer.editable = False
 
@@ -211,22 +216,34 @@ class LabelAnnotator(Container):
         Callback for when a label is clicked. It then updates the color of that
         label in the annotation layer.
         """
-        # Need to scale position that event.position returns by the
+        # Need to translate & scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
+        # If translate is (0, 0, 0)
         # If scale is anything else, this makes the click still match the
         # correct label
+        # translate before scale
         scaled_position = tuple(
-            pos / scale for pos, scale in zip(event.position, labels_layer.scale)
+            (pos - trans) / scale
+            for pos, trans, scale in zip(
+                event.position, labels_layer.translate, labels_layer.scale
+            )
         )
         label = labels_layer.get_value(scaled_position)
         if label == 0 or not label:
-            napari_info("No label clicked.")
+            napari_info(f"No label clicked on the {labels_layer} label layer.")
             return
 
-        labels_layer.features.loc[
-            labels_layer.features[self._label_column] == label, "annotations"
-        ] = self._class_selector.value.value
+        # Left click: add annotation
+        if event.button == 1:
+            labels_layer.features.loc[
+                labels_layer.features[self._label_column] == label, "annotations"
+            ] = self._class_selector.value.value
+        # Right click: Remove annotation
+        elif event.button == 2:
+            labels_layer.features.loc[
+                labels_layer.features[self._label_column] == label, "annotations"
+            ] = np.NaN
 
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
@@ -255,9 +272,11 @@ class LabelAnnotator(Container):
                     [label_layer.features, annotation_df], axis=1
                 )
 
-        label_layer.opacity = 0.4
+        # label_layer.opacity = 0.4
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
+        self._annotations_layer.translate = label_layer.translate
+
         reset_display_colormaps(
             label_layer,
             feature_col="annotations",
@@ -267,7 +286,7 @@ class LabelAnnotator(Container):
         )
         label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
-        # # keybindings for the available classes (0 = deselect)
+        # keybindings for the available classes (0 = deselect)
         for i in range(len(self.ClassSelection)):
             set_class = partial(self.set_class_n, n=i)
             set_class.__name__ = f"set_class_{i}"
