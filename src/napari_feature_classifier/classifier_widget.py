@@ -258,6 +258,7 @@ class ClassifierRunContainer(Container):
             name="Predictions",
             translate=self._last_selected_label_layer.translate,
         )
+        self._prediction_layer.contour = 2
 
         # Set the label selection to a valid label layer => Running into proxy bug
         self._viewer.layers.selection.active = self._last_selected_label_layer
@@ -296,9 +297,9 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
         # Whenever the label layer is clicked, hide the prediction layer
         # (e.g. new annotations are made)
-        self._last_selected_label_layer.mouse_drag_callbacks.append(
-            self.hide_prediction_layer
-        )
+        # self._last_selected_label_layer.mouse_drag_callbacks.append(
+        #     self.hide_prediction_layer
+        # )
 
     def run(self):
         """
@@ -398,9 +399,9 @@ class ClassifierRunContainer(Container):
             ):
                 self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._init_prediction_layer(self._viewer.layers.selection.active)
-                self._last_selected_label_layer.mouse_drag_callbacks.append(
-                    self.hide_prediction_layer
-                )
+                # self._last_selected_label_layer.mouse_drag_callbacks.append(
+                #     self.hide_prediction_layer
+                # )
                 self._update_export_destination(self._last_selected_label_layer)
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
@@ -447,11 +448,11 @@ class ClassifierRunContainer(Container):
                 cmap=get_colormap(),
             )
 
-    def hide_prediction_layer(self, labels_layer, event):
-        """
-        Hide the prediction layer
-        """
-        self._prediction_layer.visible = False
+    # def hide_prediction_layer(self, labels_layer, event):
+    #     """
+    #     Hide the prediction layer
+    #     """
+    #     self._prediction_layer.visible = False
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []
