@@ -2,6 +2,7 @@
 import logging
 import pickle
 
+from packaging import version
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +28,8 @@ from napari_feature_classifier.annotator_widget import (
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.utils import (
     get_colormap,
-    reset_display_colormaps,
+    reset_display_colormaps_modern,
+    reset_display_colormaps_legacy,
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
     napari_info,
@@ -256,6 +258,7 @@ class ClassifierRunContainer(Container):
             name="Predictions",
             translate=self._last_selected_label_layer.translate,
         )
+        self._prediction_layer.contour = 2
 
         # Set the label selection to a valid label layer => Running into proxy bug
         self._viewer.layers.selection.active = self._last_selected_label_layer
@@ -294,9 +297,9 @@ class ClassifierRunContainer(Container):
         self._init_prediction_layer(self._last_selected_label_layer)
         # Whenever the label layer is clicked, hide the prediction layer
         # (e.g. new annotations are made)
-        self._last_selected_label_layer.mouse_drag_callbacks.append(
-            self.hide_prediction_layer
-        )
+        # self._last_selected_label_layer.mouse_drag_callbacks.append(
+        #     self.hide_prediction_layer
+        # )
 
     def run(self):
         """
@@ -396,9 +399,9 @@ class ClassifierRunContainer(Container):
             ):
                 self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._init_prediction_layer(self._viewer.layers.selection.active)
-                self._last_selected_label_layer.mouse_drag_callbacks.append(
-                    self.hide_prediction_layer
-                )
+                # self._last_selected_label_layer.mouse_drag_callbacks.append(
+                #     self.hide_prediction_layer
+                # )
                 self._update_export_destination(self._last_selected_label_layer)
 
     def _init_prediction_layer(self, label_layer: napari.layers.Labels):
@@ -427,19 +430,29 @@ class ClassifierRunContainer(Container):
         self._prediction_layer.translate = label_layer.translate
 
         # Update the colormap of the prediction layer
-        reset_display_colormaps(
-            label_layer,
-            feature_col="prediction",
-            display_layer=self._prediction_layer,
-            label_column=self._label_column,
-            cmap=get_colormap(),
-        )
+        napari_version = version.parse(napari.__version__)
+        if napari_version >= version.parse("0.4.19"):
+            reset_display_colormaps_modern(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self._prediction_layer,
+                label_column=self._label_column,
+                cmap=get_colormap(),
+            )
+        else:
+            reset_display_colormaps_legacy(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self._prediction_layer,
+                label_column=self._label_column,
+                cmap=get_colormap(),
+            )
 
-    def hide_prediction_layer(self, labels_layer, event):
-        """
-        Hide the prediction layer
-        """
-        self._prediction_layer.visible = False
+    # def hide_prediction_layer(self, labels_layer, event):
+    #     """
+    #     Hide the prediction layer
+    #     """
+    #     self._prediction_layer.visible = False
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []
