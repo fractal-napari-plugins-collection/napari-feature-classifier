@@ -12,7 +12,7 @@ An interactive classifier plugin that allows the user to assign objects in a lab
 ## Usage
 <p align="center"><img src="https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/assets/18033446/1ebf0890-1a7b-4e4b-a21c-88ca8f1dd800" /></p>
 
-To use the napari-feature-classifier, you need to have a label image and corresponding measurements: as a csv file, loaded to layer.features or in an [OME-Zarr Anndata table loaded with another plugin](https://github.com/jluethi/napari-ome-zarr-roi-loader). Your feature measurements need to contain a `label` column that matches the label objects in the label image.
+To use the napari-feature-classifier, you need to have a label image and corresponding measurements: as a csv file, loaded to layer.features or in an [OME-Zarr Anndata table loaded with another plugin](https://github.com/fractal-napari-plugins-collection/napari-ome-zarr-navigator). Your feature measurements need to contain a `label` column that matches the label objects in the label image.
 These interactive classification workflows are well suited to visually define cell types, find mitotic cells in images, do quality control by automatically detecting missegmented cells and other tasks where a user can easily assign objects to groups.
 
 #### Prepare the label layer:
