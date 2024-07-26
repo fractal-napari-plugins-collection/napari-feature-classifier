@@ -337,9 +337,9 @@ class LabelAnnotator(Container):
         """
         Update the color of a single object in the annotations layer.
 
-        napari >= 0.4.19 does not have a direct API to only update a single 
+        napari >= 0.4.19 does not have a direct API to only update a single
         color. It always validates & updates the whole colormap.
-        Therefore, this update mode scales badly with the number of unique 
+        Therefore, this update mode scales badly with the number of unique
         labels.
         See details in https://github.com/napari/napari/issues/6732
 
@@ -354,11 +354,10 @@ class LabelAnnotator(Container):
             / len(self.cmap.colors)
         )
         from napari.utils.colormaps import DirectLabelColormap
+
         colordict = self._annotations_layer.colormap.color_dict
         colordict[label] = color
-        self._annotations_layer.colormap = DirectLabelColormap(
-            color_dict=colordict
-        )
+        self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)
         self._annotations_layer.opacity = 1.0
 
     def _on_save_clicked(self):

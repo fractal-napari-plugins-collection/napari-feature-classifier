@@ -96,6 +96,7 @@ def reset_display_colormaps_modern(
     Modern version to support napari >= 0.4.19
     """
     from napari.utils.colormaps import DirectLabelColormap
+
     colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
     colordict = dict(zip(label_layer.features[label_column], colors))
     colordict[None] = [0, 0, 0, 0]
