@@ -70,7 +70,7 @@ def get_colormap(matplotlib_colormap="Set1"):
     return cmap
 
 
-def reset_display_colormaps(
+def reset_display_colormaps_legacy(
     label_layer, feature_col, display_layer, label_column, cmap
 ):
     """
@@ -85,25 +85,24 @@ def reset_display_colormaps(
     display_layer.color_mode = "direct"
 
 
-#     # Check if it runs in napari
-#     # This currently triggers an exception.
-#     # Find a new way to ensure the warning is also shown in the napari
-#     # interface    # if _ipython_has_eventloop():
-#     NapariQtNotification(message, 'INFO').show()
+def reset_display_colormaps_modern(
+    label_layer, feature_col, display_layer, label_column, cmap
+):
+    """
+    Reset the colormap based on the annotations in
+    label_layer.features['annotation'] and sends the updated colormap
+    to the annotation label layer
+
+    Modern version to support napari >= 0.4.19
+    """
+    from napari.utils.colormaps import DirectLabelColormap
+    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
+    colordict = dict(zip(label_layer.features[label_column], colors))
+    colordict[None] = [0, 0, 0, 0]
+    display_layer.colormap = DirectLabelColormap(color_dict=colordict)
+    display_layer.opacity = 1.0
 
 
-# def napari_warn(message):
-#     # Wrapper function to ensure a message o
-#     warnings.warn(message)
-#     show_info(message)
-#     print('test')
-#     # This currently triggers an exception.
-#     # Find a new way to ensure the warning is also shown in the napari
-#     # interface
-#     if _ipython_has_eventloop():
-#         pass
-#         # NapariQtNotification(message, 'WARNING').show()
-#
 def napari_info(message):
     """
     Info message wrapper.

@@ -2,6 +2,7 @@
 import warnings
 from enum import Enum
 from functools import partial
+from packaging import version
 from pathlib import Path
 from typing import Optional, Sequence, cast
 
@@ -24,7 +25,8 @@ from magicgui.widgets import (
 # pylint: disable=R0801
 from napari_feature_classifier.utils import (
     get_colormap,
-    reset_display_colormaps,
+    reset_display_colormaps_legacy,
+    reset_display_colormaps_modern,
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
     napari_info,
@@ -245,7 +247,11 @@ class LabelAnnotator(Container):
             ] = np.NaN
 
         # Update only the single color value that changed
-        self.update_single_color(labels_layer, label)
+        napari_version = version.parse(napari.__version__)
+        if napari_version >= version.parse("0.4.19"):
+            self.update_single_color_slow(labels_layer, label)
+        else:
+            self.update_single_color_legacy(labels_layer, label)
 
     def set_class_n(self, event, n: int):  # pylint: disable=C0103
         self._class_selector.value = self.ClassSelection[
@@ -276,13 +282,23 @@ class LabelAnnotator(Container):
         self._annotations_layer.scale = label_layer.scale
         self._annotations_layer.translate = label_layer.translate
 
-        reset_display_colormaps(
-            label_layer,
-            feature_col="annotations",
-            display_layer=self._annotations_layer,
-            label_column=self._label_column,
-            cmap=self.cmap,
-        )
+        napari_version = version.parse(napari.__version__)
+        if napari_version >= version.parse("0.4.19"):
+            reset_display_colormaps_modern(
+                label_layer,
+                feature_col="annotations",
+                display_layer=self._annotations_layer,
+                label_column=self._label_column,
+                cmap=self.cmap,
+            )
+        else:
+            reset_display_colormaps_legacy(
+                label_layer,
+                feature_col="annotations",
+                display_layer=self._annotations_layer,
+                label_column=self._label_column,
+                cmap=self.cmap,
+            )
         label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
         # keybindings for the available classes (0 = deselect)
@@ -300,7 +316,7 @@ class LabelAnnotator(Container):
         base_path = Path(self._save_destination.value).parent
         self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"
 
-    def update_single_color(self, label_layer, label):
+    def update_single_color_legacy(self, label_layer, label):
         """
         Update the color of a single object in the annotations layer.
         """
@@ -316,6 +332,34 @@ class LabelAnnotator(Container):
         self._annotations_layer.color[label] = color
         self._annotations_layer.opacity = 1.0
         self._annotations_layer.color_mode = "direct"
+
+    def update_single_color_slow(self, label_layer, label):
+        """
+        Update the color of a single object in the annotations layer.
+
+        napari >= 0.4.19 does not have a direct API to only update a single 
+        color. It always validates & updates the whole colormap.
+        Therefore, this update mode scales badly with the number of unique 
+        labels.
+        See details in https://github.com/napari/napari/issues/6732
+
+        """
+        color = self.cmap(
+            float(
+                label_layer.features.loc[
+                    label_layer.features[self._label_column] == label,
+                    "annotations",
+                ].iloc[0]
+            )
+            / len(self.cmap.colors)
+        )
+        from napari.utils.colormaps import DirectLabelColormap
+        colordict = self._annotations_layer.colormap.color_dict
+        colordict[label] = color
+        self._annotations_layer.colormap = DirectLabelColormap(
+            color_dict=colordict
+        )
+        self._annotations_layer.opacity = 1.0
 
     def _on_save_clicked(self):
         """

@@ -2,6 +2,7 @@
 import logging
 import pickle
 
+from packaging import version
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +28,8 @@ from napari_feature_classifier.annotator_widget import (
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.utils import (
     get_colormap,
-    reset_display_colormaps,
+    reset_display_colormaps_modern,
+    reset_display_colormaps_legacy,
     get_valid_label_layers,
     get_selected_or_valid_label_layer,
     napari_info,
@@ -427,13 +429,23 @@ class ClassifierRunContainer(Container):
         self._prediction_layer.translate = label_layer.translate
 
         # Update the colormap of the prediction layer
-        reset_display_colormaps(
-            label_layer,
-            feature_col="prediction",
-            display_layer=self._prediction_layer,
-            label_column=self._label_column,
-            cmap=get_colormap(),
-        )
+        napari_version = version.parse(napari.__version__)
+        if napari_version >= version.parse("0.4.19"):
+            reset_display_colormaps_modern(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self._prediction_layer,
+                label_column=self._label_column,
+                cmap=get_colormap(),
+            )
+        else:
+            reset_display_colormaps_legacy(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self._prediction_layer,
+                label_column=self._label_column,
+                cmap=get_colormap(),
+            )
 
     def hide_prediction_layer(self, labels_layer, event):
         """
