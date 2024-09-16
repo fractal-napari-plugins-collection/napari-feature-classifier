@@ -251,13 +251,7 @@ class ClassifierRunContainer(Container):
         for layer in self._viewer.layers:
             if type(layer) == napari.layers.Labels and layer.name == "Predictions":
                 self._viewer.layers.remove(layer)
-        self._prediction_layer = self._viewer.add_labels(
-            self._last_selected_label_layer.data,
-            scale=self._last_selected_label_layer.scale,
-            name="Predictions",
-            translate=self._last_selected_label_layer.translate,
-        )
-        self._prediction_layer.contour = 2
+        self.add_prediction_layer()
 
         # Set the label selection to a valid label layer => Running into proxy bug
         self._viewer.layers.selection.active = self._last_selected_label_layer
@@ -342,6 +336,15 @@ class ClassifierRunContainer(Container):
                     # using the layer name as roi_id
                     dict_of_features[layer.name] = layer.features
         self._classifier.add_dict_of_features(dict_of_features)
+
+    def add_prediction_layer(self):
+        self._prediction_layer = self._viewer.add_labels(
+            self._last_selected_label_layer.data,
+            scale=self._last_selected_label_layer.scale,
+            name="Predictions",
+            translate=self._last_selected_label_layer.translate,
+        )
+        self._prediction_layer.contour = 2
 
     def make_predictions(self):
         """
@@ -446,12 +449,7 @@ class ClassifierRunContainer(Container):
             "Predictions" not in [x.name for x in self._viewer.layers]
             and ensure_layer_presence
         ):
-            self._prediction_layer = self._viewer.add_labels(
-                self._last_selected_label_layer.data,
-                scale=self._last_selected_label_layer.scale,
-                name="Predictions",
-                translate=self._last_selected_label_layer.translate,
-            )
+            self.add_prediction_layer()
         if ensure_layer_presence:
             # Ensure correct layer order: This sometimes fails with weird
             # EmitLoopError & IndexError that should be ignored

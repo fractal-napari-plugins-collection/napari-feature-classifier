@@ -136,16 +136,7 @@ class LabelAnnotator(Container):
         for layer in self._viewer.layers:
             if type(layer) == napari.layers.Labels and layer.name == "Annotations":
                 self._viewer.layers.remove(layer)
-        self._annotations_layer = self._viewer.add_labels(
-            self._last_selected_label_layer.data,
-            scale=self._last_selected_label_layer.scale,
-            name="Annotations",
-            translate=self._last_selected_label_layer.translate,
-        )
-        self._annotations_layer.editable = False
-
-        # Set the label selection to a valid label layer => Running into proxy bug
-        self._viewer.layers.selection.active = self._last_selected_label_layer
+        self.add_annotations_layer()
 
         # Class selection
         self.ClassSelection = ClassSelection  # pylint: disable=C0103
@@ -212,11 +203,26 @@ class LabelAnnotator(Container):
             self._save_destination.enabled = False
             self._class_selector.enabled = False
 
+    def add_annotations_layer(self):
+        self._annotations_layer = self._viewer.add_labels(
+            self._last_selected_label_layer.data,
+            scale=self._last_selected_label_layer.scale,
+            name="Annotations",
+            translate=self._last_selected_label_layer.translate,
+        )
+        self._annotations_layer.editable = False
+        # Set the label selection to a valid label layer
+        self._viewer.layers.selection.active = self._last_selected_label_layer
+
     def toggle_label(self, labels_layer, event):
         """
         Callback for when a label is clicked. It then updates the color of that
         label in the annotation layer.
         """
+        # If the annotations layer is missing, add it back
+        if "Annotations" not in [x.name for x in self._viewer.layers]:
+            self.add_annotations_layer()
+
         # Need to translate & scale position that event.position returns by the
         # label_layer scale.
         # If scale is (1, 1, 1), nothing changes
