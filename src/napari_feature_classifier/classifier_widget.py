@@ -223,6 +223,7 @@ class ClassifierRunContainer(Container):
         self._last_selected_label_layer = get_selected_or_valid_label_layer(
             viewer=self._viewer
         )
+
         # Initialize the classifier
         if classifier:
             self._classifier = classifier
@@ -659,12 +660,19 @@ class LoadClassifierContainer(Container):
         with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
 
-        self._run_container = ClassifierRunContainer(
-            self._viewer,
-            clf,
-            classifier_save_path=clf_path,
-            auto_save=True,
-        )
+        try:
+            self._run_container = ClassifierRunContainer(
+                self._viewer,
+                clf,
+                classifier_save_path=clf_path,
+                auto_save=True,
+            )
+        except NotImplementedError:
+            napari_info(
+                "Create a label layer with a feature dataframe before loading "
+                "the classifier"
+            )
+            return
         self.clear()
         self.append(self._run_container)
 
