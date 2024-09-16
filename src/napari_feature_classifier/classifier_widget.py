@@ -397,12 +397,49 @@ class ClassifierRunContainer(Container):
                 )
                 self._update_export_destination(self._last_selected_label_layer)
 
+    def reorder_layers(self):
+        """Reorders layers if needed to ensure Annotation & Prediction layers
+        are above the currently selected label layer.
+        """
+        # Get the current order of layers
+        all_layers = list(self._viewer.layers)
+
+        # Determine the indices of the layers if they exist
+        indices_to_move = []
+
+        # Find the index of "Prediction" layer if it exists
+        if "Predictions" in self._viewer.layers:
+            indices_to_move.append(self._viewer.layers.index("Predictions"))
+
+        # Find the index of "Annotation" layer if it exists
+        if "Annotations" in self._viewer.layers:
+            indices_to_move.append(self._viewer.layers.index("Annotations"))
+
+        # Find the index of the reference_label_layer
+        if self._last_selected_label_layer.name in self._viewer.layers:
+            indices_to_move.append(
+                self._viewer.layers.index(self._last_selected_label_layer.name)
+            )
+
+        # Calculate the new order of layer indices
+        remaining_indices = [
+            i for i in range(len(all_layers)) if i not in indices_to_move
+        ]
+        remaining_indices.reverse()
+        new_order = indices_to_move + remaining_indices
+        new_order.reverse()
+
+        # Reorder the layers using the move_multiple function
+        self._viewer.layers.move_multiple(new_order)
+
     def _init_prediction_layer(
         self, label_layer: napari.layers.Labels, ensure_layer_presence: bool = True
     ):
         """
         Initialize the prediction layer and reset its data (to fit the input
-        label_layer) and its colormap
+        label_layer) and its colormap.
+        ensure_layer_presence creates the Predictions layer if it doesn't exist
+        yet and triggers layer reordering.
         """
         # Ensure that prediction layer exists
         if (
@@ -415,6 +452,16 @@ class ClassifierRunContainer(Container):
                 name="Predictions",
                 translate=self._last_selected_label_layer.translate,
             )
+        if ensure_layer_presence:
+            # Ensure correct layer order: This sometimes fails with weird
+            # EmitLoopError & IndexError that should be ignored
+            try:
+                self.reorder_layers()
+            except:  # noqa
+                pass
+
+        # Ensure that prediction layer is above the current label layer
+        self._last_selected_label_layer
 
         # Check if the predict column already exists in the layer.features
         if "prediction" not in label_layer.features:
