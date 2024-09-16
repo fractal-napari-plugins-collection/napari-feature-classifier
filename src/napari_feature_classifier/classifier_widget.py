@@ -248,7 +248,6 @@ class ClassifierRunContainer(Container):
             self._viewer, get_class_selection(class_names=self.class_names)
         )
 
-        # Handle existing predictions layer
         for layer in self._viewer.layers:
             if type(layer) == napari.layers.Labels and layer.name == "Predictions":
                 self._viewer.layers.remove(layer)
@@ -295,11 +294,6 @@ class ClassifierRunContainer(Container):
         self._export_button.clicked.connect(self.export_results)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
         self._init_prediction_layer(self._last_selected_label_layer)
-        # Whenever the label layer is clicked, hide the prediction layer
-        # (e.g. new annotations are made)
-        # self._last_selected_label_layer.mouse_drag_callbacks.append(
-        #     self.hide_prediction_layer
-        # )
 
     def run(self):
         """
@@ -398,17 +392,30 @@ class ClassifierRunContainer(Container):
                 viewer=self._viewer
             ):
                 self._last_selected_label_layer = self._viewer.layers.selection.active
-                self._init_prediction_layer(self._viewer.layers.selection.active)
-                # self._last_selected_label_layer.mouse_drag_callbacks.append(
-                #     self.hide_prediction_layer
-                # )
+                self._init_prediction_layer(
+                    self._viewer.layers.selection.active, ensure_layer_presence=False
+                )
                 self._update_export_destination(self._last_selected_label_layer)
 
-    def _init_prediction_layer(self, label_layer: napari.layers.Labels):
+    def _init_prediction_layer(
+        self, label_layer: napari.layers.Labels, ensure_layer_presence: bool = True
+    ):
         """
         Initialize the prediction layer and reset its data (to fit the input
         label_layer) and its colormap
         """
+        # Ensure that prediction layer exists
+        if (
+            "Predictions" not in [x.name for x in self._viewer.layers]
+            and ensure_layer_presence
+        ):
+            self._prediction_layer = self._viewer.add_labels(
+                self._last_selected_label_layer.data,
+                scale=self._last_selected_label_layer.scale,
+                name="Predictions",
+                translate=self._last_selected_label_layer.translate,
+            )
+
         # Check if the predict column already exists in the layer.features
         if "prediction" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
@@ -447,12 +454,6 @@ class ClassifierRunContainer(Container):
                 label_column=self._label_column,
                 cmap=get_colormap(),
             )
-
-    # def hide_prediction_layer(self, labels_layer, event):
-    #     """
-    #     Hide the prediction layer
-    #     """
-    #     self._prediction_layer.visible = False
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []
