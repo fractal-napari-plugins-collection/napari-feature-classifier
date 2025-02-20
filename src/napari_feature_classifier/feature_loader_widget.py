@@ -15,8 +15,9 @@ from pathlib import Path
 
 from napari_feature_classifier.utils import napari_info
 
-
-class LabelFeatureSchema(pa.SchemaModel):
+# pandera.SchemaModel is now deprecated 
+# see https://github.com/unionai-oss/pandera/releases/tag/v0.20.0
+class LabelFeatureSchema(pa.DataFrameModel):
     # roi_id: Series[str] = pa.Field(coerce=True, unique=False)
     label: Series[int] = pa.Field(coerce=True, unique=True)
 
