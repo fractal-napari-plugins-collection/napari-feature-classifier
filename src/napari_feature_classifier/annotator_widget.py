@@ -220,7 +220,6 @@ class LabelAnnotator(Container):
         label in the annotation layer.
         """
         # If the annotations layer is missing, add it back
-        print("Toggle_label triggered")
         if "Annotations" not in [x.name for x in self._viewer.layers]:
             self.add_annotations_layer()
 
@@ -320,7 +319,8 @@ class LabelAnnotator(Container):
                 label_column=self._label_column,
                 cmap=self.cmap,
             )
-        label_layer.mouse_drag_callbacks.append(self.toggle_label)
+        if self.toggle_label not in label_layer.mouse_drag_callbacks:
+            label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
         # keybindings for the available classes (0 = deselect)
         for i in range(len(self.ClassSelection)):
