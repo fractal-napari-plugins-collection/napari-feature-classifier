@@ -17,9 +17,7 @@ from napari_feature_classifier.classifier_widget import (
 lbl_img_np = imageio.v2.imread(
     Path("src/napari_feature_classifier/sample_data/test_labels.tif")
 )
-clf_path = Path(
-    "src/napari_feature_classifier/sample_data/" "test_labels_classifier.clf"
-)
+clf_path = Path("src/napari_feature_classifier/sample_data/test_labels_classifier.clf")
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
