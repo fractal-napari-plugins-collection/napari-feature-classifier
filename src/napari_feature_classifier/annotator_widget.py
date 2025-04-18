@@ -220,21 +220,12 @@ class LabelAnnotator(Container):
         label in the annotation layer.
         """
         # If the annotations layer is missing, add it back
+        print("Toggle_label triggered")
         if "Annotations" not in [x.name for x in self._viewer.layers]:
             self.add_annotations_layer()
 
-        # Need to translate & scale position that event.position returns by the
-        # label_layer scale.
-        # If scale is (1, 1, 1), nothing changes
-        # If translate is (0, 0, 0)
-        # If scale is anything else, this makes the click still match the
-        # correct label
-        # translate before scale
-        scaled_position = tuple(
-            (pos - trans) / scale
-            for pos, trans, scale in zip(
-                event.position, labels_layer.translate, labels_layer.scale
-            )
+        scaled_position = self.get_scaled_position(
+            event.position, labels_layer.translate, labels_layer.scale
         )
         label = labels_layer.get_value(scaled_position)
         if label == 0 or not label:
@@ -258,6 +249,31 @@ class LabelAnnotator(Container):
             self.update_single_color_slow(labels_layer, label)
         else:
             self.update_single_color_legacy(labels_layer, label)
+
+    @staticmethod
+    def get_scaled_position(
+        position: tuple, translate: np.array, scale: np.array
+    ) -> tuple:
+        """
+        Get the position of a click after translation & scaling
+
+
+        Position values in napari can have different shapes than the layer
+        translate & scale data (e.g. 3D position for 2D layer). This function
+        handles that edge-case
+        """
+        if len(position) == 3 and len(scale) == 2:
+            position = position[1:]
+        elif len(position) != len(scale):
+            raise NotImplementedError(
+                "Detecting annotation positions isn't implemented for "
+                f"positions like {position} of length {len(position)} and "
+                f"scales like {scale} of length {len(scale)}"
+            )
+        return tuple(
+            (pos - trans) / scale
+            for pos, trans, scale in zip(position, translate, scale)
+        )
 
     def set_class_n(self, event, n: int):  # pylint: disable=C0103
         self._class_selector.value = self.ClassSelection[
@@ -283,7 +299,6 @@ class LabelAnnotator(Container):
                     [label_layer.features, annotation_df], axis=1
                 )
 
-        # label_layer.opacity = 0.4
         self._annotations_layer.data = label_layer.data
         self._annotations_layer.scale = label_layer.scale
         self._annotations_layer.translate = label_layer.translate
