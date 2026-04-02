@@ -1,5 +1,6 @@
 # pylint: disable=C0103
 """Tests for core classifier class"""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -47,7 +48,6 @@ def get_train_predict_dfs():
     return df_train, df_predict
 
 
-# TODO: Add a real test.
 def test_prediction():
     df_train, df_predict = get_train_predict_dfs()
     df_predict_with_nans = df_predict.copy()
@@ -56,7 +56,10 @@ def test_prediction():
     c.add_features(df_train)
     c.train()
     predictions = c.predict(df_predict_with_nans)
-    return predictions
+    assert isinstance(predictions, pd.Series)
+    assert len(predictions) == len(df_predict_with_nans)
+    assert set(predictions.dropna().unique()).issubset({1, 2})
+    assert predictions.isna().sum() == df_predict_with_nans["feature1"].isna().sum()
 
 
 def get_df():

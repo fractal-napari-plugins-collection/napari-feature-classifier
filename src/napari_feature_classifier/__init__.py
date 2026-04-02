@@ -1,2 +1,4 @@
-"""Init"""
-__version__ = "0.3.2"
+try:
+    from napari_feature_classifier._version import __version__
+except ImportError:
+    __version__ = "unknown"

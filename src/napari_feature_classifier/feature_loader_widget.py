@@ -1,21 +1,23 @@
 """Widget for loading features from csv file."""
-from os import PathLike
-from typing import Callable, Sequence, Union
-from typing_extensions import TypeAlias
+
 import warnings
+from collections.abc import Callable, Sequence
+from os import PathLike
+from pathlib import Path
+from typing import TypeAlias
 
 import numpy as np
 import pandas as pd
-import pandera as pa
+import pandera.pandas as pa
 from magicgui import magic_factory
 from napari.layers import Labels
 from napari.types import LayerDataTuple
 from pandera.typing import DataFrame, Series
-from pathlib import Path
 
 from napari_feature_classifier.utils import napari_info
 
-# pandera.SchemaModel is now deprecated 
+
+# pandera.SchemaModel is now deprecated
 # see https://github.com/unionai-oss/pandera/releases/tag/v0.20.0
 class LabelFeatureSchema(pa.DataFrameModel):
     # roi_id: Series[str] = pa.Field(coerce=True, unique=False)
@@ -24,7 +26,7 @@ class LabelFeatureSchema(pa.DataFrameModel):
 
 @pa.check_types
 def load_features_csv(
-    fn: PathLike, index_column_or_columns: Union[str, list[str]] = "label"
+    fn: PathLike, index_column_or_columns: str | list[str] = "label"
 ) -> DataFrame[LabelFeatureSchema]:
     df = pd.read_csv(fn)
     if isinstance(index_column_or_columns, str):
@@ -48,7 +50,10 @@ def make_features(
     features = rng.random(size=(len(labels), n_features))
     data = {
         **{"roi_id": roi_id, "label": labels},
-        **{column: feature for column, feature in zip(columns, features.T)},
+        **{
+            column: feature
+            for column, feature in zip(columns, features.T, strict=False)
+        },
     }
     return DataFrame[LabelFeatureSchema](data)
 
@@ -60,7 +65,7 @@ FeatureLoaderFn: TypeAlias = Callable[[PathLike[str]], DataFrame[LabelFeatureSch
 def load_features_factory(
     layer: Labels, path: Path, loader: FeatureLoaderFn = load_features_csv
 ) -> LayerDataTuple:
-    df = loader(path) # pylint: disable=C0103
+    df = loader(path)  # pylint: disable=C0103
     image_labels = np.unique(layer.data)[1:]
     feature_labels = df["label"].values
     if len(set(image_labels).symmetric_difference(feature_labels)) != 0:
@@ -70,6 +75,6 @@ def load_features_factory(
         "Features with no label objects: "
         f"{sorted(set(feature_labels).difference(image_labels))}"
         napari_info(warn_str)
-        warnings.warn(warn_str)
-    napari_info(f"Loaded features and attached them to \"{layer}\" layer")
+        warnings.warn(warn_str, stacklevel=2)
+    napari_info(f'Loaded features and attached them to "{layer}" layer')
     return (layer.data, {"name": layer.name, "features": df}, "labels")

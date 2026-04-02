@@ -1,16 +1,16 @@
 """Core classifier class and helper functions."""
+
 import logging
 import pickle
 import random
 import string
-from typing import Sequence
+from collections.abc import Sequence
 
 import pandas as pd
-import pandera as pa
+import pandera.pandas as pa
 import xxhash
-
-from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score
 
 
 # TODO: define an interface for compatible classifiers (m.b. a subset of
@@ -55,7 +55,7 @@ class Classifier:
         as well as feature measurements for all rows (annotated objects)
     """
 
-    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
+    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):  # noqa: B008
         self.logger = logging.getLogger("classifier")
         self.logger.setLevel(logging.INFO)
         self._feature_names: list[str] = list(feature_names)
