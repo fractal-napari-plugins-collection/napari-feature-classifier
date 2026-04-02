@@ -1,16 +1,17 @@
 """Utils function for the classifier"""
-from functools import lru_cache
+
 import logging
 import math
+from functools import lru_cache
 from pathlib import Path
 
-# import warnings
-import pandas as pd
-from napari.utils.notifications import show_info
-from matplotlib.colors import ListedColormap
 import matplotlib
-import numpy as np
 import napari
+import numpy as np
+import pandas as pd
+from matplotlib.colors import ListedColormap
+from napari.utils.colormaps import DirectLabelColormap
+from napari.utils.notifications import show_info
 from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
 # from napari._qt.dialogs.qt_notification import NapariQtNotification
@@ -70,35 +71,16 @@ def get_colormap(matplotlib_colormap="Set1"):
     return cmap
 
 
-def reset_display_colormaps_legacy(
+def reset_display_colormaps(
     label_layer, feature_col, display_layer, label_column, cmap
 ):
     """
     Reset the colormap based on the annotations in
     label_layer.features['annotation'] and sends the updated colormap
-    to the annotation label layer
+    to the annotation label layer.
     """
     colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
-    colordict = dict(zip(label_layer.features[label_column], colors))
-    display_layer.color = colordict
-    display_layer.opacity = 1.0
-    display_layer.color_mode = "direct"
-
-
-def reset_display_colormaps_modern(
-    label_layer, feature_col, display_layer, label_column, cmap
-):
-    """
-    Reset the colormap based on the annotations in
-    label_layer.features['annotation'] and sends the updated colormap
-    to the annotation label layer
-
-    Modern version to support napari >= 0.4.19
-    """
-    from napari.utils.colormaps import DirectLabelColormap
-
-    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
-    colordict = dict(zip(label_layer.features[label_column], colors))
+    colordict = dict(zip(label_layer.features[label_column], colors, strict=False))
     colordict[None] = [0, 0, 0, 0]
     display_layer.colormap = DirectLabelColormap(color_dict=colordict)
     display_layer.opacity = 1.0

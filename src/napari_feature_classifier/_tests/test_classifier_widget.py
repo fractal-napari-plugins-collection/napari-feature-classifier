@@ -1,18 +1,18 @@
-""" Tests for classifier widget initialization"""
+"""Tests for classifier widget initialization"""
+
+import os
+from pathlib import Path
+
+import imageio
 import numpy as np
 import pandas as pd
 import pytest
-import os
 
-import imageio
-from pathlib import Path
-from napari_feature_classifier.feature_loader_widget import make_features
 from napari_feature_classifier.classifier_widget import (
     ClassifierWidget,
-)
-from napari_feature_classifier.classifier_widget import (
     LoadClassifierContainer,
 )
+from napari_feature_classifier.feature_loader_widget import make_features
 
 lbl_img_np = imageio.v2.imread(
     Path("src/napari_feature_classifier/sample_data/test_labels.tif")

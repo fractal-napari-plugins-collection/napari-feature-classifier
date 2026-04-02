@@ -1,10 +1,11 @@
 """Annotator container widget for napari"""
+
 import warnings
+from collections.abc import Sequence
 from enum import Enum
 from functools import partial
-from packaging import version
 from pathlib import Path
-from typing import Optional, Sequence, cast
+from typing import cast
 
 # pylint: disable=R0801
 import napari
@@ -13,30 +14,28 @@ import napari.viewer
 import numpy as np
 import pandas as pd
 from magicgui.widgets import (
-    Label,
     Container,
     FileEdit,
+    Label,
     PushButton,
     RadioButtons,
     create_widget,
 )
 
-
 # pylint: disable=R0801
 from napari_feature_classifier.utils import (
+    add_annotation_names,
     get_colormap,
-    reset_display_colormaps_legacy,
-    reset_display_colormaps_modern,
-    get_valid_label_layers,
     get_selected_or_valid_label_layer,
+    get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
-    add_annotation_names,
+    reset_display_colormaps,
 )
 
 
 def get_class_selection(
-    n_classes: Optional[int] = None, class_names: Optional[Sequence[str]] = None
+    n_classes: int | None = None, class_names: Sequence[str] | None = None
 ) -> Enum:
     """
     Create a class selection enum for the annotator widget.
@@ -60,7 +59,8 @@ def get_class_selection(
         warnings.warn(
             f"Value provided for `n_classes` ({n_classes}) does not match "
             f"the length of `class_names` ({len(class_names)}). "
-            f"Setting n_classes to {len(class_names)}."
+            f"Setting n_classes to {len(class_names)}.",
+            stacklevel=2,
         )
     assert len(class_names) == len(
         set(class_names)
@@ -119,8 +119,10 @@ class LabelAnnotator(Container):
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
-        ClassSelection=get_class_selection(n_classes=4),
+        ClassSelection=None,
     ):
+        if ClassSelection is None:
+            ClassSelection = get_class_selection(n_classes=4)
         self._viewer = viewer
         self._label_column = "label"
 
@@ -134,7 +136,7 @@ class LabelAnnotator(Container):
 
         # Handle existing predictions layer
         for layer in self._viewer.layers:
-            if type(layer) == napari.layers.Labels and layer.name == "Annotations":
+            if isinstance(layer, napari.layers.Labels) and layer.name == "Annotations":
                 self._viewer.layers.remove(layer)
         self.add_annotations_layer()
 
@@ -243,11 +245,7 @@ class LabelAnnotator(Container):
             ] = np.NaN
 
         # Update only the single color value that changed
-        napari_version = version.parse(napari.__version__)
-        if napari_version >= version.parse("0.4.19"):
-            self.update_single_color_slow(labels_layer, label)
-        else:
-            self.update_single_color_legacy(labels_layer, label)
+        self.update_single_color(labels_layer, label)
 
     @staticmethod
     def get_scaled_position(
@@ -271,7 +269,7 @@ class LabelAnnotator(Container):
             )
         return tuple(
             (pos - trans) / scale
-            for pos, trans, scale in zip(position, translate, scale)
+            for pos, trans, scale in zip(position, translate, scale, strict=False)
         )
 
     def set_class_n(self, event, n: int):  # pylint: disable=C0103
@@ -302,23 +300,13 @@ class LabelAnnotator(Container):
         self._annotations_layer.scale = label_layer.scale
         self._annotations_layer.translate = label_layer.translate
 
-        napari_version = version.parse(napari.__version__)
-        if napari_version >= version.parse("0.4.19"):
-            reset_display_colormaps_modern(
-                label_layer,
-                feature_col="annotations",
-                display_layer=self._annotations_layer,
-                label_column=self._label_column,
-                cmap=self.cmap,
-            )
-        else:
-            reset_display_colormaps_legacy(
-                label_layer,
-                feature_col="annotations",
-                display_layer=self._annotations_layer,
-                label_column=self._label_column,
-                cmap=self.cmap,
-            )
+        reset_display_colormaps(
+            label_layer,
+            feature_col="annotations",
+            display_layer=self._annotations_layer,
+            label_column=self._label_column,
+            cmap=self.cmap,
+        )
         if self.toggle_label not in label_layer.mouse_drag_callbacks:
             label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
@@ -337,45 +325,26 @@ class LabelAnnotator(Container):
         base_path = Path(self._save_destination.value).parent
         self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"
 
-    def update_single_color_legacy(self, label_layer, label):
-        """
-        Update the color of a single object in the annotations layer.
-        """
-        color = self.cmap(
-            float(
-                label_layer.features.loc[
-                    label_layer.features[self._label_column] == label,
-                    "annotations",
-                ].iloc[0]
-            )
-            / len(self.cmap.colors)
-        )
-        self._annotations_layer.color[label] = color
-        self._annotations_layer.opacity = 1.0
-        self._annotations_layer.color_mode = "direct"
-
-    def update_single_color_slow(self, label_layer, label):
+    def update_single_color(self, label_layer, label):
         """
         Update the color of a single object in the annotations layer.
 
-        napari >= 0.4.19 does not have a direct API to only update a single
-        color. It always validates & updates the whole colormap.
-        Therefore, this update mode scales badly with the number of unique
-        labels.
-        See details in https://github.com/napari/napari/issues/6732
-
+        napari does not have a direct API to only update a single color —
+        it always validates & updates the whole colormap, so this scales
+        with the number of unique labels.
+        See https://github.com/napari/napari/issues/6732
         """
-        color = self.cmap(
-            float(
-                label_layer.features.loc[
-                    label_layer.features[self._label_column] == label,
-                    "annotations",
-                ].iloc[0]
-            )
-            / len(self.cmap.colors)
-        )
         from napari.utils.colormaps import DirectLabelColormap
 
+        color = self.cmap(
+            float(
+                label_layer.features.loc[
+                    label_layer.features[self._label_column] == label,
+                    "annotations",
+                ].iloc[0]
+            )
+            / len(self.cmap.colors)
+        )
         colordict = self._annotations_layer.colormap.color_dict
         colordict[label] = color
         self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)

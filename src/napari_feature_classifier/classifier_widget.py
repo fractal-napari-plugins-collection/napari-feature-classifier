@@ -1,10 +1,8 @@
 """Classifier container widget for napari"""
+
 import logging
 import pickle
-
-from packaging import version
 from pathlib import Path
-from typing import Optional
 
 import napari
 import napari.layers
@@ -13,10 +11,10 @@ import numpy as np
 import pandas as pd
 from magicgui.widgets import (
     Container,
-    Label,
     FileEdit,
-    RadioButtons,
+    Label,
     PushButton,
+    RadioButtons,
     Select,
 )
 
@@ -27,15 +25,14 @@ from napari_feature_classifier.annotator_widget import (
 )
 from napari_feature_classifier.classifier import Classifier
 from napari_feature_classifier.utils import (
+    NapariHandler,
+    add_annotation_names,
     get_colormap,
-    reset_display_colormaps_modern,
-    reset_display_colormaps_legacy,
-    get_valid_label_layers,
     get_selected_or_valid_label_layer,
+    get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
-    add_annotation_names,
-    NapariHandler,
+    reset_display_colormaps,
 )
 
 
@@ -212,11 +209,11 @@ class ClassifierRunContainer(Container):
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
-        classifier: Optional[Classifier] = None,
-        class_names: Optional[list[str]] = None,
-        feature_names: Optional[list[str]] = None,
-        classifier_save_path: Optional[str] = None,
-        auto_save: Optional[bool] = False,
+        classifier: Classifier | None = None,
+        class_names: list[str] | None = None,
+        feature_names: list[str] | None = None,
+        classifier_save_path: str | None = None,
+        auto_save: bool | None = False,
     ):
         self._viewer = viewer
         self.auto_save = auto_save
@@ -250,7 +247,7 @@ class ClassifierRunContainer(Container):
         )
 
         for layer in self._viewer.layers:
-            if type(layer) == napari.layers.Labels and layer.name == "Predictions":
+            if isinstance(layer, napari.layers.Labels) and layer.name == "Predictions":
                 self._viewer.layers.remove(layer)
         self.add_prediction_layer()
 
@@ -459,9 +456,6 @@ class ClassifierRunContainer(Container):
             except:  # noqa
                 pass
 
-        # Ensure that prediction layer is above the current label layer
-        self._last_selected_label_layer
-
         # Check if the predict column already exists in the layer.features
         if "prediction" not in label_layer.features:
             unique_labels = np.unique(label_layer.data)[1:]
@@ -483,23 +477,13 @@ class ClassifierRunContainer(Container):
         self._prediction_layer.translate = label_layer.translate
 
         # Update the colormap of the prediction layer
-        napari_version = version.parse(napari.__version__)
-        if napari_version >= version.parse("0.4.19"):
-            reset_display_colormaps_modern(
-                label_layer,
-                feature_col="prediction",
-                display_layer=self._prediction_layer,
-                label_column=self._label_column,
-                cmap=get_colormap(),
-            )
-        else:
-            reset_display_colormaps_legacy(
-                label_layer,
-                feature_col="prediction",
-                display_layer=self._prediction_layer,
-                label_column=self._label_column,
-                cmap=get_colormap(),
-            )
+        reset_display_colormaps(
+            label_layer,
+            feature_col="prediction",
+            display_layer=self._prediction_layer,
+            label_column=self._label_column,
+            cmap=get_colormap(),
+        )
 
     def get_relevant_label_layers(self):
         relevant_label_layers = []

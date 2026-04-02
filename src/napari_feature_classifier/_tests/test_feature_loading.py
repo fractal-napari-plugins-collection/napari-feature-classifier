@@ -1,8 +1,10 @@
-""" Tests feature loading"""
-import pandas as pd
+"""Tests feature loading"""
+
+from pathlib import Path
 
 import imageio
-from pathlib import Path
+import pandas as pd
+
 from napari_feature_classifier.feature_loader_widget import (
     load_features_factory,
 )

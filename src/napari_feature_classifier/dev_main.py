@@ -1,10 +1,11 @@
 """Helper script to open napari with 2 test label layers with features"""
+
 from pathlib import Path
 
 import imageio
 import napari
-
 import numpy as np
+
 from napari_feature_classifier.feature_loader_widget import (
     make_features,
 )
