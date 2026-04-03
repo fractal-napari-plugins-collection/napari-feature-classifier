@@ -301,3 +301,93 @@ def test_sync_updates_geometry(viewer_with_label_layer):
     mgr.setup(labels)
     mgr.sync(labels_b)
     assert list(mgr.prediction_layer.scale) == [4.0, 4.0]
+
+
+# ---------------------------------------------------------------------------
+# ClassifierRunner: restore_annotations_to_layer
+# ---------------------------------------------------------------------------
+
+
+def _make_layer_with_annotation_column(viewer, roi_id=ROI_ID, n=N_LABELS):
+    """Layer with an annotations column (all NaN, as _init_annotation would create)."""
+    img = make_label_array(n)
+    layer = viewer.add_labels(img, name=f"Labels_{roi_id}")
+    df = make_features_df(roi_id=roi_id, n=n)
+    df["annotations"] = float("nan")
+    layer.features = df
+    return layer
+
+
+def test_restore_returns_false_when_classifier_has_no_data(viewer):
+    """Empty classifier → nothing to restore → returns False."""
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = ClassifierRunner(viewer, make_classifier())
+    assert runner.restore_annotations_to_layer(layer) is False
+    assert layer.features["annotations"].isna().all()
+
+
+def test_restore_returns_false_when_roi_id_not_in_data(viewer):
+    """Classifier has data for a different roi_id → no restore."""
+    layer = _make_layer_with_annotation_column(viewer, roi_id="site1")
+    clf = make_classifier()
+    runner = ClassifierRunner(viewer, clf)
+    # Populate classifier with a different roi
+    other = _make_layer_with_annotation_column(viewer, roi_id="site2")
+    other.features.loc[0, "annotations"] = 1.0
+    runner._classifier.add_features(other.features)
+
+    assert runner.restore_annotations_to_layer(layer) is False
+    assert layer.features["annotations"].isna().all()
+
+
+def test_restore_writes_stored_annotations_to_nan_slots(viewer):
+    """Stored annotations are written back where layer has NaN."""
+    layer = _make_layer_with_annotation_column(viewer)
+    clf = make_classifier()
+    runner = ClassifierRunner(viewer, clf)
+
+    # Simulate prior training run: push two annotations into _data
+    layer.features.loc[0, "annotations"] = 1.0
+    layer.features.loc[1, "annotations"] = 2.0
+    runner.add_features_to_classifier()
+
+    # Reset layer annotations to NaN (simulates reloading the layer)
+    layer.features["annotations"] = float("nan")
+
+    restored = runner.restore_annotations_to_layer(layer)
+    assert restored is True
+    assert layer.features.loc[0, "annotations"] == 1.0
+    assert layer.features.loc[1, "annotations"] == 2.0
+    # Labels with no stored annotation remain NaN
+    assert layer.features.loc[2, "annotations"] != layer.features.loc[2, "annotations"]
+
+
+def test_restore_does_not_overwrite_live_annotations(viewer):
+    """Live (non-NaN) annotations on the layer are not replaced by stored values."""
+    layer = _make_layer_with_annotation_column(viewer)
+    clf = make_classifier()
+    runner = ClassifierRunner(viewer, clf)
+
+    # Push annotation=1 for label index 0 into _data
+    layer.features.loc[0, "annotations"] = 1.0
+    runner.add_features_to_classifier()
+
+    # Simulate user changing the live annotation to class 2 after reload
+    layer.features["annotations"] = float("nan")
+    layer.features.loc[0, "annotations"] = 2.0  # live override
+
+    runner.restore_annotations_to_layer(layer)
+    # Live annotation should be preserved
+    assert layer.features.loc[0, "annotations"] == 2.0
+
+
+def test_restore_returns_false_when_no_roi_id_column(viewer):
+    """Layer without a roi_id column is skipped gracefully."""
+    img = make_label_array()
+    layer = viewer.add_labels(img, name="NoRoi")
+    layer.features["label"] = list(range(1, N_LABELS + 1))
+    layer.features["annotations"] = float("nan")
+
+    clf = make_classifier()
+    runner = ClassifierRunner(viewer, clf)
+    assert runner.restore_annotations_to_layer(layer) is False

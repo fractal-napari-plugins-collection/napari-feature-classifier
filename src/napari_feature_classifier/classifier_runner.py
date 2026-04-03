@@ -187,6 +187,60 @@ class ClassifierRunner:
             )
         return df_relevant
 
+    def restore_annotations_to_layer(self, label_layer: napari.layers.Labels) -> bool:
+        """
+        If the classifier has stored annotations for this layer's roi_id,
+        write them back into layer.features["annotations"] where the current
+        value is NaN (live annotations always take precedence).
+
+        Returns True if any annotations were restored, False otherwise.
+
+        Prerequisites: the layer must already have an "annotations" column
+        (call _init_annotation first). If the layer has no roi_id column or
+        more than one unique roi_id, returns False without modifying anything.
+        """
+        if len(self._classifier._data) == 0:
+            return False
+
+        # Determine roi_id for this layer
+        if self._roi_id_column not in label_layer.features.columns:
+            return False
+        roi_col: pd.Series = label_layer.features[self._roi_id_column]
+        unique_ids = roi_col.dropna().unique()
+        if len(unique_ids) != 1:
+            return False
+        roi_id = unique_ids[0]
+
+        # Check whether the classifier has data for this roi_id
+        stored_rois = self._classifier._data.index.get_level_values(self._roi_id_column)
+        if roi_id not in stored_rois:
+            return False
+
+        # Extract stored annotations for this roi_id (drop NaN / NoClass rows)
+        stored = self._classifier._data.loc[
+            self._classifier._data.index.get_level_values(self._roi_id_column)
+            == roi_id,
+            "annotations",
+        ].dropna()
+        stored = stored[stored != -1]
+        if stored.empty:
+            return False
+
+        # stored.index is a MultiIndex (roi_id, label); extract label level
+        stored_labels = stored.index.get_level_values(self._label_column)
+        label_map = dict(zip(stored_labels, stored.values, strict=False))
+
+        # Only fill rows that are currently NaN — live annotations take precedence
+        features = label_layer.features
+        nan_mask = features["annotations"].isna() & features[self._label_column].isin(
+            stored_labels
+        )
+        features.loc[nan_mask, "annotations"] = features.loc[
+            nan_mask, self._label_column
+        ].map(label_map)
+
+        return bool(nan_mask.any())
+
 
 class PredictionLayerManager:
     """

@@ -388,6 +388,8 @@ class ClassifierRunContainer(Container):
             ]
         )
         self._prediction_manager.setup(self._last_selected_label_layer)
+        # Restore any stored annotations for the initially selected layer
+        self._restore_annotations(self._last_selected_label_layer)
         # Set the label selection to a valid label layer => Running into proxy bug
         self._viewer.layers.selection.active = self._last_selected_label_layer
         self._run_button.clicked.connect(self.run)
@@ -425,8 +427,23 @@ class ClassifierRunContainer(Container):
         active = self._viewer.layers.selection.active
         if active and active in get_valid_label_layers(viewer=self._viewer):
             self._last_selected_label_layer = active
+            # LabelAnnotator.selection_changed fires first (connected earlier),
+            # so the annotations column already exists by the time we get here.
+            self._restore_annotations(active)
             self._prediction_manager.sync(active)
             self._export_panel.update_selected_layer(active)
+            self._update_counts()
+
+    def _restore_annotations(self, layer: napari.layers.Labels) -> None:
+        """
+        Restore stored annotations from classifier._data into the layer and
+        re-render the annotation colormap if any were written back.
+        """
+        restored = self._runner.restore_annotations_to_layer(layer)
+        if restored:
+            # Re-run _init_annotation to refresh the colormap; it is idempotent
+            # when the annotations column already exists.
+            self._annotator._init_annotation(layer)
             self._update_counts()
 
     def _on_class_names_changed(self, new_names: list[str]) -> None:
