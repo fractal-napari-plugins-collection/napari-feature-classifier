@@ -85,7 +85,7 @@ def test_running_classification_through_widget(features, make_napari_viewer):
     classifier_widget._run_container.run()
 
     # Assert something that the layer is visible, predictions exist and are not NaN
-    assert classifier_widget._run_container._prediction_layer.visible
+    assert classifier_widget._run_container._prediction_manager.prediction_layer.visible
     assert "prediction" in label_layer.features.columns
     assert pd.notna(label_layer.features["prediction"]).all().all()
 
@@ -130,8 +130,10 @@ def test_prediction_export(make_napari_viewer, capsys):
     classifier_widget._run_container.run()
 
     # Test result export
-    classifier_widget._run_container.export_results()
-    df = pd.read_csv(classifier_widget._run_container._export_destination.value)
+    classifier_widget._run_container._export_panel.export_results()
+    df = pd.read_csv(
+        classifier_widget._run_container._export_panel._export_destination.value
+    )
     assert df.shape == (16, 5)
     assert df["prediction"].isna().sum() == 0
 
@@ -212,7 +214,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels_2"
     )
     assert (
-        str(classifier_widget._run_container._export_destination.value)
+        str(classifier_widget._run_container._export_panel._export_destination.value)
         == "test_labels_2_predictions.csv"
     )
     viewer.layers.selection.active = label_layer1
@@ -221,7 +223,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels"
     )
     assert (
-        classifier_widget._run_container._export_destination.value.name
+        classifier_widget._run_container._export_panel._export_destination.value.name
         == "test_labels_predictions.csv"
     )
 
@@ -244,7 +246,7 @@ def test_load_classifier_widget(make_napari_viewer, capsys):
     loading_widget.load()
 
     # Some basic checks that loading looks to have worked
-    assert loading_widget._run_container._prediction_layer.visible
+    assert loading_widget._run_container._prediction_manager.prediction_layer.visible
     assert "prediction" in label_layer.features.columns
 
 
