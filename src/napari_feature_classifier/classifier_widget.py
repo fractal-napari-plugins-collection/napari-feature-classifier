@@ -399,25 +399,53 @@ class ClassifierRunContainer(Container):
 
     def run(self):
         """
-        Run method that adds features to the classifier, trains it, triggers
-        predictions & saves the classifier
-        """
+        Run the classifier pipeline in a background thread to keep the UI
+        responsive during feature collection and training.
 
-        self._runner.add_features_to_classifier()
-        try:
-            self._classifier.train()
-        except ValueError as e:
+        Feature collection and training run off the main thread.  All napari
+        layer writes (predictions, colormap, save) are dispatched back to the
+        main thread via the worker's `returned` / `errored` signals.
+        """
+        from napari.qt.threading import thread_worker
+
+        self._run_button.enabled = False
+        self._run_button.text = "Running…"
+
+        @thread_worker(ignore_errors=True)
+        def _train():
+            self._runner.add_features_to_classifier()
+            f1 = self._classifier.train()  # raises ValueError on bad input
+            return f1
+
+        self._run_worker = _train()
+        # Connect to self methods (QObject) so PyQt uses QueuedConnection for
+        # cross-thread dispatch, ensuring callbacks run in the main thread.
+        self._run_worker.returned.connect(self._on_run_done)
+        self._run_worker.errored.connect(self._on_run_error)
+        self._run_worker.start()
+
+    def _on_run_done(self, _f1) -> None:
+        """Called in the main thread when background training succeeds."""
+        self._runner.make_predictions()
+        self._prediction_manager.setup(self._last_selected_label_layer)
+        self._prediction_manager.set_visible(True)
+        self._export_panel.save()
+        self._update_counts()
+        self._run_button.text = "Run Classifier"
+        self._run_button.enabled = True
+
+    def _on_run_error(self, exc: Exception) -> None:
+        """Called in the main thread when background training raises."""
+        if isinstance(exc, ValueError):
             napari_info(
                 "Training failed. A typical reason are not having "
                 "enough annotations. \nThe error message was: "
-                f"{e}"
+                f"{exc}"
             )
         else:
-            self._runner.make_predictions()
-            self._prediction_manager.setup(self._last_selected_label_layer)
-            self._prediction_manager.set_visible(True)
-            self._export_panel.save()
-            self._update_counts()
+            napari_info(f"Unexpected error during training: {exc}")
+        self._run_button.text = "Run Classifier"
+        self._run_button.enabled = True
 
     def selection_changed(self):
         """

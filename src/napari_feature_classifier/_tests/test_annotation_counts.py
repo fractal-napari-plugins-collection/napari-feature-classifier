@@ -204,7 +204,7 @@ def test_count_closed_plus_open(viewer):
 # ---------------------------------------------------------------------------
 
 
-def test_count_label_still_correct_after_run(viewer, tmp_path, monkeypatch):
+def test_count_label_still_correct_after_run(viewer, qtbot, tmp_path, monkeypatch):
     """Panel row counts are refreshed correctly after run() completes."""
     monkeypatch.chdir(tmp_path)
     layer = make_label_layer(viewer)
@@ -216,6 +216,7 @@ def test_count_label_still_correct_after_run(viewer, tmp_path, monkeypatch):
 
     container = make_run_container(viewer)
     container.run()
+    qtbot.waitSignal(container._run_worker.signals.finished, timeout=30_000)
 
     counts = panel_counts(container)
     assert counts["Class_1"] == 4
