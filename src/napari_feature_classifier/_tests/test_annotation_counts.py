@@ -32,11 +32,10 @@ def make_run_container(viewer):
     )
 
 
-def parse_counts(count_str: str) -> dict[str, int]:
-    """Parse "Class_1: 3\nClass_2: 2" → {"Class_1": 3, "Class_2": 2}."""
-    if not count_str:
-        return {}
-    return {k: int(v) for k, v in (line.split(": ") for line in count_str.splitlines())}
+def panel_counts(container) -> dict[str, int]:
+    """Read counts from the ClassSelectorPanel row labels."""
+    panel = container._annotator._class_selector
+    return {row.class_name: int(row._count_label.value) for row in panel._rows}
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +57,7 @@ def test_count_all_zeros_when_no_annotations_column(viewer):
     """Layer with no annotations column → all classes show 0."""
     make_label_layer(viewer)
     container = make_run_container(viewer)
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 0, "Class_2": 0}
 
 
@@ -67,7 +66,7 @@ def test_count_all_zeros_when_all_annotations_are_nan(viewer):
     layer = make_label_layer(viewer)
     layer.features["annotations"] = float("nan")
     container = make_run_container(viewer)
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 0, "Class_2": 0}
 
 
@@ -85,35 +84,36 @@ def test_count_single_layer_basic(viewer):
     layer.features.loc[3, "annotations"] = 2.0
     layer.features.loc[4, "annotations"] = 2.0
     container = make_run_container(viewer)
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 3, "Class_2": 2}
 
 
 def test_count_updates_after_annotation_write(viewer):
-    """Writing a new annotation and calling _update_count_label refreshes the display."""
+    """Writing a new annotation and calling _update_counts refreshes the panel."""
     layer = make_label_layer(viewer)
     layer.features.loc[0, "annotations"] = 1.0
     container = make_run_container(viewer)
-    assert parse_counts(container._count_label.value) == {"Class_1": 1, "Class_2": 0}
+    assert panel_counts(container) == {"Class_1": 1, "Class_2": 0}
 
     layer.features.loc[1, "annotations"] = 1.0
-    container._update_count_label()
-    assert parse_counts(container._count_label.value) == {"Class_1": 2, "Class_2": 0}
+    container._update_counts()
+    assert panel_counts(container) == {"Class_1": 2, "Class_2": 0}
 
 
 def test_count_label_updated_via_callback(viewer):
-    """The callback wired into LabelAnnotator updates _count_label.value."""
+    """The callback wired into LabelAnnotator updates the panel row counts."""
     layer = make_label_layer(viewer)
     container = make_run_container(viewer)
-    initial = container._count_label.value
+    initial = panel_counts(container)
 
     layer.features.loc[0, "annotations"] = 2.0
     # Fire callbacks the same way toggle_label() does
     for cb in container._annotator._annotation_callbacks:
         cb()
 
-    assert container._count_label.value != initial
-    assert parse_counts(container._count_label.value)["Class_2"] == 1
+    after = panel_counts(container)
+    assert after != initial
+    assert after["Class_2"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ def test_count_aggregates_two_open_layers(viewer):
     layer2.features.loc[3, "annotations"] = 2.0  # 3 × Class_2 on layer2
 
     container = make_run_container(viewer)
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 3, "Class_2": 3}
 
 
@@ -156,7 +156,7 @@ def test_count_includes_closed_image(viewer):
     # Remove the layer — simulates closing the image
     viewer.layers.remove(layer1)
 
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 1, "Class_2": 1}
 
 
@@ -176,7 +176,7 @@ def test_count_live_overrides_stale_history(viewer):
     layer.features.loc[2, "annotations"] = 1.0  # 3 × Class_1 live
     layer.features.loc[3, "annotations"] = 2.0  # 1 × Class_2 live
 
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     # Live data should win — NOT 2 (history) + 3 (live) = 5
     assert counts == {"Class_1": 3, "Class_2": 1}
 
@@ -195,7 +195,7 @@ def test_count_closed_plus_open(viewer):
     layer2 = make_label_layer(viewer, name="Labels2", roi_id="site2")
     layer2.features.loc[0, "annotations"] = 2.0  # 1 × Class_2 from site2
 
-    counts = parse_counts(container._get_annotation_counts())
+    counts = container._get_annotation_counts()
     assert counts == {"Class_1": 2, "Class_2": 1}
 
 
@@ -205,7 +205,7 @@ def test_count_closed_plus_open(viewer):
 
 
 def test_count_label_still_correct_after_run(viewer, tmp_path, monkeypatch):
-    """_count_label.value is refreshed correctly after run() completes."""
+    """Panel row counts are refreshed correctly after run() completes."""
     monkeypatch.chdir(tmp_path)
     layer = make_label_layer(viewer)
     # 4 × Class_1 and 4 × Class_2: enough for the hash-based train/test split
@@ -217,7 +217,7 @@ def test_count_label_still_correct_after_run(viewer, tmp_path, monkeypatch):
     container = make_run_container(viewer)
     container.run()
 
-    counts = parse_counts(container._count_label.value)
+    counts = panel_counts(container)
     assert counts["Class_1"] == 4
     assert counts["Class_2"] == 4
 
@@ -228,7 +228,7 @@ def test_count_label_still_correct_after_run(viewer, tmp_path, monkeypatch):
 
 
 def test_count_updates_on_layer_selection_change(viewer):
-    """Switching the active layer triggers _update_count_label via selection_changed."""
+    """Switching the active layer triggers _update_counts via selection_changed."""
     layer1 = make_label_layer(viewer, name="Labels1", roi_id="site1")
     layer2 = make_label_layer(viewer, name="Labels2", roi_id="site2")
 
@@ -237,9 +237,9 @@ def test_count_updates_on_layer_selection_change(viewer):
 
     container = make_run_container(viewer)
 
-    # Switch active layer — selection_changed should fire _update_count_label
+    # Switch active layer — selection_changed should fire _update_counts
     viewer.layers.selection.active = layer1
-    counts_after_switch = parse_counts(container._count_label.value)
+    counts_after_switch = panel_counts(container)
 
     # Both layers are open, so both annotations should be visible
     assert counts_after_switch["Class_1"] == 1

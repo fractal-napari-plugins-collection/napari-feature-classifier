@@ -72,14 +72,37 @@ def get_colormap(matplotlib_colormap="Set1"):
 
 
 def reset_display_colormaps(
-    label_layer, feature_col, display_layer, label_column, cmap
+    label_layer,
+    feature_col,
+    display_layer,
+    label_column,
+    cmap=None,
+    color_resolver=None,
 ):
     """
     Reset the colormap based on the annotations in
-    label_layer.features['annotation'] and sends the updated colormap
-    to the annotation label layer.
+    label_layer.features[feature_col] and apply it to display_layer.
+
+    Either `cmap` or `color_resolver` must be provided.
+
+    Parameters
+    ----------
+    cmap : matplotlib colormap, optional
+        Used when color_resolver is None. Color = cmap(value / len(cmap.colors)).
+    color_resolver : Callable[[int], RGBA], optional
+        If provided, called with the integer annotation/prediction value to
+        return an RGBA tuple. Takes precedence over cmap.
     """
-    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
+    feature_values = label_layer.features[feature_col]
+    if color_resolver is not None:
+        colors = [
+            color_resolver(int(v))
+            if not (isinstance(v, float) and math.isnan(v))
+            else (0.0, 0.0, 0.0, 0.0)
+            for v in feature_values
+        ]
+    else:
+        colors = cmap(feature_values.astype(float) / len(cmap.colors))
     colordict = dict(zip(label_layer.features[label_column], colors, strict=False))
     colordict[None] = [0, 0, 0, 0]
     display_layer.colormap = DirectLabelColormap(color_dict=colordict)

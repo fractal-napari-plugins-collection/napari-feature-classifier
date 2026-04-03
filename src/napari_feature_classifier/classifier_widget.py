@@ -320,7 +320,10 @@ class ClassifierRunContainer(Container):
         self._annotator = LabelAnnotator(
             self._viewer,
             get_class_selection(class_names=self.class_names),
-            annotation_callbacks=[self._update_count_label],
+            annotation_callbacks=[self._update_counts],
+            class_colors=self._classifier._class_colors,
+            on_names_changed=self._on_class_names_changed,
+            on_colors_changed=self._on_class_colors_changed,
         )
 
         self._export_panel = ClassifierExportPanel(
@@ -332,13 +335,11 @@ class ClassifierRunContainer(Container):
         )
 
         self._run_button = PushButton(text="Run Classifier")
-        self._count_label = Label(value=self._get_annotation_counts())
 
         super().__init__(
             widgets=[
                 self._annotator,
                 self._run_button,
-                self._count_label,
                 self._export_panel,
             ]
         )
@@ -347,6 +348,8 @@ class ClassifierRunContainer(Container):
         self._viewer.layers.selection.active = self._last_selected_label_layer
         self._run_button.clicked.connect(self.run)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
+        # Initialise counts now that the panel is fully wired
+        self._update_counts()
 
     def run(self):
         """
@@ -368,7 +371,7 @@ class ClassifierRunContainer(Container):
             self._prediction_manager.setup(self._last_selected_label_layer)
             self._prediction_manager.set_visible(True)
             self._export_panel.save()
-            self._update_count_label()
+            self._update_counts()
 
     def selection_changed(self):
         """
@@ -380,12 +383,22 @@ class ClassifierRunContainer(Container):
             self._last_selected_label_layer = active
             self._prediction_manager.sync(active)
             self._export_panel.update_selected_layer(active)
-            self._update_count_label()
+            self._update_counts()
 
-    def _update_count_label(self) -> None:
-        self._count_label.value = self._get_annotation_counts()
+    def _on_class_names_changed(self, new_names: list[str]) -> None:
+        """Sync classifier class names when the user renames a class."""
+        self._classifier._class_names = list(new_names)
 
-    def _get_annotation_counts(self) -> str:
+    def _on_class_colors_changed(
+        self, class_index: int, rgba: tuple[float, float, float, float]
+    ) -> None:
+        """Persist color edits to the classifier so they survive save/load."""
+        self._classifier._class_colors[class_index] = rgba
+
+    def _update_counts(self) -> None:
+        self._annotator._class_selector.update_counts(self._get_annotation_counts())
+
+    def _get_annotation_counts(self) -> dict[str, int]:
         """
         Return per-class annotation counts merging live open layers with
         historical data from classifier._data (closed images included).
@@ -414,14 +427,13 @@ class ClassifierRunContainer(Container):
                 parts.append(closed)
 
         if not parts:
-            return ""
+            return {name: 0 for name in self._classifier.get_class_names()}
 
         counts = pd.concat(parts, ignore_index=True).dropna().value_counts()
-        lines = [
-            f"{name}: {int(counts.get(float(i + 1), 0))}"
+        return {
+            name: int(counts.get(float(i + 1), 0))
             for i, name in enumerate(self._classifier.get_class_names())
-        ]
-        return "\n".join(lines)
+        }
 
 
 class LoadClassifierContainer(Container):

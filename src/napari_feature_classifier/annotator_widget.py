@@ -5,7 +5,6 @@ from collections.abc import Callable, Sequence
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import cast
 
 # pylint: disable=R0801
 import napari
@@ -14,12 +13,12 @@ import napari.viewer
 import numpy as np
 import pandas as pd
 from magicgui.widgets import (
+    CheckBox,
     Container,
     FileEdit,
     Label,
+    LineEdit,
     PushButton,
-    RadioButtons,
-    create_widget,
 )
 
 # pylint: disable=R0801
@@ -75,6 +74,224 @@ def get_class_selection(
     return ClassSelection
 
 
+class ClassSelectorRow(Container):
+    """
+    One row in `ClassSelectorPanel`: radio toggle, editable name, color swatch, count.
+
+    Parameters
+    ----------
+    class_index : int
+        1-based class index (matches the numeric annotation value).
+    class_name : str
+        Initial display name for this class.
+    color : tuple[float, float, float, float]
+        RGBA float tuple for the initial swatch color.
+    on_select : Callable[[int], None]
+        Called with `class_index` when the radio button is toggled on.
+    on_color_changed : Callable[[int, tuple], None]
+        Called with `(class_index, rgba)` when the user picks a new color.
+    on_name_changed : Callable[[int, str], None]
+        Called with `(class_index, new_name)` when the name edit changes.
+    """
+
+    def __init__(
+        self,
+        class_index: int,
+        class_name: str,
+        color: tuple[float, float, float, float],
+        on_select: Callable[[int], None],
+        on_color_changed: Callable[[int, tuple], None],
+        on_name_changed: Callable[[int, str], None],
+    ):
+        self._class_index = class_index
+        self._color = color
+        self._on_select = on_select
+        self._on_color_changed = on_color_changed
+        self._on_name_changed = on_name_changed
+
+        self._radio = CheckBox(value=False, label="")
+        self._name_edit = LineEdit(value=class_name)
+        self._color_btn = PushButton(text="")
+        self._count_label = Label(value="0")
+
+        super().__init__(
+            widgets=[self._radio, self._name_edit, self._color_btn, self._count_label],
+            layout="horizontal",
+            labels=False,
+        )
+        self._apply_color_style(color)
+        self._radio.changed.connect(self._on_radio_changed)
+        self._name_edit.changed.connect(
+            lambda val: self._on_name_changed(self._class_index, val)
+        )
+        self._color_btn.clicked.connect(self._open_color_dialog)
+
+    def _on_radio_changed(self, value: bool) -> None:
+        if value:
+            self._on_select(self._class_index)
+
+    def _open_color_dialog(self) -> None:
+        from qtpy.QtWidgets import QColorDialog
+
+        r, g, b, a = (int(c * 255) for c in self._color)
+        initial = __import__("qtpy.QtGui", fromlist=["QColor"]).QColor(r, g, b, a)
+        color = QColorDialog.getColor(initial, options=QColorDialog.ShowAlphaChannel)
+        if color.isValid():
+            rgba = (
+                color.redF(),
+                color.greenF(),
+                color.blueF(),
+                color.alphaF(),
+            )
+            self.update_color(rgba)
+            self._on_color_changed(self._class_index, rgba)
+
+    def _apply_color_style(self, color: tuple[float, float, float, float]) -> None:
+        r, g, b, a = (int(c * 255) for c in color)
+        self._color_btn.native.setStyleSheet(
+            f"background-color: rgba({r},{g},{b},{a}); min-width: 20px; max-width: 20px;"
+        )
+
+    def select(self) -> None:
+        """Mark this row as selected without re-firing on_select."""
+        self._radio.changed.disconnect(self._on_radio_changed)
+        self._radio.value = True
+        self._radio.changed.connect(self._on_radio_changed)
+
+    def deselect(self) -> None:
+        """Mark this row as deselected without re-firing on_select."""
+        self._radio.changed.disconnect(self._on_radio_changed)
+        self._radio.value = False
+        self._radio.changed.connect(self._on_radio_changed)
+
+    def update_count(self, n: int) -> None:
+        self._count_label.value = str(n)
+
+    def update_color(self, color: tuple[float, float, float, float]) -> None:
+        self._color = color
+        self._apply_color_style(color)
+
+    @property
+    def class_name(self) -> str:
+        return self._name_edit.value
+
+
+class ClassSelectorPanel(Container):
+    """
+    Vertical panel of `ClassSelectorRow` widgets — one per class.
+
+    Replaces the magicgui `RadioButtons` widget in `LabelAnnotator`. Provides the
+    same `.value` property interface (returns an Enum member) so that `toggle_label()`
+    can still use `.value.value` to get the numeric annotation value.
+
+    Parameters
+    ----------
+    ClassSelection : Enum
+        The class selection enum (including NoClass at index 0).
+    class_colors : dict[int, tuple]
+        Per-class colors keyed by 1-based class index. Missing entries fall back
+        to the Set1 colormap.
+    on_names_changed : Callable[[list[str]], None]
+        Fired when any class name is edited. Receives the full new name list.
+    on_colors_changed : Callable[[int, tuple], None]
+        Fired when a color swatch is changed. Receives (class_index, rgba).
+    """
+
+    def __init__(
+        self,
+        ClassSelection,  # noqa: N803
+        class_colors: dict[int, tuple[float, float, float, float]] | None = None,
+        on_names_changed: Callable[[list[str]], None] | None = None,
+        on_colors_changed: Callable[[int, tuple], None] | None = None,
+    ):
+        self.ClassSelection = ClassSelection  # pylint: disable=C0103
+        self._class_colors = class_colors or {}
+        self._on_names_changed = on_names_changed or (lambda names: None)
+        self._on_colors_changed = on_colors_changed or (lambda idx, rgba: None)
+        self._selected_n = 1  # default: first real class (index 1 in __members__)
+        self._cmap = get_colormap()
+
+        # Build one row per class (skip NoClass at index 0)
+        members = list(ClassSelection.__members__.keys())  # [NoClass, Class_1, ...]
+        self._rows: list[ClassSelectorRow] = []
+        for i, name in enumerate(members[1:], start=1):
+            color = self._resolve_color(i)
+            row = ClassSelectorRow(
+                class_index=i,
+                class_name=name,
+                color=color,
+                on_select=self._on_row_selected,
+                on_color_changed=self._on_row_color_changed,
+                on_name_changed=self._on_row_name_changed,
+            )
+            self._rows.append(row)
+
+        super().__init__(widgets=self._rows, labels=False)
+        # Select the first class by default
+        if self._rows:
+            self._rows[0].select()
+
+    def _resolve_color(self, class_index: int) -> tuple[float, float, float, float]:
+        """Return the stored color for class_index, falling back to Set1."""
+        if class_index in self._class_colors:
+            return self._class_colors[class_index]
+        # Set1 fallback: normalize class_index into [0,1] for the colormap
+        return tuple(self._cmap(class_index / len(self._cmap.colors)))
+
+    def _on_row_selected(self, class_index: int) -> None:
+        self._selected_n = class_index
+        for row in self._rows:
+            if row._class_index != class_index:
+                row.deselect()
+
+    def _on_row_color_changed(
+        self, class_index: int, rgba: tuple[float, float, float, float]
+    ) -> None:
+        self._class_colors[class_index] = rgba
+        self._on_colors_changed(class_index, rgba)
+
+    def _on_row_name_changed(self, class_index: int, new_name: str) -> None:
+        # Rebuild ClassSelection Enum with updated names
+        new_names = [row.class_name for row in self._rows]
+        # Apply the edit (row's LineEdit already has the new value)
+        new_names[class_index - 1] = new_name
+        try:
+            self.ClassSelection = get_class_selection(class_names=new_names)
+        except AssertionError:
+            return  # Duplicate name — ignore until unique
+        self._on_names_changed(new_names)
+
+    @property
+    def value(self):
+        """Return the currently selected ClassSelection Enum member."""
+        members = list(self.ClassSelection.__members__.keys())
+        return self.ClassSelection[members[self._selected_n]]
+
+    def set_selected(self, n: int) -> None:
+        """
+        Select class by position in ClassSelection.__members__ (0 = NoClass).
+        n=0 deselects all rows; n=1..N selects the corresponding row.
+        """
+        self._selected_n = n
+        for row in self._rows:
+            if n > 0 and row._class_index == n:
+                row.select()
+            else:
+                row.deselect()
+
+    def update_counts(self, counts: dict[str, int]) -> None:
+        """Update the count label on each row."""
+        for row in self._rows:
+            name = row.class_name
+            row.update_count(counts.get(name, 0))
+
+    def get_color(self, class_index: int) -> tuple[float, float, float, float]:
+        """Return the current color for a 1-based class index."""
+        if 1 <= class_index <= len(self._rows):
+            return self._rows[class_index - 1]._color
+        return (0.0, 0.0, 0.0, 0.0)
+
+
 # pylint: disable=R0902
 class LabelAnnotator(Container):
     """
@@ -121,6 +338,9 @@ class LabelAnnotator(Container):
         viewer: napari.viewer.Viewer,
         ClassSelection=None,
         annotation_callbacks: list[Callable] | None = None,
+        class_colors: dict[int, tuple[float, float, float, float]] | None = None,
+        on_names_changed: Callable[[list[str]], None] | None = None,
+        on_colors_changed: Callable[[int, tuple], None] | None = None,
     ):
         if ClassSelection is None:
             ClassSelection = get_class_selection(n_classes=4)
@@ -142,18 +362,15 @@ class LabelAnnotator(Container):
                 self._viewer.layers.remove(layer)
         self.add_annotations_layer()
 
-        # Class selection
+        # Class selection panel (replaces RadioButtons)
         self.ClassSelection = ClassSelection  # pylint: disable=C0103
         self.nb_classes = len(self.ClassSelection) - 1
         self.cmap = get_colormap()
-        self._class_selector = cast(
-            RadioButtons,
-            create_widget(
-                label="Class Selection",
-                value=ClassSelection[list(ClassSelection.__members__.keys())[1]],
-                annotation=ClassSelection,
-                widget_type=RadioButtons,
-            ),
+        self._class_selector = ClassSelectorPanel(
+            ClassSelection=ClassSelection,
+            class_colors=class_colors,
+            on_names_changed=self._on_class_names_changed_internal(on_names_changed),
+            on_colors_changed=self._on_class_colors_changed_internal(on_colors_changed),
         )
         self._init_annotation(self._last_selected_label_layer)
         self._save_destination = FileEdit(
@@ -170,13 +387,39 @@ class LabelAnnotator(Container):
             ]
         )
         self._save_annotation.clicked.connect(self._on_save_clicked)
-        # TODO: Connect to the user clicking save in the file dialog. I can
-        # trigger an event that the user clicked the button to open the
-        # file dialog (see below), but don't get the info whether the user
-        # clicked confirm or cancel.
-        # self._save_destination.choose_btn.changed.connect(self.user_accepted)
         # Connect to label layer change, potentially call init
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
+
+    def _on_class_names_changed_internal(
+        self, external_cb: Callable[[list[str]], None] | None
+    ) -> Callable[[list[str]], None]:
+        """Return a callback that syncs ClassSelection on the annotator then calls external_cb."""
+
+        def _cb(new_names: list[str]) -> None:
+            self.ClassSelection = self._class_selector.ClassSelection
+            if external_cb:
+                external_cb(new_names)
+
+        return _cb
+
+    def _on_class_colors_changed_internal(
+        self, external_cb: Callable[[int, tuple], None] | None
+    ) -> Callable[[int, tuple], None]:
+        """Return a callback that updates the annotation colormap then calls external_cb."""
+
+        def _cb(class_index: int, rgba: tuple) -> None:
+            # Re-render the annotations layer with the new color
+            reset_display_colormaps(
+                self._last_selected_label_layer,
+                feature_col="annotations",
+                display_layer=self._annotations_layer,
+                label_column=self._label_column,
+                color_resolver=self._class_selector.get_color,
+            )
+            if external_cb:
+                external_cb(class_index, rgba)
+
+        return _cb
 
     def selection_changed(self, event):
         """
@@ -277,9 +520,7 @@ class LabelAnnotator(Container):
         )
 
     def set_class_n(self, event, n: int):  # pylint: disable=C0103
-        self._class_selector.value = self.ClassSelection[
-            list(self.ClassSelection.__members__)[n]
-        ]
+        self._class_selector.set_selected(n)
 
     def _init_annotation(self, label_layer: napari.layers.Labels):
         """
@@ -309,7 +550,7 @@ class LabelAnnotator(Container):
             feature_col="annotations",
             display_layer=self._annotations_layer,
             label_column=self._label_column,
-            cmap=self.cmap,
+            color_resolver=self._class_selector.get_color,
         )
         if self.toggle_label not in label_layer.mouse_drag_callbacks:
             label_layer.mouse_drag_callbacks.append(self.toggle_label)
@@ -340,15 +581,16 @@ class LabelAnnotator(Container):
         """
         from napari.utils.colormaps import DirectLabelColormap
 
-        color = self.cmap(
-            float(
-                label_layer.features.loc[
-                    label_layer.features[self._label_column] == label,
-                    "annotations",
-                ].iloc[0]
-            )
-            / len(self.cmap.colors)
-        )
+        annotation_val = label_layer.features.loc[
+            label_layer.features[self._label_column] == label,
+            "annotations",
+        ].iloc[0]
+        import math as _math
+
+        if isinstance(annotation_val, float) and _math.isnan(annotation_val):
+            color = (0.0, 0.0, 0.0, 0.0)
+        else:
+            color = self._class_selector.get_color(int(annotation_val))
         colordict = self._annotations_layer.colormap.color_dict
         colordict[label] = color
         self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)

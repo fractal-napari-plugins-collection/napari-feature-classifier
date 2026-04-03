@@ -76,6 +76,15 @@ class Classifier:
         # MultiIndex (issue: https://github.com/unionai-oss/pandera/issues/1049).
         # Can remove `self._schema.validate` call once fixed.
         self._data: pd.DataFrame = self._schema.validate(self._schema.example(0))
+        # Per-class colors: keys are 1-based class indices, values are RGBA float tuples.
+        # Empty dict means "use Set1 fallback". Persisted via pickle.
+        self._class_colors: dict[int, tuple[float, float, float, float]] = {}
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore state from pickle, adding defaults for attributes added in later versions."""
+        self.__dict__.update(state)
+        if "_class_colors" not in self.__dict__:
+            self._class_colors = {}
 
     # TODO: Add tests.
     def train(self):
