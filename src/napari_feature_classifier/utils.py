@@ -116,7 +116,7 @@ class NapariHandler(logging.Handler):
         napari_info(log_entry)
 
 
-def get_valid_label_layers(viewer) -> list[str]:
+def get_valid_label_layers(viewer) -> list[napari.layers.Labels]:
     """
     Get a list of label layers that are not `Annotations` or `Predictions`.
     """

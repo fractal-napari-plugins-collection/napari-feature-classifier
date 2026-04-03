@@ -318,7 +318,9 @@ class ClassifierRunContainer(Container):
         self._prediction_manager = PredictionLayerManager(self._viewer)
 
         self._annotator = LabelAnnotator(
-            self._viewer, get_class_selection(class_names=self.class_names)
+            self._viewer,
+            get_class_selection(class_names=self.class_names),
+            annotation_callbacks=[self._update_count_label],
         )
 
         self._export_panel = ClassifierExportPanel(
@@ -330,11 +332,13 @@ class ClassifierRunContainer(Container):
         )
 
         self._run_button = PushButton(text="Run Classifier")
+        self._count_label = Label(value=self._get_annotation_counts())
 
         super().__init__(
             widgets=[
                 self._annotator,
                 self._run_button,
+                self._count_label,
                 self._export_panel,
             ]
         )
@@ -364,6 +368,7 @@ class ClassifierRunContainer(Container):
             self._prediction_manager.setup(self._last_selected_label_layer)
             self._prediction_manager.set_visible(True)
             self._export_panel.save()
+            self._update_count_label()
 
     def selection_changed(self):
         """
@@ -375,6 +380,48 @@ class ClassifierRunContainer(Container):
             self._last_selected_label_layer = active
             self._prediction_manager.sync(active)
             self._export_panel.update_selected_layer(active)
+            self._update_count_label()
+
+    def _update_count_label(self) -> None:
+        self._count_label.value = self._get_annotation_counts()
+
+    def _get_annotation_counts(self) -> str:
+        """
+        Return per-class annotation counts merging live open layers with
+        historical data from classifier._data (closed images included).
+        """
+        # Collect live annotations from currently open label layers
+        open_roi_ids: dict[str, pd.Series] = {}
+        for layer in get_valid_label_layers(self._viewer):
+            if "annotations" not in layer.features.columns:
+                continue
+            if "roi_id" in layer.features.columns:
+                unique = layer.features["roi_id"].unique()
+                if len(unique) != 1:
+                    continue
+                roi_id = unique[0]
+            else:
+                roi_id = layer.name
+            open_roi_ids[roi_id] = layer.features["annotations"]
+
+        # Add historical annotations for roi_ids no longer open
+        parts = list(open_roi_ids.values())
+        if len(self._classifier._data) > 0:
+            clf_ann = self._classifier._data["annotations"]
+            clf_rois = self._classifier._data.index.get_level_values("roi_id")
+            closed = clf_ann[~clf_rois.isin(open_roi_ids)]
+            if len(closed):
+                parts.append(closed)
+
+        if not parts:
+            return ""
+
+        counts = pd.concat(parts, ignore_index=True).dropna().value_counts()
+        lines = [
+            f"{name}: {int(counts.get(float(i + 1), 0))}"
+            for i, name in enumerate(self._classifier.get_class_names())
+        ]
+        return "\n".join(lines)
 
 
 class LoadClassifierContainer(Container):

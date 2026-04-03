@@ -1,7 +1,7 @@
 """Annotator container widget for napari"""
 
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import Enum
 from functools import partial
 from pathlib import Path
@@ -120,10 +120,12 @@ class LabelAnnotator(Container):
         self,
         viewer: napari.viewer.Viewer,
         ClassSelection=None,
+        annotation_callbacks: list[Callable] | None = None,
     ):
         if ClassSelection is None:
             ClassSelection = get_class_selection(n_classes=4)
         self._viewer = viewer
+        self._annotation_callbacks: list[Callable] = annotation_callbacks or []
         self._label_column = "label"
 
         self._last_selected_label_layer = get_selected_or_valid_label_layer(
@@ -246,6 +248,8 @@ class LabelAnnotator(Container):
 
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
+        for cb in self._annotation_callbacks:
+            cb()
 
     @staticmethod
     def get_scaled_position(
