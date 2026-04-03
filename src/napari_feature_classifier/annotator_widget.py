@@ -15,7 +15,6 @@ import pandas as pd
 from magicgui.widgets import (
     CheckBox,
     Container,
-    FileEdit,
     Label,
     LineEdit,
     PushButton,
@@ -28,7 +27,6 @@ from napari_feature_classifier.utils import (
     get_selected_or_valid_label_layer,
     get_valid_label_layers,
     napari_info,
-    overwrite_check_passed,
     reset_display_colormaps,
 )
 
@@ -299,6 +297,45 @@ class ClassSelectorPanel(Container):
         return (0.0, 0.0, 0.0, 0.0)
 
 
+class CollapsibleSection(Container):
+    """
+    A container with a toggle button that shows/hides its contents.
+
+    Parameters
+    ----------
+    title : str
+        Label shown on the toggle button.
+    widgets : list
+        Child widgets to show/hide.
+    collapsed : bool
+        Whether to start collapsed (default True).
+    """
+
+    def __init__(self, title: str, widgets: list, collapsed: bool = True):
+        self._title = title
+        self._expanded = not collapsed
+        self._inner = Container(widgets=widgets, labels=False)
+        arrow = "▼" if self._expanded else "▶"
+        self._toggle_btn = PushButton(text=f"{arrow} {title}")
+        super().__init__(widgets=[self._toggle_btn, self._inner], labels=False)
+        self._toggle_btn.native.setStyleSheet(
+            "QPushButton { border: none; background: transparent; "
+            "text-align: left; padding: 2px 0px; font-weight: bold; }"
+            "QPushButton:hover { text-decoration: underline; }"
+        )
+        self._toggle_btn.clicked.connect(self._toggle)
+        if collapsed:
+            self._inner.native.hide()
+
+    def _toggle(self) -> None:
+        self._expanded = not self._expanded
+        self._toggle_btn.text = f"{'▼' if self._expanded else '▶'} {self._title}"
+        if self._expanded:
+            self._inner.native.show()
+        else:
+            self._inner.native.hide()
+
+
 # pylint: disable=R0902
 class LabelAnnotator(Container):
     """
@@ -380,17 +417,17 @@ class LabelAnnotator(Container):
             on_colors_changed=self._on_class_colors_changed_internal(on_colors_changed),
         )
         self._init_annotation(self._last_selected_label_layer)
-        self._save_destination = FileEdit(
-            label="Save Path", value="annotation.csv", mode="w"
-        )
-        self._save_annotation = PushButton(label="Save Annotations")
+        self._save_path = Path("annotation.csv")
+        self._save_annotation = PushButton(text="Save Annotations…")
         self._update_save_destination(self._last_selected_label_layer)
+        self._save_section = CollapsibleSection(
+            "Save Annotations", [self._save_annotation], collapsed=True
+        )
         super().__init__(
             widgets=[
                 self.last_selected_layer_label,
                 self._class_selector,
-                self._save_destination,
-                self._save_annotation,
+                self._save_section,
             ]
         )
         self._save_annotation.clicked.connect(self._on_save_clicked)
@@ -440,8 +477,7 @@ class LabelAnnotator(Container):
                 viewer=self._viewer
             ):
                 self._init_annotation(self._viewer.layers.selection.active)
-                self._save_annotation.enabled = True
-                self._save_destination.enabled = True
+                self._save_section.enabled = True
                 self._class_selector.enabled = True
                 self.last_selected_layer_label.value = (
                     self._viewer.layers.selection.active
@@ -449,12 +485,10 @@ class LabelAnnotator(Container):
                 self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._update_save_destination(self._last_selected_label_layer)
             else:
-                self._save_annotation.enabled = False
-                self._save_destination.enabled = False
+                self._save_section.enabled = False
                 self._class_selector.enabled = False
         else:
-            self._save_annotation.enabled = False
-            self._save_destination.enabled = False
+            self._save_section.enabled = False
             self._class_selector.enabled = False
 
     def add_annotations_layer(self):
@@ -570,12 +604,11 @@ class LabelAnnotator(Container):
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
         """
-        Update the default save destination to the name of the label layer.
-        If a base_path was already set, keep it on that base path.
-
+        Update the default save path to the name of the label layer.
+        If a base path was already set, keep it.
         """
-        base_path = Path(self._save_destination.value).parent
-        self._save_destination.value = base_path / f"{label_layer.name}_annotation.csv"
+        base_path = self._save_path.parent
+        self._save_path = base_path / f"{label_layer.name}_annotation.csv"
 
     def update_single_color(self, label_layer, label):
         """
@@ -605,13 +638,19 @@ class LabelAnnotator(Container):
 
     def _on_save_clicked(self):
         """
-        Save annotations to a csv file.
+        Open a Save As dialog and write annotations to the chosen CSV file.
         """
-        # Check whether annotations should be overwritten.
-        if not overwrite_check_passed(
-            file_path=self._save_destination.value, output_type="annotation export"
-        ):
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            None,
+            "Save Annotations",
+            str(self._save_path),
+            "CSV files (*.csv);;All files (*)",
+        )
+        if not path:
             return
+        self._save_path = Path(path)
 
         annotations = self._last_selected_label_layer.features.loc[
             :, [self._label_column, "annotations"]
@@ -621,5 +660,5 @@ class LabelAnnotator(Container):
             df=pd.DataFrame(annotations), ClassSelection=self.ClassSelection
         )
 
-        df.to_csv(self._save_destination.value)
-        napari_info(f"Annotations were saved at {self._save_destination.value}")
+        df.to_csv(self._save_path)
+        napari_info(f"Annotations were saved at {self._save_path}")

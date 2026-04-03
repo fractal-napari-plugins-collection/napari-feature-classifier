@@ -19,6 +19,7 @@ from magicgui.widgets import (
 
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
+    CollapsibleSection,
     LabelAnnotator,
     get_class_selection,
 )
@@ -178,56 +179,42 @@ class ClassifierExportPanel(Container):
         self._label_column = label_column
         self.auto_save = auto_save
 
-        self._save_destination = FileEdit(
-            label="Classifier Save Path",
-            value=f"{initial_layer}_classifier.clf",
-            mode="w",
+        self._save_path = Path(
+            classifier_save_path or f"{initial_layer}_classifier.clf"
         )
-        if classifier_save_path:
-            self._save_destination.value = classifier_save_path
-        self._save_button = PushButton(text="Save Classifier")
+        self._export_path = Path(f"{initial_layer}_predictions.csv")
 
-        self._export_destination = FileEdit(
-            label="Prediction Export Path",
-            value=f"{initial_layer}_predictions.csv",
-            mode="w",
-        )
-        self._export_button = PushButton(text="Export Classifier Result")
+        self._save_button = PushButton(text="Save Classifier As…")
+        self._export_button = PushButton(text="Export Results As…")
 
-        super().__init__(
-            widgets=[
-                self._save_destination,
-                self._save_button,
-                self._export_destination,
-                self._export_button,
-            ]
+        self._saving_section = CollapsibleSection(
+            "Saving & Export",
+            [self._save_button, self._export_button],
+            collapsed=True,
         )
-        self._save_button.clicked.connect(self.save)
-        self._export_button.clicked.connect(self.export_results)
+
+        super().__init__(widgets=[self._saving_section])
+        self._save_button.clicked.connect(self._on_save_as_clicked)
+        self._export_button.clicked.connect(self._on_export_clicked)
 
     def update_selected_layer(self, label_layer: napari.layers.Labels) -> None:
-        """Update the tracked layer and refresh the export destination path."""
+        """Update the tracked layer and refresh the export path."""
         self._last_selected_label_layer = label_layer
         self._update_export_destination(label_layer)
 
     def save(self) -> None:
-        """Save the classifier, handling overwrite confirmation."""
+        """Save the classifier to _save_path, with overwrite check on first save."""
         if not self.auto_save:
             if not overwrite_check_passed(
-                file_path=self._save_destination.value, output_type="classifier"
+                file_path=self._save_path, output_type="classifier"
             ):
                 return
         self.auto_save = True
-        output_path = Path(self._save_destination.value)
-        self._classifier.save(output_path)
+        self._classifier.save(self._save_path)
+        napari_info(f"Classifier saved at {self._save_path}")
 
     def export_results(self) -> None:
         """Export classifier predictions for the currently selected layer."""
-        if not overwrite_check_passed(
-            file_path=self._export_destination.value, output_type="predictions"
-        ):
-            return
-
         predictions = self._last_selected_label_layer.features.loc[
             :, [self._label_column, "prediction", "annotations"]
         ]
@@ -236,15 +223,45 @@ class ClassifierExportPanel(Container):
             df=pd.DataFrame(predictions),
             ClassSelection=self._annotator.ClassSelection,
         )
-        df.to_csv(self._export_destination.value)
-        napari_info(f"Annotations were saved at {self._export_destination.value}")
+        df.to_csv(self._export_path)
+        napari_info(f"Annotations were saved at {self._export_path}")
+
+    def _on_save_as_clicked(self) -> None:
+        """Open a Save As dialog and save the classifier to the chosen path."""
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            None,
+            "Save Classifier",
+            str(self._save_path),
+            "Classifier files (*.clf);;All files (*)",
+        )
+        if not path:
+            return
+        self._save_path = Path(path)
+        self.auto_save = True
+        self._classifier.save(self._save_path)
+        napari_info(f"Classifier saved at {self._save_path}")
+
+    def _on_export_clicked(self) -> None:
+        """Open a Save As dialog and export predictions to the chosen path."""
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            None,
+            "Export Results",
+            str(self._export_path),
+            "CSV files (*.csv);;All files (*)",
+        )
+        if not path:
+            return
+        self._export_path = Path(path)
+        self.export_results()
 
     def _update_export_destination(self, label_layer: napari.layers.Labels) -> None:
         """Update the default export path to match the selected layer name."""
-        base_path = Path(self._export_destination.value).parent
-        self._export_destination.value = (
-            base_path / f"{label_layer.name}_predictions.csv"
-        )
+        base_path = self._export_path.parent
+        self._export_path = base_path / f"{label_layer.name}_predictions.csv"
 
 
 class ClassifierRunContainer(Container):

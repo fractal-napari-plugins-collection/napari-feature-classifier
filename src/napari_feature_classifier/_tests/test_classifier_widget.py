@@ -131,9 +131,7 @@ def test_prediction_export(make_napari_viewer, capsys):
 
     # Test result export
     classifier_widget._run_container._export_panel.export_results()
-    df = pd.read_csv(
-        classifier_widget._run_container._export_panel._export_destination.value
-    )
+    df = pd.read_csv(classifier_widget._run_container._export_panel._export_path)
     assert df.shape == (16, 5)
     assert df["prediction"].isna().sum() == 0
 
@@ -214,7 +212,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels_2"
     )
     assert (
-        str(classifier_widget._run_container._export_panel._export_destination.value)
+        str(classifier_widget._run_container._export_panel._export_path)
         == "test_labels_2_predictions.csv"
     )
     viewer.layers.selection.active = label_layer1
@@ -223,7 +221,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels"
     )
     assert (
-        classifier_widget._run_container._export_panel._export_destination.value.name
+        classifier_widget._run_container._export_panel._export_path.name
         == "test_labels_predictions.csv"
     )
 
