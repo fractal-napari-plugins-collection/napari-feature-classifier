@@ -119,6 +119,11 @@ class ClassSelectorRow(Container):
             layout="horizontal",
             labels=False,
         )
+        # Uniform layout spacing so color swatches line up across rows
+        self.native.layout().setContentsMargins(2, 1, 2, 1)
+        self.native.layout().setSpacing(4)
+        # Fixed-width count label so it doesn't shift the color swatch
+        self._count_label.native.setFixedWidth(32)
         self._apply_color_style(color)
         self._radio.changed.connect(self._on_radio_changed)
         self._name_edit.changed.connect(
@@ -226,7 +231,9 @@ class ClassSelectorPanel(Container):
             )
             self._rows.append(row)
 
-        super().__init__(widgets=self._rows, labels=False)
+        self._no_class_btn = PushButton(text="No Class")
+        super().__init__(widgets=[self._no_class_btn, *self._rows], labels=False)
+        self._no_class_btn.clicked.connect(lambda: self.set_selected(0))
         # Select the first class by default
         if self._rows:
             self._rows[0].select()

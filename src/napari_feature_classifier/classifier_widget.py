@@ -326,6 +326,11 @@ class ClassifierRunContainer(Container):
             on_colors_changed=self._on_class_colors_changed,
         )
 
+        # Wire per-class colors into the prediction layer renderer
+        self._prediction_manager._color_resolver = (
+            self._annotator._class_selector.get_color
+        )
+
         self._export_panel = ClassifierExportPanel(
             classifier=self._classifier,
             annotator=self._annotator,
@@ -392,8 +397,13 @@ class ClassifierRunContainer(Container):
     def _on_class_colors_changed(
         self, class_index: int, rgba: tuple[float, float, float, float]
     ) -> None:
-        """Persist color edits to the classifier so they survive save/load."""
+        """Persist color edits to the classifier and refresh the prediction layer."""
         self._classifier._class_colors[class_index] = rgba
+        # Re-render the prediction layer with the updated color
+        try:
+            self._prediction_manager.sync(self._last_selected_label_layer)
+        except RuntimeError:
+            pass  # prediction layer not yet set up
 
     def _update_counts(self) -> None:
         self._annotator._class_selector.update_counts(self._get_annotation_counts())

@@ -4,6 +4,8 @@ These classes have no Qt dependency and can be unit-tested with a headless
 napari viewer.
 """
 
+from collections.abc import Callable
+
 import napari
 import napari.layers
 import napari.viewer
@@ -209,6 +211,9 @@ class PredictionLayerManager:
         self._viewer = viewer
         self._label_column = label_column
         self._prediction_layer: napari.layers.Labels | None = None
+        # Optional per-class color resolver; None = use Set1 colormap fallback.
+        # Set by ClassifierRunContainer after constructing the annotator.
+        self._color_resolver: Callable[[int], tuple] | None = None
 
         # Remove any stale Predictions layer left from a previous session
         for layer in list(self._viewer.layers):
@@ -299,13 +304,22 @@ class PredictionLayerManager:
             reset_display_colormaps,
         )
 
-        reset_display_colormaps(
-            label_layer,
-            feature_col="prediction",
-            display_layer=self.prediction_layer,
-            label_column=self._label_column,
-            cmap=get_colormap(),
-        )
+        if self._color_resolver is not None:
+            reset_display_colormaps(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self.prediction_layer,
+                label_column=self._label_column,
+                color_resolver=self._color_resolver,
+            )
+        else:
+            reset_display_colormaps(
+                label_layer,
+                feature_col="prediction",
+                display_layer=self.prediction_layer,
+                label_column=self._label_column,
+                cmap=get_colormap(),
+            )
 
     def _reorder_layers(self, reference_layer: napari.layers.Labels) -> None:
         """Ensure Predictions, Annotations, and reference layer are ordered correctly."""
