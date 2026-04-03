@@ -1,4 +1,5 @@
 """Annotator init widget for napari"""
+
 import napari
 import napari.layers
 import napari.viewer
@@ -15,26 +16,36 @@ class LabelAnnotatorTextSelector(Container):
     The `LabelAnnotatorTextSelector` container is a helper container for the
     label annotator where the user can name the classes to be annotated.
 
-    Paramters
-    ---------
+    Starts with `default_n_classes` pre-filled boxes. Additional classes can
+    be added one at a time via the "Add Class" button, up to MAX_CLASSES.
+
+    Parameters
+    ----------
     default_n_classes: int
-        The number of classes to display. Defaults to 5.
+        The number of pre-filled class boxes to show on init. Defaults to 2.
     """
 
     MAX_CLASSES: int = 9
 
-    def __init__(self, default_n_classes=5):
-        default_line_edits = [
+    def __init__(self, default_n_classes=2):
+        self._text_edits: list[LineEdit] = [
             LineEdit(value=f"Class_{i + 1}", nullable=True)
             for i in range(default_n_classes)
         ]
-        empty_line_edits = [
-            LineEdit(nullable=True) for i in range(self.MAX_CLASSES - default_n_classes)
-        ]
+        self._add_button = PushButton(text="Add Class")
+        super().__init__(widgets=[*self._text_edits, self._add_button])
+        self._add_button.clicked.connect(self._add_class)
 
-        self._text_edits = tuple([*default_line_edits, *empty_line_edits])
-
-        super().__init__(widgets=[*self._text_edits])
+    def _add_class(self) -> None:
+        """Append a new empty LineEdit before the Add Class button, up to MAX_CLASSES."""
+        if len(self._text_edits) >= self.MAX_CLASSES:
+            return
+        new_edit = LineEdit(nullable=True)
+        self._text_edits.append(new_edit)
+        # Insert before the Add Class button (last widget)
+        self.insert(len(self) - 1, new_edit)
+        if len(self._text_edits) >= self.MAX_CLASSES:
+            self._add_button.enabled = False
 
     def get_class_names(self):
         class_names = [e.value for e in self._text_edits if e.value != ""]
@@ -51,10 +62,10 @@ class InitializeLabelAnnotatorWidget(Container):
     viewer: napari.Viewer
         The current napari.Viewer instance
     default_n_classes: int
-        The number of classes to display. Defaults to 5.
+        The number of classes to display. Defaults to 2.
     """
 
-    def __init__(self, viewer: napari.viewer.Viewer, default_n_classes=5):
+    def __init__(self, viewer: napari.viewer.Viewer, default_n_classes=2):
         self.viewer = viewer
         self.label_class_container = LabelAnnotatorTextSelector(default_n_classes)
         self._init_button = PushButton(label="Initialize")

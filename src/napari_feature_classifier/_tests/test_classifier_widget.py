@@ -79,7 +79,7 @@ def test_running_classification_through_widget(features, make_napari_viewer):
     # Add some annotations manually
     label_layer.features.loc[0, "annotations"] = 1.0
     label_layer.features.loc[1, "annotations"] = 1.0
-    label_layer.features.loc[3, "annotations"] = 3.0
+    label_layer.features.loc[3, "annotations"] = 2.0
 
     # Run the classifier
     classifier_widget._run_container.run()
@@ -124,7 +124,7 @@ def test_prediction_export(make_napari_viewer, capsys):
     # Add some annotations manually
     label_layer.features.loc[0, "annotations"] = 1.0
     label_layer.features.loc[1, "annotations"] = 1.0
-    label_layer.features.loc[3, "annotations"] = 3.0
+    label_layer.features.loc[3, "annotations"] = 2.0
 
     # Run the classifier
     classifier_widget._run_container.run()
