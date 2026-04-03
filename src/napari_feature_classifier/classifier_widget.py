@@ -356,11 +356,33 @@ class ClassifierRunContainer(Container):
             auto_save=auto_save or False,
         )
 
+        feature_names = self._classifier.get_feature_names()
+        self._feature_list = Select(
+            choices=feature_names,
+            value=feature_names,
+            allow_multiple=True,
+            label="",
+        )
+        # Make read-only at the Qt level: no selection, no focus, no interaction.
+        # Do NOT use .enabled = False — that propagates through magicgui's container
+        # chain and disables the whole plugin.
+        from qtpy.QtCore import Qt
+        from qtpy.QtWidgets import QAbstractItemView
+
+        self._feature_list.native.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+        self._feature_list.native.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._feature_section = CollapsibleSection(
+            "Features", [self._feature_list], collapsed=True
+        )
+
         self._run_button = PushButton(text="Run Classifier")
 
         super().__init__(
             widgets=[
                 self._annotator,
+                self._feature_section,
                 self._run_button,
                 self._export_panel,
             ]
