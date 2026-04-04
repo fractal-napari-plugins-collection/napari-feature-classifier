@@ -9,7 +9,7 @@
 
 An interactive classifier plugin for napari that lets you annotate objects in a label image and train a random forest classifier to generalize those annotations across all objects — without leaving the viewer.
 
-[SCREENSHOT: overview animation or side-by-side of annotating + predictions appearing]
+![napari-feature-classifier](https://github.com/user-attachments/assets/e1a3156a-bc78-442e-9294-f81aba503ee4)
 
 ## When to use this
 
@@ -39,7 +39,8 @@ Your feature table must have:
 
 Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
-[SCREENSHOT: init widget — feature list, class name fields]
+<img width="1694" height="1088" alt="classifier_init" src="https://github.com/user-attachments/assets/05a2495a-b7fd-40be-bd9c-607177c0aa68" />
+
 
 - Select the features to use for training. Hold Cmd/Ctrl to select multiple. The feature list reflects the currently selected label layer.
 - Name your classes (e.g. "Mitotic", "Interphase"). Classes without a name won't be created.
@@ -49,7 +50,8 @@ Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
 ### 3. Annotate and train
 
-[SCREENSHOT: classifier widget open, annotations layer visible with colored objects, count display showing per-class annotation counts]
+<img width="1694" height="1088" alt="classifier_annotation" src="https://github.com/user-attachments/assets/25a9c90a-0d58-4fc2-92df-9006cdae00aa" />
+
 
 - Select your label layer in the napari layer list.
 - Pick a class using the panel buttons or keyboard shortcuts (keys **1–9** for classes, **0** to deselect).
@@ -59,7 +61,7 @@ Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
 The classifier splits your annotations 80/20 into training and test sets, trains a random forest, and applies it to all objects. Predictions appear as a color-coded **Predictions** layer.
 
-[SCREENSHOT: predictions layer showing colored classification result]
+<img width="1694" height="1088" alt="classifier-predict" src="https://github.com/user-attachments/assets/273d696f-669f-4d01-88e4-e74e204a066d" />
 
 Correct mistakes the classifier made and click Run Classifier again to improve it. Iterative annotation is the intended workflow.
 
@@ -69,8 +71,6 @@ After each run, the classifier auto-saves to a `.clf` file named after the label
 
 To resume work or apply a trained classifier to new images:
 `Plugins → napari-feature-classifier → Load Classifier`
-
-[SCREENSHOT: load classifier widget]
 
 Select the `.clf` file, make sure your label layers with features are already open, and click **Load Classifier**. 
 
@@ -84,16 +84,17 @@ The exported CSV contains:
 - `annotations` — your manual annotations (NaN = not annotated, −1 = explicitly deselected, 1–N = class)
 - One column per annotation class name
 
-[SCREENSHOT: Export button in the collapsed Saving & Export panel]
+<img width="317" height="137" alt="classifier-save" src="https://github.com/user-attachments/assets/62236f0d-7cc5-4760-8158-efe65e52109a" />
+
 
 ### 6. Standalone annotator
 
 You can use the annotation tool independently from the classifier:
 `Plugins → napari-feature-classifier → Annotator`
 
-[SCREENSHOT: standalone annotator with class rows visible]
-
 Name up to 9 classes, click **Initialize**, then annotate as above. Annotations are stored in `layer.features["annotations"]` and can be saved to CSV via **▶ Save Annotations**.
+
+<img width="322" height="239" alt="annotator" src="https://github.com/user-attachments/assets/05c3bebc-3d9c-4a78-bfde-b821e8f565cc" />
 
 ### Batch / scripted use
 
