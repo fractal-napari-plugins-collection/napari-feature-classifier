@@ -193,7 +193,8 @@ class ClassifierExportPanel(Container):
             collapsed=True,
         )
 
-        super().__init__(widgets=[self._saving_section])
+        super().__init__(widgets=[self._saving_section], labels=False)
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._save_button.clicked.connect(self._on_save_as_clicked)
         self._export_button.clicked.connect(self._on_export_clicked)
 
@@ -266,7 +267,7 @@ class ClassifierExportPanel(Container):
 
 class ClassifierRunContainer(Container):
     """
-    Thin coordinator widget that wires together the annotator, classifier
+    Coordinator widget that wires together the annotator, classifier
     runner, prediction layer manager, and export panel.
 
     The `ClassifierRunContainer` can be initialized with either an existing
@@ -385,8 +386,10 @@ class ClassifierRunContainer(Container):
                 self._feature_section,
                 self._run_button,
                 self._export_panel,
-            ]
+            ],
+            labels=False,
         )
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._prediction_manager.setup(self._last_selected_label_layer)
         # Restore any stored annotations for the initially selected layer
         self._restore_annotations(self._last_selected_label_layer)

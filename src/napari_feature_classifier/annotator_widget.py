@@ -396,8 +396,13 @@ class LabelAnnotator(Container):
             viewer=self._viewer
         )
 
+        layer_name = (
+            str(self._last_selected_label_layer)
+            if self._last_selected_label_layer
+            else "None"
+        )
         self.last_selected_layer_label = Label(
-            label="Last selected label layer:", value=self._last_selected_label_layer
+            value=f"Last selected label layer: {layer_name}"
         )
 
         # Handle existing predictions layer
@@ -428,8 +433,10 @@ class LabelAnnotator(Container):
                 self.last_selected_layer_label,
                 self._class_selector,
                 self._save_section,
-            ]
+            ],
+            labels=False,
         )
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._save_annotation.clicked.connect(self._on_save_clicked)
         # Connect to label layer change, potentially call init
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
@@ -480,7 +487,7 @@ class LabelAnnotator(Container):
                 self._save_section.enabled = True
                 self._class_selector.enabled = True
                 self.last_selected_layer_label.value = (
-                    self._viewer.layers.selection.active
+                    f"Last selected label layer: {self._viewer.layers.selection.active}"
                 )
                 self._last_selected_label_layer = self._viewer.layers.selection.active
                 self._update_save_destination(self._last_selected_label_layer)
