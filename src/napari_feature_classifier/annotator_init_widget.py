@@ -33,7 +33,8 @@ class LabelAnnotatorTextSelector(Container):
             for i in range(default_n_classes)
         ]
         self._add_button = PushButton(text="Add Class")
-        super().__init__(widgets=[*self._text_edits, self._add_button])
+        super().__init__(widgets=[*self._text_edits, self._add_button], labels=False)
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._add_button.clicked.connect(self._add_class)
 
     def _add_class(self) -> None:

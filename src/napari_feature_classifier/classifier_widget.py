@@ -80,14 +80,18 @@ class ClassifierInitContainer(Container):
             )
         except NotImplementedError:
             self._last_selected_label_layer = None
-        # TODO: Make this label left-aligned, not centered
+        layer_name = (
+            str(self._last_selected_label_layer)
+            if self._last_selected_label_layer
+            else "None"
+        )
         self.last_selected_layer_label = Label(
-            label="Selecting features from:", value=self._last_selected_label_layer
+            value=f"Select features from: {layer_name}"
         )
         self._feature_combobox = Select(
             choices=self.get_feature_options(self._last_selected_label_layer),
             allow_multiple=True,
-            label="Feature Selection:",
+            label="",
         )
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         # pylint: disable=W0212
@@ -98,8 +102,10 @@ class ClassifierInitContainer(Container):
                 self._feature_combobox,
                 self._annotation_name_selector,
                 self._initialize_button,
-            ]
+            ],
+            labels=False,
         )
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._viewer.layers.selection.events.changed.connect(
             self.update_layer_selection
         )
@@ -134,7 +140,9 @@ class ClassifierInitContainer(Container):
         """
         if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
             self._last_selected_label_layer = self._viewer.layers.selection.active
-            self.last_selected_layer_label.value = self._last_selected_label_layer
+            self.last_selected_layer_label.value = (
+                f"Select features from: {self._last_selected_label_layer}"
+            )
             self._feature_combobox.choices = self.get_feature_options(
                 self._last_selected_label_layer
             )
