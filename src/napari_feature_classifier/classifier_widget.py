@@ -1,41 +1,40 @@
 """Classifier container widget for napari"""
+
 import logging
 import pickle
-
-from packaging import version
 from pathlib import Path
-from typing import Optional
 
 import napari
 import napari.layers
 import napari.viewer
-import numpy as np
 import pandas as pd
 from magicgui.widgets import (
     Container,
-    Label,
     FileEdit,
-    RadioButtons,
+    Label,
     PushButton,
+    RadioButtons,
     Select,
 )
 
 from napari_feature_classifier.annotator_init_widget import LabelAnnotatorTextSelector
 from napari_feature_classifier.annotator_widget import (
+    CollapsibleSection,
     LabelAnnotator,
     get_class_selection,
 )
 from napari_feature_classifier.classifier import Classifier
+from napari_feature_classifier.classifier_runner import (
+    ClassifierRunner,
+    PredictionLayerManager,
+)
 from napari_feature_classifier.utils import (
-    get_colormap,
-    reset_display_colormaps_modern,
-    reset_display_colormaps_legacy,
-    get_valid_label_layers,
+    NapariHandler,
+    add_annotation_names,
     get_selected_or_valid_label_layer,
+    get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
-    add_annotation_names,
-    NapariHandler,
 )
 
 
@@ -81,14 +80,18 @@ class ClassifierInitContainer(Container):
             )
         except NotImplementedError:
             self._last_selected_label_layer = None
-        # TODO: Make this label left-aligned, not centered
+        layer_name = (
+            str(self._last_selected_label_layer)
+            if self._last_selected_label_layer
+            else "None"
+        )
         self.last_selected_layer_label = Label(
-            label="Selecting features from:", value=self._last_selected_label_layer
+            value=f"Select features from: {layer_name}"
         )
         self._feature_combobox = Select(
             choices=self.get_feature_options(self._last_selected_label_layer),
             allow_multiple=True,
-            label="Feature Selection:",
+            label="",
         )
         self._annotation_name_selector = LabelAnnotatorTextSelector()
         # pylint: disable=W0212
@@ -99,11 +102,22 @@ class ClassifierInitContainer(Container):
                 self._feature_combobox,
                 self._annotation_name_selector,
                 self._initialize_button,
-            ]
+            ],
+            labels=False,
         )
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._viewer.layers.selection.events.changed.connect(
             self.update_layer_selection
         )
+        self.native.destroyed.connect(self.close)
+
+    def close(self) -> None:
+        try:
+            self._viewer.layers.selection.events.changed.disconnect(
+                self.update_layer_selection
+            )
+        except (ValueError, RuntimeError):
+            pass
 
     def get_selected_features(self):
         """
@@ -135,7 +149,9 @@ class ClassifierInitContainer(Container):
         """
         if isinstance(self._viewer.layers.selection.active, napari.layers.Labels):
             self._last_selected_label_layer = self._viewer.layers.selection.active
-            self.last_selected_layer_label.value = self._last_selected_label_layer
+            self.last_selected_layer_label.value = (
+                f"Select features from: {self._last_selected_label_layer}"
+            )
             self._feature_combobox.choices = self.get_feature_options(
                 self._last_selected_label_layer
             )
@@ -145,81 +161,172 @@ class ClassifierInitContainer(Container):
             )
 
 
-# pylint: disable=R0902
+class ClassifierExportPanel(Container):
+    """
+    Owns the save and export UI for a trained classifier.
+
+    Parameters
+    ----------
+    classifier: Classifier
+        The classifier to save.
+    annotator: LabelAnnotator
+        Used to resolve class names when exporting predictions.
+    initial_layer: napari.layers.Labels
+        The initially selected label layer (used for default file names).
+    classifier_save_path: Optional[str]
+        Pre-filled save path for the classifier file.
+    auto_save: bool
+        If True, skip overwrite confirmation on save.
+    label_column: str
+        Column name for object labels in layer.features.
+    """
+
+    def __init__(
+        self,
+        classifier: Classifier,
+        annotator: "LabelAnnotator",
+        initial_layer: napari.layers.Labels,
+        classifier_save_path: str | None = None,
+        auto_save: bool = False,
+        label_column: str = "label",
+    ):
+        self._classifier = classifier
+        self._annotator = annotator
+        self._last_selected_label_layer = initial_layer
+        self._label_column = label_column
+        self.auto_save = auto_save
+
+        self._save_path = Path(
+            classifier_save_path or f"{initial_layer}_classifier.clf"
+        )
+        self._export_path = Path(f"{initial_layer}_predictions.csv")
+
+        self._save_button = PushButton(text="Save Classifier As…")
+        self._export_button = PushButton(text="Export Results As…")
+
+        self._saving_section = CollapsibleSection(
+            "Saving & Export",
+            [self._save_button, self._export_button],
+            collapsed=True,
+        )
+
+        super().__init__(widgets=[self._saving_section], labels=False)
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
+        self._save_button.clicked.connect(self._on_save_as_clicked)
+        self._export_button.clicked.connect(self._on_export_clicked)
+
+    def update_selected_layer(self, label_layer: napari.layers.Labels) -> None:
+        """Update the tracked layer and refresh the export path."""
+        self._last_selected_label_layer = label_layer
+        self._update_export_destination(label_layer)
+
+    def save(self) -> None:
+        """Save the classifier to _save_path, with overwrite check on first save."""
+        if not self.auto_save:
+            if not overwrite_check_passed(
+                file_path=self._save_path, output_type="classifier"
+            ):
+                return
+        self.auto_save = True
+        self._classifier.save(self._save_path)
+        napari_info(f"Classifier saved at {self._save_path}")
+
+    def export_results(self) -> None:
+        """Export classifier predictions for the currently selected layer."""
+        predictions = self._last_selected_label_layer.features.loc[
+            :, [self._label_column, "prediction", "annotations"]
+        ]
+        # pylint: disable=C0103
+        df = add_annotation_names(
+            df=pd.DataFrame(predictions),
+            ClassSelection=self._annotator.ClassSelection,
+        )
+        df.to_csv(self._export_path)
+        napari_info(f"Annotations were saved at {self._export_path}")
+
+    def _on_save_as_clicked(self) -> None:
+        """Open a Save As dialog and save the classifier to the chosen path."""
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
+            None,
+            "Save Classifier",
+            str(self._save_path),
+            "Classifier files (*.clf);;All files (*)",
+        )
+        if not path:
+            return
+        self._save_path = Path(path)
+        self.auto_save = True
+        self._classifier.save(self._save_path)
+        napari_info(f"Classifier saved at {self._save_path}")
+
+    def _on_export_clicked(self) -> None:
+        """Open a Save As dialog and export predictions to the chosen path."""
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
+            None,
+            "Export Results",
+            str(self._export_path),
+            "CSV files (*.csv);;All files (*)",
+        )
+        if not path:
+            return
+        self._export_path = Path(path)
+        self.export_results()
+
+    def _update_export_destination(self, label_layer: napari.layers.Labels) -> None:
+        """Update the default export path to match the selected layer name."""
+        base_path = self._export_path.parent
+        self._export_path = base_path / f"{label_layer.name}_predictions.csv"
+
+
 class ClassifierRunContainer(Container):
     """
-    The `ClassifierRunContainer` manages all the options needed to do
-    annotations, train a classifier and show classifier results.
+    Coordinator widget that wires together the annotator, classifier
+    runner, prediction layer manager, and export panel.
 
     The `ClassifierRunContainer` can be initialized with either an existing
-    classifier or with class_names + feature_names
+    classifier or with class_names + feature_names.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     viewer: napari.Viewer
-        The current napari.Viewer instance
+        The current napari.Viewer instance.
     classifier: Optional[Classifier]
-        The container can be initialized with an existing classifier. If none
-        is provided, a classifier is generated upon init.
+        An existing classifier to resume from. If omitted, class_names and
+        feature_names must be provided.
     class_names: Optional[list[str]]
-        The class names of the classifier. Needs to be provided if no
-        classifier is provided.
+        Class names for a new classifier (ignored when classifier is given).
     feature_names: Optional[list[str]]
-        The feature names of the classifier. Needs to be provided if no
-        classifier is provided.
+        Feature names for a new classifier (ignored when classifier is given).
     classifier_save_path: Optional[str]
-        The path to save the classifier to. If none is provided, the
-        classifier creates a default path in the current working directory.
+        Pre-filled save path passed to ClassifierExportPanel.
     auto_save: Optional[bool]
-        Whether the classifier can automatically save at the
-        classifier_save_path upon run and save. If false, run does not
-        trigger a save and save checks for overwrite conflicts.
+        If True, skip overwrite confirmation on first save.
 
     Attributes
     ----------
-    viewer: napari.Viewer
-        The current napari.Viewer instance
-    _last_selected_label_layer: napari.layers.Labels
-        The last selected label layer
+    _viewer: napari.Viewer
     _classifier: Classifier
-        The classifier object
-    class_names: list[str]
-        The class names of the classifier classes. Matching the first name to
-        1, second to 2 etc.
-    feature_names: list[str]
-        The feature names of the classifier. These features are loaded from
-        layer.features to train the classifier
-    _label_column: str
-        The column name of the label column in the layer.features dataframe,
-        hard-coded to "label"
-    _roi_id_column: str
-        The column name of the roi_id column in the layer.features dataframe,
-        hard-coded to "roi_id"
+    _runner: ClassifierRunner
+    _prediction_manager: PredictionLayerManager
     _annotator: LabelAnnotator
-        The LabelAnnotator container that manages annotations
-    _prediction_layer: napari.layers.Labels
-        The prediction layer that is generated by the classifier and which
-        displays predictions made for the currently selected label layer.
+    _export_panel: ClassifierExportPanel
     _run_button: magicgui.widgets.PushButton
-        The PushButton widget for running the classifier
-    _save_destination: magicgui.widgets.FileEdit
-        The FileEdit widget for selecting the save destination of the classifier
-    _save_button: magicgui.widgets.PushButton
-        The PushButton widget for saving the classifier
     """
 
-    # pylint: disable=R0913
     def __init__(
         self,
         viewer: napari.viewer.Viewer,
-        classifier: Optional[Classifier] = None,
-        class_names: Optional[list[str]] = None,
-        feature_names: Optional[list[str]] = None,
-        classifier_save_path: Optional[str] = None,
-        auto_save: Optional[bool] = False,
+        classifier: Classifier | None = None,
+        class_names: list[str] | None = None,
+        feature_names: list[str] | None = None,
+        classifier_save_path: str | None = None,
+        auto_save: bool | None = False,
     ):
         self._viewer = viewer
-        self.auto_save = auto_save
         self._last_selected_label_layer = get_selected_or_valid_label_layer(
             viewer=self._viewer
         )
@@ -242,363 +349,219 @@ class ClassifierRunContainer(Container):
             self.class_names = class_names
             self.feature_names = feature_names
 
-        self._label_column = "label"
-        self._roi_id_colum = "roi_id"
+        self._runner = ClassifierRunner(self._viewer, self._classifier)
+        self._prediction_manager = PredictionLayerManager(self._viewer)
 
         self._annotator = LabelAnnotator(
-            self._viewer, get_class_selection(class_names=self.class_names)
+            self._viewer,
+            get_class_selection(class_names=self.class_names),
+            annotation_callbacks=[self._update_counts],
+            class_colors=self._classifier._class_colors,
+            on_names_changed=self._on_class_names_changed,
+            on_colors_changed=self._on_class_colors_changed,
         )
 
-        for layer in self._viewer.layers:
-            if type(layer) == napari.layers.Labels and layer.name == "Predictions":
-                self._viewer.layers.remove(layer)
-        self.add_prediction_layer()
+        # Wire per-class colors into the prediction layer renderer
+        self._prediction_manager._color_resolver = (
+            self._annotator._class_selector.get_color
+        )
 
-        # Set the label selection to a valid label layer => Running into proxy bug
-        self._viewer.layers.selection.active = self._last_selected_label_layer
+        self._export_panel = ClassifierExportPanel(
+            classifier=self._classifier,
+            annotator=self._annotator,
+            initial_layer=self._last_selected_label_layer,
+            classifier_save_path=classifier_save_path,
+            auto_save=auto_save or False,
+        )
+
+        feature_names = self._classifier.get_feature_names()
+        self._feature_list = Select(
+            choices=feature_names,
+            value=feature_names,
+            allow_multiple=True,
+            label="",
+        )
+        # Make read-only at the Qt level: no selection, no focus, no interaction.
+        # Do NOT use .enabled = False — that propagates through magicgui's container
+        # chain and disables the whole plugin.
+        from qtpy.QtCore import Qt  # type: ignore[attr-defined]
+        from qtpy.QtWidgets import QAbstractItemView
+
+        self._feature_list.native.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+        self._feature_list.native.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._feature_section = CollapsibleSection(
+            "Features", [self._feature_list], collapsed=True
+        )
 
         self._run_button = PushButton(text="Run Classifier")
-        self._save_destination = FileEdit(
-            label="Classifier Save Path",
-            value=f"{self._last_selected_label_layer}_classifier.clf",
-            mode="w",
-        )
-        if classifier_save_path:
-            self._save_destination.value = classifier_save_path
-        self._save_button = PushButton(text="Save Classifier")
 
-        # Export options
-        self._export_destination = FileEdit(
-            label="Prediction Export Path",
-            value=f"{self._last_selected_label_layer}_predictions.csv",
-            mode="w",
-        )
-        self._export_button = PushButton(text="Export Classifier Result")
         super().__init__(
             widgets=[
                 self._annotator,
-                self._save_destination,
+                self._feature_section,
                 self._run_button,
-                self._save_button,
-                self._export_destination,
-                self._export_button,
-            ]
+                self._export_panel,
+            ],
+            labels=False,
         )
+        self.native.layout().setContentsMargins(0, 0, 0, 0)
+        self._prediction_manager.setup(self._last_selected_label_layer)
+        # Restore any stored annotations for the initially selected layer
+        self._restore_annotations(self._last_selected_label_layer)
+        # Set the label selection to a valid label layer => Running into proxy bug
+        self._viewer.layers.selection.active = self._last_selected_label_layer
         self._run_button.clicked.connect(self.run)
-        self._save_button.clicked.connect(self.save)
-        self._export_button.clicked.connect(self.export_results)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
-        self._init_prediction_layer(self._last_selected_label_layer)
+        self.native.destroyed.connect(self.close)
+        # Initialise counts now that the panel is fully wired
+        self._update_counts()
+
+    def close(self) -> None:
+        try:
+            self._viewer.layers.selection.events.changed.disconnect(
+                self.selection_changed
+            )
+        except (ValueError, RuntimeError):
+            pass
 
     def run(self):
         """
-        Run method that adds features to the classifier, trains it, triggers
-        predictions & saves the classifier
-        """
+        Run the classifier pipeline in a background thread to keep the UI
+        responsive during feature collection and training.
 
-        self.add_features_to_classifier()
-        try:
-            self._classifier.train()
-        except ValueError as e:
+        Feature collection and training run off the main thread.  All napari
+        layer writes (predictions, colormap, save) are dispatched back to the
+        main thread via the worker's `returned` / `errored` signals.
+        """
+        from napari.qt.threading import thread_worker
+
+        self._run_button.enabled = False
+        self._run_button.text = "Running…"
+
+        @thread_worker(ignore_errors=True)
+        def _train():
+            self._runner.add_features_to_classifier()
+            f1 = self._classifier.train()  # raises ValueError on bad input
+            return f1
+
+        self._run_worker = _train()
+        # Connect to self methods (QObject) so PyQt uses QueuedConnection for
+        # cross-thread dispatch, ensuring callbacks run in the main thread.
+        self._run_worker.returned.connect(self._on_run_done)
+        self._run_worker.errored.connect(self._on_run_error)
+        self._run_worker.start()
+
+    def _on_run_done(self, _f1) -> None:
+        """Called in the main thread when background training succeeds."""
+        assert isinstance(self._last_selected_label_layer, napari.layers.Labels)
+        self._runner.make_predictions()
+        self._prediction_manager.setup(self._last_selected_label_layer)
+        self._prediction_manager.set_visible(True)
+        self._export_panel.save()
+        self._update_counts()
+        self._run_button.text = "Run Classifier"
+        self._run_button.enabled = True
+
+    def _on_run_error(self, exc: Exception) -> None:
+        """Called in the main thread when background training raises."""
+        if isinstance(exc, ValueError):
             napari_info(
                 "Training failed. A typical reason are not having "
                 "enough annotations. \nThe error message was: "
-                f"{e}"
+                f"{exc}"
             )
         else:
-            self.make_predictions()
-            self._prediction_layer.visible = True
-            self.save()
-
-    def add_features_to_classifier(self):
-        """
-        Generate a dict of features: Key are roi_ids, values are dataframes
-        from layer.features.
-        """
-        dict_of_features = {}
-        for layer in self._viewer.layers:
-            if (
-                isinstance(layer, napari.layers.Labels)
-                and len(layer.features) > 0
-                and "annotations" in layer.features.columns
-            ):
-                # TODO: Add extra checks that it contains valid features?
-                if "roi_id" in layer.features.columns:
-                    roi_ids = layer.features["roi_id"].unique()
-                    if len(roi_ids) > 1:
-                        raise NotImplementedError(
-                            f"{layer=} contained no-unique roi_ids: {roi_ids}"
-                        )
-
-                    roi_id = roi_ids[0]
-                    dict_of_features[roi_id] = layer.features
-                else:
-                    # TODO: Consider label-layer hashing here instead of
-                    # using the layer name as roi_id
-                    dict_of_features[layer.name] = layer.features
-        self._classifier.add_dict_of_features(dict_of_features)
-
-    def add_prediction_layer(self):
-        self._prediction_layer = self._viewer.add_labels(
-            self._last_selected_label_layer.data,
-            scale=self._last_selected_label_layer.scale,
-            name="Predictions",
-            translate=self._last_selected_label_layer.translate,
-        )
-        self._prediction_layer.contour = 2
-
-    def make_predictions(self):
-        """
-        Make predictions for all relevant label layers and add them to the
-        layer.features `prediction` column of each layer
-        """
-        # Get all the label layers that have fitting features
-        relevant_label_layers = self.get_relevant_label_layers()
-
-        # Get the features dataframes with the relevant features
-        prediction_dfs = {}
-        for label_layer in relevant_label_layers:
-            roi_id = self.get_layer_roi_id(label_layer)
-            if roi_id in prediction_dfs.keys():
-                raise ValueError(
-                    f"Duplicate roi_id {roi_id} found in {label_layer.name}. "
-                    "It's already present as the roi_id of another label layer. "
-                )
-            prediction_dfs[roi_id] = self.get_relevant_features(
-                label_layer.features, set_index=False
-            )
-
-        # Get the classifier predictions
-        prediction_results_dict = self._classifier.predict_on_dict(prediction_dfs)
-
-        # Append the predictions to each open label layer ("prediction" column)
-        for label_layer in relevant_label_layers:
-            roi_id = self.get_layer_roi_id(label_layer)
-            if "prediction" in label_layer.features.columns:
-                label_layer.features.drop(columns=["prediction"], inplace=True)
-            # Merge the predictions back into the layer.features dataframe
-            label_layer.features = label_layer.features.merge(
-                prediction_results_dict[roi_id],
-                left_on=[self._roi_id_colum, self._label_column],
-                right_index=True,
-                how="outer",
-            )
-
-        self._init_prediction_layer(self._last_selected_label_layer)
+            napari_info(f"Unexpected error during training: {exc}")
+        self._run_button.text = "Run Classifier"
+        self._run_button.enabled = True
 
     def selection_changed(self):
         """
         Check if the selection change results in a valid label layer being
-        selected. If so, initialize the prediction layer for it.
+        selected. If so, sync prediction layer and export panel to it.
         """
-        if self._viewer.layers.selection.active:
-            if self._viewer.layers.selection.active in get_valid_label_layers(
-                viewer=self._viewer
-            ):
-                self._last_selected_label_layer = self._viewer.layers.selection.active
-                self._init_prediction_layer(
-                    self._viewer.layers.selection.active, ensure_layer_presence=False
-                )
-                self._update_export_destination(self._last_selected_label_layer)
-
-    def reorder_layers(self):
-        """Reorders layers if needed to ensure Annotation & Prediction layers
-        are above the currently selected label layer.
-        """
-        # Get the current order of layers
-        all_layers = list(self._viewer.layers)
-
-        # Determine the indices of the layers if they exist
-        indices_to_move = []
-
-        # Find the index of "Prediction" layer if it exists
-        if "Predictions" in self._viewer.layers:
-            indices_to_move.append(self._viewer.layers.index("Predictions"))
-
-        # Find the index of "Annotation" layer if it exists
-        if "Annotations" in self._viewer.layers:
-            indices_to_move.append(self._viewer.layers.index("Annotations"))
-
-        # Find the index of the reference_label_layer
-        if self._last_selected_label_layer.name in self._viewer.layers:
-            indices_to_move.append(
-                self._viewer.layers.index(self._last_selected_label_layer.name)
-            )
-
-        # Calculate the new order of layer indices
-        remaining_indices = [
-            i for i in range(len(all_layers)) if i not in indices_to_move
-        ]
-        remaining_indices.reverse()
-        new_order = indices_to_move + remaining_indices
-        new_order.reverse()
-
-        # Reorder the layers using the move_multiple function
-        self._viewer.layers.move_multiple(new_order)
-
-    def _init_prediction_layer(
-        self, label_layer: napari.layers.Labels, ensure_layer_presence: bool = True
-    ):
-        """
-        Initialize the prediction layer and reset its data (to fit the input
-        label_layer) and its colormap.
-        ensure_layer_presence creates the Predictions layer if it doesn't exist
-        yet and triggers layer reordering.
-        """
-        # Ensure that prediction layer exists
+        active = self._viewer.layers.selection.active
         if (
-            "Predictions" not in [x.name for x in self._viewer.layers]
-            and ensure_layer_presence
+            active
+            and active in get_valid_label_layers(viewer=self._viewer)
+            and isinstance(active, napari.layers.Labels)
         ):
-            self.add_prediction_layer()
-        if ensure_layer_presence:
-            # Ensure correct layer order: This sometimes fails with weird
-            # EmitLoopError & IndexError that should be ignored
-            try:
-                self.reorder_layers()
-            except:  # noqa
-                pass
+            self._last_selected_label_layer = active
+            # LabelAnnotator.selection_changed fires first (connected earlier),
+            # so the annotations column already exists by the time we get here.
+            self._restore_annotations(active)
+            self._prediction_manager.sync(active)
+            self._export_panel.update_selected_layer(active)
+            self._update_counts()
 
-        # Ensure that prediction layer is above the current label layer
-        self._last_selected_label_layer
+    def _restore_annotations(self, layer: napari.layers.Labels) -> None:
+        """
+        Restore stored annotations from classifier._data into the layer and
+        re-render the annotation colormap if any were written back.
+        """
+        restored = self._runner.restore_annotations_to_layer(layer)
+        if restored:
+            # Re-run _init_annotation to refresh the colormap; it is idempotent
+            # when the annotations column already exists.
+            self._annotator._init_annotation(layer)
+            self._update_counts()
 
-        # Check if the predict column already exists in the layer.features
-        if "prediction" not in label_layer.features:
-            unique_labels = np.unique(label_layer.data)[1:]
-            predict_df = pd.DataFrame(
-                {self._label_column: unique_labels, "prediction": np.NaN}
-            )
-            if self._label_column in label_layer.features.columns:
-                label_layer.features = label_layer.features.merge(
-                    predict_df, on=self._label_column, how="outer"
-                )
+    def _on_class_names_changed(self, new_names: list[str]) -> None:
+        """Sync classifier class names when the user renames a class."""
+        self._classifier._class_names = list(new_names)
+
+    def _on_class_colors_changed(
+        self, class_index: int, rgba: tuple[float, float, float, float]
+    ) -> None:
+        """Persist color edits to the classifier and refresh the prediction layer."""
+        self._classifier._class_colors[class_index] = rgba
+        # Re-render the prediction layer with the updated color
+        try:
+            self._prediction_manager.sync(self._last_selected_label_layer)
+        except RuntimeError:
+            pass  # prediction layer not yet set up
+
+    def _update_counts(self) -> None:
+        self._annotator._class_selector.update_counts(self._get_annotation_counts())
+
+    def _get_annotation_counts(self) -> dict[str, int]:
+        """
+        Return per-class annotation counts merging live open layers with
+        historical data from classifier._data (closed images included).
+        """
+        # Collect live annotations from currently open label layers
+        open_roi_ids: dict[str, pd.Series] = {}
+        for layer in get_valid_label_layers(self._viewer):
+            if "annotations" not in layer.features.columns:
+                continue
+            if "roi_id" in layer.features.columns:
+                unique = layer.features["roi_id"].unique()
+                if len(unique) != 1:
+                    continue
+                roi_id = unique[0]
             else:
-                label_layer.features = pd.concat(
-                    [label_layer.features, predict_df], axis=1
-                )
+                roi_id = layer.name
+            open_roi_ids[roi_id] = layer.features["annotations"]  # type: ignore[assignment]
 
-        # Update the label data in the prediction layer
-        self._prediction_layer.data = label_layer.data
-        self._prediction_layer.scale = label_layer.scale
-        self._prediction_layer.translate = label_layer.translate
+        # Add historical annotations for roi_ids no longer open
+        parts = list(open_roi_ids.values())
+        if len(self._classifier._data) > 0:
+            clf_ann = self._classifier._data["annotations"]
+            clf_rois = self._classifier._data.index.get_level_values("roi_id")
+            closed = clf_ann[~clf_rois.isin(open_roi_ids)]
+            if len(closed):
+                parts.append(closed)  # type: ignore[arg-type]
 
-        # Update the colormap of the prediction layer
-        napari_version = version.parse(napari.__version__)
-        if napari_version >= version.parse("0.4.19"):
-            reset_display_colormaps_modern(
-                label_layer,
-                feature_col="prediction",
-                display_layer=self._prediction_layer,
-                label_column=self._label_column,
-                cmap=get_colormap(),
-            )
-        else:
-            reset_display_colormaps_legacy(
-                label_layer,
-                feature_col="prediction",
-                display_layer=self._prediction_layer,
-                label_column=self._label_column,
-                cmap=get_colormap(),
-            )
+        if not parts:
+            return {name: 0 for name in self._classifier.get_class_names()}
 
-    def get_relevant_label_layers(self):
-        relevant_label_layers = []
-        required_columns = [self._label_column, self._roi_id_colum]
-        excluded_label_layers = ["Annotations", "Predictions"]
-        for label_layer in self._viewer.layers:
-            if (
-                isinstance(label_layer, napari.layers.Labels)
-                and label_layer.name not in excluded_label_layers
-            ):
-                if label_layer.features is not None:
-                    if all(x in label_layer.features.columns for x in required_columns):
-                        relevant_label_layers.append(label_layer)
-        return relevant_label_layers
-
-    def get_layer_roi_id(self, label_layer):
-        roi_ids = label_layer.features[self._roi_id_colum].unique()
-        if len(roi_ids) > 1:
-            raise NotImplementedError(
-                f"{label_layer=} contained no-unique roi_ids: {roi_ids}"
-            )
-        return roi_ids[0]
-
-    # pylint: disable=C0103
-    def get_relevant_features(
-        self, df, filter_annotations: bool = False, set_index=False
-    ):
-        """
-        Get the relevant features from the pandas table
-        Can optionally create a double-indexing with label & roi_id
-        filter_annotations: Only return rows that contain annotations?
-        """
-        if not filter_annotations:
-            df_relevant = df[
-                [*self.feature_names, self._label_column, self._roi_id_colum]
-            ]
-        else:
-            df_relevant = df.loc[
-                df["annotations"].notna(),
-                [
-                    *self.feature_names,
-                    self._label_column,
-                    self._roi_id_colum,
-                    "annotations",
-                ],
-            ]
-        if set_index:
-            df_relevant.set_index(
-                [self._roi_id_colum, self._label_column], inplace=True
-            )
-        return df_relevant
-
-    def save(self):
-        """
-        Save the classifier and handle overwriting of existing classifier file
-        """
-        if not self.auto_save:
-            # Handle existing classifier file => ask for overwrite
-            if not overwrite_check_passed(
-                file_path=self._save_destination.value, output_type="classifier"
-            ):
-                return
-        # If the user confirms overwriting the classifier once, keep
-        # overwriting it going forward. We want classifier auto-save, just not
-        # overwriting of other existing classifiers with the same name.
-        self.auto_save = True
-        output_path = Path(self._save_destination.value)
-        self._classifier.save(output_path)
-
-    def _update_export_destination(self, label_layer: napari.layers.Labels):
-        """
-        Update the default export destination to the name of the label layer.
-        If a base_path was already set, keep it on that base path.
-
-        """
-        base_path = Path(self._export_destination.value).parent
-        self._export_destination.value = (
-            base_path / f"{label_layer.name}_predictions.csv"
-        )
-
-    def export_results(self):
-        """
-        Export classifier results for the current layer if available
-        """
-        if not overwrite_check_passed(
-            file_path=self._export_destination.value, output_type="predictions"
-        ):
-            return
-
-        predictions = self._last_selected_label_layer.features.loc[
-            :, [self._label_column, "prediction", "annotations"]
-        ]
-        # pylint: disable=C0103
-        df = add_annotation_names(
-            df=pd.DataFrame(predictions), ClassSelection=self._annotator.ClassSelection
-        )
-
-        df.to_csv(self._export_destination.value)
-        napari_info(f"Annotations were saved at {self._export_destination.value}")
+        counts = pd.concat(parts, ignore_index=True).dropna().value_counts()
+        return {
+            name: int(counts.get(float(i + 1), 0))  # type: ignore[arg-type]
+            for i, name in enumerate(self._classifier.get_class_names())
+        }
 
 
 class LoadClassifierContainer(Container):
@@ -630,9 +593,11 @@ class LoadClassifierContainer(Container):
 
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
-        self._clf_destination = FileEdit(mode="r", filter=None)
+        from magicgui.types import FileDialogMode
+
+        self._clf_destination = FileEdit(mode=FileDialogMode.EXISTING_FILE, filter=None)
         self._filter = RadioButtons(
-            value="*.clf",
+            value="*.clf",  # pyright: ignore[reportCallIssue]
             choices=["*.clf", "*.pkl", "*"],
             orientation="horizontal",
             label="Filter",
@@ -656,7 +621,7 @@ class LoadClassifierContainer(Container):
         Load a classifier from a file and start the run container with the
         correct options(already set classifier_save_path and turn on auto_save)
         """
-        clf_path = Path(self._clf_destination.value)
+        clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
         with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
 
@@ -664,7 +629,7 @@ class LoadClassifierContainer(Container):
             self._run_container = ClassifierRunContainer(
                 self._viewer,
                 clf,
-                classifier_save_path=clf_path,
+                classifier_save_path=str(clf_path),
                 auto_save=True,
             )
         except NotImplementedError:
@@ -736,6 +701,7 @@ class ClassifierWidget(Container):
         )
 
     def initialize_run_widget(self):
+        assert self._init_container is not None
         class_names = self._init_container.get_class_names()
         feature_names = self._init_container.get_selected_features()
         if not feature_names:

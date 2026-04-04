@@ -1,5 +1,6 @@
 # pylint: disable=C0103
 """Tests for core classifier class"""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -47,7 +48,6 @@ def get_train_predict_dfs():
     return df_train, df_predict
 
 
-# TODO: Add a real test.
 def test_prediction():
     df_train, df_predict = get_train_predict_dfs()
     df_predict_with_nans = df_predict.copy()
@@ -56,7 +56,10 @@ def test_prediction():
     c.add_features(df_train)
     c.train()
     predictions = c.predict(df_predict_with_nans)
-    return predictions
+    assert isinstance(predictions, pd.Series)
+    assert len(predictions) == len(df_predict_with_nans)
+    assert set(predictions.dropna().unique()).issubset({1, 2})
+    assert predictions.isna().sum() == df_predict_with_nans["feature1"].isna().sum()
 
 
 def get_df():
@@ -207,3 +210,92 @@ def test_nans_in_non_classifier_features_have_no_effect():
     c.add_features(df)
     c2.add_features(df_nans)
     assert np.all(c._data == c2._data)
+
+
+def test_train_returns_f1_score():
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    f1 = c.train()
+    assert isinstance(f1, float)
+    assert 0.0 <= f1 <= 1.0
+
+
+def test_train_produces_predictions():
+    """After training, predict() returns valid class labels for all non-NaN rows."""
+    df_train, df_predict = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+    predictions = c.predict(df_predict)
+    assert isinstance(predictions, pd.Series)
+    assert len(predictions) == len(df_predict)
+    assert set(predictions.dropna().unique()).issubset({1, 2})
+    assert predictions.isna().sum() == 0
+
+
+def test_train_splits_data_correctly():
+    """Training uses 80% of data; test split is the remaining 20%."""
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    # Verify data is split by hash threshold
+    train_data = c._data[c._data.hash < c._training_data_perc]
+    test_data = c._data[c._data.hash >= c._training_data_perc]
+    assert len(train_data) + len(test_data) == len(df_train)
+    assert len(train_data) > 0
+    assert len(test_data) > 0
+
+
+def test_get_counts_per_class():
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    counts = c.get_counts_per_class(c._data["annotations"])
+    assert set(counts.keys()) == set(CLASS_NAMES)
+    assert counts["s"] == 30  # annotations=[1,2,1,1,2]*10 → class 1 ("s") = 30
+    assert counts["m"] == 20
+
+
+def test_save_and_load_roundtrip(tmp_path):
+    """save() pickles correctly; loading restores state including _class_colors."""
+    import pickle
+
+    df_train, df_predict = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+    c._class_colors[1] = (1.0, 0.0, 0.0, 1.0)
+
+    path = tmp_path / "test.clf"
+    c.save(path)
+
+    with open(path, "rb") as f:
+        c2 = pickle.loads(f.read())  # noqa: S301
+
+    assert c2._feature_names == c._feature_names
+    assert c2._class_names == c._class_names
+    assert c2._class_colors == {1: (1.0, 0.0, 0.0, 1.0)}
+    # Loaded classifier should predict the same values
+    pred_orig = c.predict(df_predict)
+    pred_loaded = c2.predict(df_predict)
+    assert (pred_orig == pred_loaded).all()
+
+
+def test_setstate_adds_class_colors_default():
+    """Old pickled classifiers without _class_colors get an empty dict on load."""
+    import pickle
+
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+
+    # Simulate an old pickle by removing _class_colors before pickling
+    state = c.__dict__.copy()
+    del state["_class_colors"]
+    c.__dict__ = state
+
+    data = pickle.dumps(c)  # noqa: S301
+    c2 = pickle.loads(data)  # noqa: S301
+    assert c2._class_colors == {}

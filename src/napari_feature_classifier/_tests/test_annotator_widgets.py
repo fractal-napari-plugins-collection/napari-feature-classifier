@@ -1,6 +1,9 @@
-""" Tests for annotator widget initialization"""
-import imageio
+"""Tests for annotator widget initialization"""
+
 from pathlib import Path
+
+import imageio
+
 from napari_feature_classifier.annotator_init_widget import (
     InitializeLabelAnnotatorWidget,
 )

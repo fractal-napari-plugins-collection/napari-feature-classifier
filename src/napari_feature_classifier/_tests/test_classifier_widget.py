@@ -1,18 +1,29 @@
-""" Tests for classifier widget initialization"""
+"""Tests for classifier widget initialization"""
+
+from pathlib import Path
+
+import imageio
 import numpy as np
 import pandas as pd
 import pytest
-import os
 
-import imageio
-from pathlib import Path
-from napari_feature_classifier.feature_loader_widget import make_features
 from napari_feature_classifier.classifier_widget import (
     ClassifierWidget,
-)
-from napari_feature_classifier.classifier_widget import (
     LoadClassifierContainer,
 )
+from napari_feature_classifier.feature_loader_widget import make_features
+
+
+def run_and_wait(container, qtbot, timeout=30_000):
+    """Trigger container.run() and block until the background worker finishes.
+
+    Waits for the run button to be re-enabled, which is the last action in
+    both _on_run_done and _on_run_error — guaranteeing those callbacks have
+    fully completed regardless of which thread they ran in.
+    """
+    container.run()
+    qtbot.waitUntil(lambda: container._run_button.enabled, timeout=timeout)
+
 
 lbl_img_np = imageio.v2.imread(
     Path("src/napari_feature_classifier/sample_data/test_labels.tif")
@@ -43,6 +54,7 @@ def test_classifier_widgets_initialization_no_features_selected(make_napari_view
 def test_classifier_initializtion_without_label_image(make_napari_viewer):
     viewer = make_napari_viewer()
     classifier_widget = ClassifierWidget(viewer)
+    assert classifier_widget._init_container is not None
     assert classifier_widget._init_container._last_selected_label_layer is None
 
 
@@ -52,10 +64,13 @@ features_no_roi_id = features.drop(columns=["roi_id"])
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
 @pytest.mark.parametrize("features", [features, features_no_roi_id])
-def test_running_classification_through_widget(features, make_napari_viewer):
+def test_running_classification_through_widget(
+    features, make_napari_viewer, qtbot, tmp_path, monkeypatch
+):
     """
     Tests if the main widget launches
     """
+    monkeypatch.chdir(tmp_path)
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
     label_layer = viewer.add_labels(lbl_img_np)
@@ -65,6 +80,7 @@ def test_running_classification_through_widget(features, make_napari_viewer):
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -79,28 +95,26 @@ def test_running_classification_through_widget(features, make_napari_viewer):
     # Add some annotations manually
     label_layer.features.loc[0, "annotations"] = 1.0
     label_layer.features.loc[1, "annotations"] = 1.0
-    label_layer.features.loc[3, "annotations"] = 3.0
+    label_layer.features.loc[3, "annotations"] = 2.0
 
-    # Run the classifier
-    classifier_widget._run_container.run()
+    # Run the classifier and wait for the background worker to finish
+    run_and_wait(classifier_widget._run_container, qtbot)
 
     # Assert something that the layer is visible, predictions exist and are not NaN
-    assert classifier_widget._run_container._prediction_layer.visible
+    assert classifier_widget._run_container._prediction_manager.prediction_layer.visible
     assert "prediction" in label_layer.features.columns
     assert pd.notna(label_layer.features["prediction"]).all().all()
 
     # Check that the classifier file was saved
-    assert Path("lbl_img_np_classifier.clf").exists()
-
-    # Delete the classifier file (cleanup to avoid overwriting confirmation)
-    os.remove("lbl_img_np_classifier.clf")
+    assert (tmp_path / "lbl_img_np_classifier.clf").exists()
 
 
 # Test classifier results export
-def test_prediction_export(make_napari_viewer, capsys):
+def test_prediction_export(make_napari_viewer, qtbot, capsys, tmp_path, monkeypatch):
     """
     Tests if the main widget launches
     """
+    monkeypatch.chdir(tmp_path)
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
     label_layer = viewer.add_labels(lbl_img_np)
@@ -110,6 +124,7 @@ def test_prediction_export(make_napari_viewer, capsys):
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -124,20 +139,16 @@ def test_prediction_export(make_napari_viewer, capsys):
     # Add some annotations manually
     label_layer.features.loc[0, "annotations"] = 1.0
     label_layer.features.loc[1, "annotations"] = 1.0
-    label_layer.features.loc[3, "annotations"] = 3.0
+    label_layer.features.loc[3, "annotations"] = 2.0
 
-    # Run the classifier
-    classifier_widget._run_container.run()
+    # Run the classifier and wait for the background worker to finish
+    run_and_wait(classifier_widget._run_container, qtbot)
 
     # Test result export
-    classifier_widget._run_container.export_results()
-    df = pd.read_csv(classifier_widget._run_container._export_destination.value)
+    classifier_widget._run_container._export_panel.export_results()
+    df = pd.read_csv(classifier_widget._run_container._export_panel._export_path)
     assert df.shape == (16, 5)
     assert df["prediction"].isna().sum() == 0
-
-    # Delete the classifier file (cleanup to avoid overwriting confirmation)
-    os.remove("lbl_img_np_classifier.clf")
-    os.remove("lbl_img_np_predictions.csv")
 
     message = "INFO: Annotations were saved at lbl_img_np_predictions.csv"
     assert message in capsys.readouterr().out
@@ -151,10 +162,13 @@ features = make_features(np.unique(lbl_img_np)[1:], roi_id="ROI1", n_features=6)
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
-def test_classifier_fails_running_without_annotation(make_napari_viewer, capsys):
+def test_classifier_fails_running_without_annotation(
+    make_napari_viewer, qtbot, capsys, tmp_path, monkeypatch
+):
     """
     Tests if the main widget launches
     """
+    monkeypatch.chdir(tmp_path)
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
     label_layer = viewer.add_labels(lbl_img_np)
@@ -164,6 +178,7 @@ def test_classifier_fails_running_without_annotation(make_napari_viewer, capsys)
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -172,8 +187,9 @@ def test_classifier_fails_running_without_annotation(make_napari_viewer, capsys)
 
     classifier_widget.initialize_run_widget()
 
-    # Run the classifier
-    classifier_widget._run_container.run()
+    # Run the classifier and wait for the background worker to finish
+    assert classifier_widget._run_container is not None
+    run_and_wait(classifier_widget._run_container, qtbot)
 
     expected_message = (
         "INFO: Training failed. A typical reason are not "
@@ -199,6 +215,7 @@ def test_layer_selection_changes(make_napari_viewer):
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -207,12 +224,13 @@ def test_layer_selection_changes(make_napari_viewer):
 
     classifier_widget.initialize_run_widget()
 
+    assert classifier_widget._run_container is not None
     assert (
         classifier_widget._run_container._last_selected_label_layer.name
         == "test_labels_2"
     )
     assert (
-        str(classifier_widget._run_container._export_destination.value)
+        str(classifier_widget._run_container._export_panel._export_path)
         == "test_labels_2_predictions.csv"
     )
     viewer.layers.selection.active = label_layer1
@@ -221,7 +239,7 @@ def test_layer_selection_changes(make_napari_viewer):
         == "test_labels"
     )
     assert (
-        classifier_widget._run_container._export_destination.value.name
+        classifier_widget._run_container._export_panel._export_path.name
         == "test_labels_predictions.csv"
     )
 
@@ -244,7 +262,8 @@ def test_load_classifier_widget(make_napari_viewer, capsys):
     loading_widget.load()
 
     # Some basic checks that loading looks to have worked
-    assert loading_widget._run_container._prediction_layer.visible
+    assert loading_widget._run_container is not None
+    assert loading_widget._run_container._prediction_manager.prediction_layer.visible
     assert "prediction" in label_layer.features.columns
 
 

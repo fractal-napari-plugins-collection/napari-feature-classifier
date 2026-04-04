@@ -1,5 +1,78 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
+[project]
+name = "napari-feature-classifier"
+dynamic = ["version"]
+description = "An interactive classifier plugin to use with label images and feature measurements"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "Joel Luethi and Max Hess", email = "joel.luethi@uzh.ch" }
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Framework :: napari",
+    "Topic :: Software Development :: Testing",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+]
+dependencies = [
+    "numpy",
+    "napari>=0.6.0",
+    "matplotlib",
+    "magicgui",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.2.2",
+    "pandera",
+    "xxhash",
+]
 
+[project.optional-dependencies]
+testing = [
+    "pytest",
+    "pytest-cov",
+    "pytest-qt",
+    "qtpy",
+    "hypothesis",
+]
+
+[project.urls]
+"Bug Tracker" = "https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/issues"
+"Documentation" = "https://github.com/fractal-napari-plugins-collection/napari-feature-classifier#napari-feature-classifier"
+"Source Code" = "https://github.com/fractal-napari-plugins-collection/napari-feature-classifier"
+"User Support" = "https://github.com/fractal-napari-plugins-collection/napari-feature-classifier/issues"
+
+[project.entry-points."napari.manifest"]
+napari-feature-classifier = "napari_feature_classifier:napari.yaml"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/napari_feature_classifier/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/napari_feature_classifier"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+addopts = "--color=yes --cov=napari_feature_classifier --cov-report=xml"
+
+[tool.coverage.run]
+omit = ["src/napari_feature_classifier/dev_main.py"]

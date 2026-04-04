@@ -1,0 +1,35 @@
+[workspace]
+name = "napari-feature-classifier"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+
+[dependencies]
+python = ">=3.10,<3.13"
+napari = ">=0.7.0"
+pyqt6 = "*"
+ruff = "*"
+pyright = "*"
+zarr = "<3.0.0" # Remove once napari-ome-zarr-navigator adopts ngio 0.5
+
+[pypi-dependencies]
+napari-feature-classifier = { path = ".", editable = true, extras = ["testing"] }
+
+[feature.local-dev.pypi-dependencies]
+napari-ome-zarr = ">=0.6.0, <0.7.0" # Switch to >0.7 once ngio 0.5 is used
+napari-ome-zarr-navigator = ">=0.2.6"
+ipykernel = "*"
+
+[environments]
+local-dev = ["local-dev"]
+
+[tasks]
+test = "pytest -v --color=yes --cov=napari_feature_classifier --cov-report=xml"
+napari = "napari"
+lint = "ruff check src"
+format = "ruff format src"
+typecheck = "pyright src"
+check = { depends-on = ["lint", "typecheck", "test"] }
+
+[tasks.napari-ome-zarr]
+cmd = "napari"
+default-environment = "local-dev"

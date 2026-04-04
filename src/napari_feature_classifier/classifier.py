@@ -1,16 +1,16 @@
 """Core classifier class and helper functions."""
+
 import logging
 import pickle
 import random
 import string
-from typing import Sequence
+from collections.abc import Sequence
 
 import pandas as pd
-import pandera as pa
+import pandera.pandas as pa
 import xxhash
-
-from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score
 
 
 # TODO: define an interface for compatible classifiers (m.b. a subset of
@@ -55,7 +55,7 @@ class Classifier:
         as well as feature measurements for all rows (annotated objects)
     """
 
-    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):
+    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):  # noqa: B008
         self.logger = logging.getLogger("classifier")
         self.logger.setLevel(logging.INFO)
         self._feature_names: list[str] = list(feature_names)
@@ -76,6 +76,15 @@ class Classifier:
         # MultiIndex (issue: https://github.com/unionai-oss/pandera/issues/1049).
         # Can remove `self._schema.validate` call once fixed.
         self._data: pd.DataFrame = self._schema.validate(self._schema.example(0))
+        # Per-class colors: keys are 1-based class indices, values are RGBA float tuples.
+        # Empty dict means "use Set1 fallback". Persisted via pickle.
+        self._class_colors: dict[int, tuple[float, float, float, float]] = {}
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore state from pickle, adding defaults for attributes added in later versions."""
+        self.__dict__.update(state)
+        if "_class_colors" not in self.__dict__:
+            self._class_colors = {}
 
     # TODO: Add tests.
     def train(self):
@@ -101,13 +110,13 @@ class Classifier:
             f"F1 score on test set: {f1} \n"
             f"Annotations split into {len(X_train)} training and {len(X_test)} "
             "test samples. \n"
-            f"Training set contains {self.get_counts_per_class(y_train)}. \n"
-            f"Test set contains {self.get_counts_per_class(y_test)}."
+            f"Training set contains {self.get_counts_per_class(y_train)}. \n"  # type: ignore[arg-type]
+            f"Test set contains {self.get_counts_per_class(y_test)}."  # type: ignore[arg-type]
         )
         return f1
 
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
-        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
+        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}  # type: ignore[arg-type]
 
     def predict(self, df):
         """
@@ -163,7 +172,7 @@ class Classifier:
         df_valid = self._predict_schema.validate(df_no_nans).set_index(
             self._index_columns
         )
-        return df_valid
+        return df_valid  # type: ignore[return-value]
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -239,7 +248,7 @@ def hash_single_object_id(object_id: str) -> float:
 def get_normalized_hash_column(
     df: pd.DataFrame, index_columns: Sequence[str] = ("roi_id", "label")
 ) -> pd.Series:
-    return join_index_columns(df, index_columns=index_columns).apply(
+    return join_index_columns(df, index_columns=index_columns).apply(  # type: ignore[return-value]
         hash_single_object_id
     )
 

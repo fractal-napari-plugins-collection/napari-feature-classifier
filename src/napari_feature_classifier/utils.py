@@ -1,20 +1,19 @@
 """Utils function for the classifier"""
-from functools import lru_cache
+
 import logging
 import math
+from functools import lru_cache
 from pathlib import Path
 
-# import warnings
-import pandas as pd
-from napari.utils.notifications import show_info
-from matplotlib.colors import ListedColormap
 import matplotlib
-import numpy as np
 import napari
+import napari.layers
+import numpy as np
+import pandas as pd
+from matplotlib.colors import ListedColormap
+from napari.utils.colormaps import DirectLabelColormap
+from napari.utils.notifications import show_info
 from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
-
-# from napari._qt.dialogs.qt_notification import NapariQtNotification
-# from napari._qt.qt_event_loop import _ipython_has_eventloop
 
 
 @lru_cache(maxsize=16)
@@ -43,9 +42,11 @@ def in_notebook():
     # Check if I'm running in jupyter notebook, from here:
     # https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     try:
-        from IPython import get_ipython  # pylint: disable-msg=C0415
+        from IPython import (
+            get_ipython,  # type: ignore[attr-defined]  # pylint: disable-msg=C0415
+        )
 
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
+        if "IPKernelApp" not in get_ipython().config:  # type: ignore[union-attr]  # pragma: no cover
             return False
     except ImportError:
         return False
@@ -58,7 +59,7 @@ def get_colormap(matplotlib_colormap="Set1"):
     """
     Generates colormaps depending on the number of classes
     """
-    new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
+    new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(  # type: ignore[attr-defined]
         np.float32
     )
     cmap_np = np.zeros(
@@ -70,35 +71,39 @@ def get_colormap(matplotlib_colormap="Set1"):
     return cmap
 
 
-def reset_display_colormaps_legacy(
-    label_layer, feature_col, display_layer, label_column, cmap
+def reset_display_colormaps(
+    label_layer,
+    feature_col,
+    display_layer,
+    label_column,
+    cmap=None,
+    color_resolver=None,
 ):
     """
     Reset the colormap based on the annotations in
-    label_layer.features['annotation'] and sends the updated colormap
-    to the annotation label layer
+    label_layer.features[feature_col] and apply it to display_layer.
+
+    Either `cmap` or `color_resolver` must be provided.
+
+    Parameters
+    ----------
+    cmap : matplotlib colormap, optional
+        Used when color_resolver is None. Color = cmap(value / len(cmap.colors)).
+    color_resolver : Callable[[int], RGBA], optional
+        If provided, called with the integer annotation/prediction value to
+        return an RGBA tuple. Takes precedence over cmap.
     """
-    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
-    colordict = dict(zip(label_layer.features[label_column], colors))
-    display_layer.color = colordict
-    display_layer.opacity = 1.0
-    display_layer.color_mode = "direct"
-
-
-def reset_display_colormaps_modern(
-    label_layer, feature_col, display_layer, label_column, cmap
-):
-    """
-    Reset the colormap based on the annotations in
-    label_layer.features['annotation'] and sends the updated colormap
-    to the annotation label layer
-
-    Modern version to support napari >= 0.4.19
-    """
-    from napari.utils.colormaps import DirectLabelColormap
-
-    colors = cmap(label_layer.features[feature_col].astype(float) / len(cmap.colors))
-    colordict = dict(zip(label_layer.features[label_column], colors))
+    feature_values = label_layer.features[feature_col]
+    if color_resolver is not None:
+        colors = [
+            color_resolver(int(v))
+            if not (isinstance(v, float) and math.isnan(v))
+            else (0.0, 0.0, 0.0, 0.0)
+            for v in feature_values
+        ]
+    else:
+        colors = cmap(feature_values.astype(float) / len(cmap.colors))  # type: ignore[arg-type,call-arg]
+    colordict = dict(zip(label_layer.features[label_column], colors, strict=False))
     colordict[None] = [0, 0, 0, 0]
     display_layer.colormap = DirectLabelColormap(color_dict=colordict)
     display_layer.opacity = 1.0
@@ -134,7 +139,7 @@ class NapariHandler(logging.Handler):
         napari_info(log_entry)
 
 
-def get_valid_label_layers(viewer) -> list[str]:
+def get_valid_label_layers(viewer) -> list[napari.layers.Labels]:
     """
     Get a list of label layers that are not `Annotations` or `Predictions`.
     """
@@ -199,7 +204,7 @@ def add_annotation_names(df, ClassSelection):
     class_names = []
     for annotation in df["annotations"]:
         if math.isnan(annotation):
-            class_names.append(np.NaN)
+            class_names.append(float("nan"))
         else:
             class_names.append(ClassSelection(annotation).name)
     df["annotation_names"] = class_names
