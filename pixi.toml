@@ -9,6 +9,7 @@ napari = ">=0.7.0"
 pyqt6 = "*"
 ruff = "*"
 pyright = "*"
+pandas = "<3.0.0"
 zarr = "<3.0.0" # Remove once napari-ome-zarr-navigator adopts ngio 0.5
 
 [pypi-dependencies]
