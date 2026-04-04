@@ -90,3 +90,6 @@ venv/
 *.clf
 *.csv
 *.pkl
+
+# Local dev
+examples/movies

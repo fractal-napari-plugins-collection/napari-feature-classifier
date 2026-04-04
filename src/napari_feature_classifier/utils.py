@@ -15,9 +15,6 @@ from napari.utils.colormaps import DirectLabelColormap
 from napari.utils.notifications import show_info
 from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
-# from napari._qt.dialogs.qt_notification import NapariQtNotification
-# from napari._qt.qt_event_loop import _ipython_has_eventloop
-
 
 @lru_cache(maxsize=16)
 def get_df(path):

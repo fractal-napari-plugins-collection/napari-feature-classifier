@@ -8457,8 +8457,8 @@ packages:
   timestamp: 1760544595269
 - pypi: ./
   name: napari-feature-classifier
-  version: 0.3.3.dev0+gd44594434.d20260402
-  sha256: 125b0c12119c2d5a95aaefaa1b32995c53bbba0dcf0b7db2da7965fc6beabba2
+  version: 0.3.3.dev19+g38d66ba35.d20260404
+  sha256: b4c395c671dd5c842c72b84100d2245d5af8cfa68db7f495c985dc2e181eaba8
   requires_dist:
   - magicgui
   - matplotlib
