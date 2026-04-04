@@ -239,7 +239,7 @@ class ClassifierExportPanel(Container):
         """Open a Save As dialog and save the classifier to the chosen path."""
         from qtpy.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getSaveFileName(
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
             None,
             "Save Classifier",
             str(self._save_path),
@@ -256,7 +256,7 @@ class ClassifierExportPanel(Container):
         """Open a Save As dialog and export predictions to the chosen path."""
         from qtpy.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getSaveFileName(
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
             None,
             "Export Results",
             str(self._export_path),
@@ -375,7 +375,7 @@ class ClassifierRunContainer(Container):
         # Make read-only at the Qt level: no selection, no focus, no interaction.
         # Do NOT use .enabled = False — that propagates through magicgui's container
         # chain and disables the whole plugin.
-        from qtpy.QtCore import Qt
+        from qtpy.QtCore import Qt  # type: ignore[attr-defined]
         from qtpy.QtWidgets import QAbstractItemView
 
         self._feature_list.native.setSelectionMode(
@@ -437,6 +437,7 @@ class ClassifierRunContainer(Container):
 
     def _on_run_done(self, _f1) -> None:
         """Called in the main thread when background training succeeds."""
+        assert isinstance(self._last_selected_label_layer, napari.layers.Labels)
         self._runner.make_predictions()
         self._prediction_manager.setup(self._last_selected_label_layer)
         self._prediction_manager.set_visible(True)
@@ -464,7 +465,11 @@ class ClassifierRunContainer(Container):
         selected. If so, sync prediction layer and export panel to it.
         """
         active = self._viewer.layers.selection.active
-        if active and active in get_valid_label_layers(viewer=self._viewer):
+        if (
+            active
+            and active in get_valid_label_layers(viewer=self._viewer)
+            and isinstance(active, napari.layers.Labels)
+        ):
             self._last_selected_label_layer = active
             # LabelAnnotator.selection_changed fires first (connected earlier),
             # so the annotations column already exists by the time we get here.
@@ -520,7 +525,7 @@ class ClassifierRunContainer(Container):
                 roi_id = unique[0]
             else:
                 roi_id = layer.name
-            open_roi_ids[roi_id] = layer.features["annotations"]
+            open_roi_ids[roi_id] = layer.features["annotations"]  # type: ignore[assignment]
 
         # Add historical annotations for roi_ids no longer open
         parts = list(open_roi_ids.values())
@@ -529,14 +534,14 @@ class ClassifierRunContainer(Container):
             clf_rois = self._classifier._data.index.get_level_values("roi_id")
             closed = clf_ann[~clf_rois.isin(open_roi_ids)]
             if len(closed):
-                parts.append(closed)
+                parts.append(closed)  # type: ignore[arg-type]
 
         if not parts:
             return {name: 0 for name in self._classifier.get_class_names()}
 
         counts = pd.concat(parts, ignore_index=True).dropna().value_counts()
         return {
-            name: int(counts.get(float(i + 1), 0))
+            name: int(counts.get(float(i + 1), 0))  # type: ignore[arg-type]
             for i, name in enumerate(self._classifier.get_class_names())
         }
 
@@ -570,9 +575,11 @@ class LoadClassifierContainer(Container):
 
     def __init__(self, viewer: napari.viewer.Viewer):
         self._viewer = viewer
-        self._clf_destination = FileEdit(mode="r", filter=None)
+        from magicgui.types import FileDialogMode
+
+        self._clf_destination = FileEdit(mode=FileDialogMode.EXISTING_FILE, filter=None)
         self._filter = RadioButtons(
-            value="*.clf",
+            value="*.clf",  # pyright: ignore[reportCallIssue]
             choices=["*.clf", "*.pkl", "*"],
             orientation="horizontal",
             label="Filter",
@@ -596,7 +603,7 @@ class LoadClassifierContainer(Container):
         Load a classifier from a file and start the run container with the
         correct options(already set classifier_save_path and turn on auto_save)
         """
-        clf_path = Path(self._clf_destination.value)
+        clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
         with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
 
@@ -604,7 +611,7 @@ class LoadClassifierContainer(Container):
             self._run_container = ClassifierRunContainer(
                 self._viewer,
                 clf,
-                classifier_save_path=clf_path,
+                classifier_save_path=str(clf_path),
                 auto_save=True,
             )
         except NotImplementedError:
@@ -676,6 +683,7 @@ class ClassifierWidget(Container):
         )
 
     def initialize_run_widget(self):
+        assert self._init_container is not None
         class_names = self._init_container.get_class_names()
         feature_names = self._init_container.get_selected_features()
         if not feature_names:

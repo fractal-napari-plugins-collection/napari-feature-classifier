@@ -110,13 +110,13 @@ class Classifier:
             f"F1 score on test set: {f1} \n"
             f"Annotations split into {len(X_train)} training and {len(X_test)} "
             "test samples. \n"
-            f"Training set contains {self.get_counts_per_class(y_train)}. \n"
-            f"Test set contains {self.get_counts_per_class(y_test)}."
+            f"Training set contains {self.get_counts_per_class(y_train)}. \n"  # type: ignore[arg-type]
+            f"Test set contains {self.get_counts_per_class(y_test)}."  # type: ignore[arg-type]
         )
         return f1
 
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
-        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}
+        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}  # type: ignore[arg-type]
 
     def predict(self, df):
         """
@@ -172,7 +172,7 @@ class Classifier:
         df_valid = self._predict_schema.validate(df_no_nans).set_index(
             self._index_columns
         )
-        return df_valid
+        return df_valid  # type: ignore[return-value]
 
     def _validate_input_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -248,7 +248,7 @@ def hash_single_object_id(object_id: str) -> float:
 def get_normalized_hash_column(
     df: pd.DataFrame, index_columns: Sequence[str] = ("roi_id", "label")
 ) -> pd.Series:
-    return join_index_columns(df, index_columns=index_columns).apply(
+    return join_index_columns(df, index_columns=index_columns).apply(  # type: ignore[return-value]
         hash_single_object_id
     )
 

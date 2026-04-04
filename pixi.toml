@@ -8,6 +8,7 @@ python = ">=3.10,<3.13"
 napari = ">=0.7.0"
 pyqt6 = "*"
 ruff = "*"
+pyright = "*"
 zarr = "<3.0.0" # Remove once napari-ome-zarr-navigator adopts ngio 0.5
 
 [pypi-dependencies]
@@ -26,7 +27,8 @@ test = "pytest -v --color=yes --cov=napari_feature_classifier --cov-report=xml"
 napari = "napari"
 lint = "ruff check src"
 format = "ruff format src"
-check = { depends-on = ["lint", "test"] }
+typecheck = "pyright src"
+check = { depends-on = ["lint", "typecheck", "test"] }
 
 [tasks.napari-ome-zarr]
 cmd = "napari"

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import matplotlib
 import napari
+import napari.layers
 import numpy as np
 import pandas as pd
 from matplotlib.colors import ListedColormap
@@ -44,9 +45,11 @@ def in_notebook():
     # Check if I'm running in jupyter notebook, from here:
     # https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
     try:
-        from IPython import get_ipython  # pylint: disable-msg=C0415
+        from IPython import (
+            get_ipython,  # type: ignore[attr-defined]  # pylint: disable-msg=C0415
+        )
 
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
+        if "IPKernelApp" not in get_ipython().config:  # type: ignore[union-attr]  # pragma: no cover
             return False
     except ImportError:
         return False
@@ -59,7 +62,7 @@ def get_colormap(matplotlib_colormap="Set1"):
     """
     Generates colormaps depending on the number of classes
     """
-    new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(
+    new_colors = np.array(matplotlib.colormaps[matplotlib_colormap].colors).astype(  # type: ignore[attr-defined]
         np.float32
     )
     cmap_np = np.zeros(
@@ -102,7 +105,7 @@ def reset_display_colormaps(
             for v in feature_values
         ]
     else:
-        colors = cmap(feature_values.astype(float) / len(cmap.colors))
+        colors = cmap(feature_values.astype(float) / len(cmap.colors))  # type: ignore[arg-type,call-arg]
     colordict = dict(zip(label_layer.features[label_column], colors, strict=False))
     colordict[None] = [0, 0, 0, 0]
     display_layer.colormap = DirectLabelColormap(color_dict=colordict)
@@ -204,7 +207,7 @@ def add_annotation_names(df, ClassSelection):
     class_names = []
     for annotation in df["annotations"]:
         if math.isnan(annotation):
-            class_names.append(np.NaN)
+            class_names.append(float("nan"))
         else:
             class_names.append(ClassSelection(annotation).name)
     df["annotation_names"] = class_names

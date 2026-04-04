@@ -49,6 +49,7 @@ def get_class_selection(
     if n_classes is None and class_names is None:
         raise ValueError("Provide either `n_classes` or a list of `class_names`")
     if class_names is None:
+        assert n_classes is not None  # guaranteed by the check above
         class_names = [f"Class_{i+1}" for i in range(n_classes)]
     if n_classes is None:
         n_classes = len(class_names)
@@ -241,7 +242,7 @@ class ClassSelectorPanel(Container):
         if class_index in self._class_colors:
             return self._class_colors[class_index]
         # Set1 fallback: normalize class_index into [0,1] for the colormap
-        return tuple(self._cmap(class_index / len(self._cmap.colors)))
+        return tuple(self._cmap(class_index / len(self._cmap.colors)))  # type: ignore[return-value,arg-type]
 
     def _on_row_selected(self, class_index: int) -> None:
         self._selected_n = class_index
@@ -269,8 +270,8 @@ class ClassSelectorPanel(Container):
     @property
     def value(self):
         """Return the currently selected ClassSelection Enum member."""
-        members = list(self.ClassSelection.__members__.keys())
-        return self.ClassSelection[members[self._selected_n]]
+        members = list(self.ClassSelection.__members__.keys())  # type: ignore[attr-defined]
+        return self.ClassSelection[members[self._selected_n]]  # type: ignore[index]
 
     def set_selected(self, n: int) -> None:
         """
@@ -413,7 +414,7 @@ class LabelAnnotator(Container):
 
         # Class selection panel (replaces RadioButtons)
         self.ClassSelection = ClassSelection  # pylint: disable=C0103
-        self.nb_classes = len(self.ClassSelection) - 1
+        self.nb_classes = len(self.ClassSelection) - 1  # type: ignore[arg-type]
         self.cmap = get_colormap()
         self._class_selector = ClassSelectorPanel(
             ClassSelection=ClassSelection,
@@ -479,17 +480,18 @@ class LabelAnnotator(Container):
         """
         # Check if the selection change results in a valid label layer being
         # selected. If so, initialize the annotator for it.
-        if self._viewer.layers.selection.active:
-            if self._viewer.layers.selection.active in get_valid_label_layers(
-                viewer=self._viewer
+        active = self._viewer.layers.selection.active
+        if active:
+            if active in get_valid_label_layers(viewer=self._viewer) and isinstance(
+                active, napari.layers.Labels
             ):
-                self._init_annotation(self._viewer.layers.selection.active)
+                self._init_annotation(active)
                 self._save_section.enabled = True
                 self._class_selector.enabled = True
                 self.last_selected_layer_label.value = (
-                    f"Last selected label layer: {self._viewer.layers.selection.active}"
+                    f"Last selected label layer: {active}"
                 )
-                self._last_selected_label_layer = self._viewer.layers.selection.active
+                self._last_selected_label_layer = active
                 self._update_save_destination(self._last_selected_label_layer)
             else:
                 self._save_section.enabled = False
@@ -535,7 +537,7 @@ class LabelAnnotator(Container):
         elif event.button == 2:
             labels_layer.features.loc[
                 labels_layer.features[self._label_column] == label, "annotations"
-            ] = np.NaN
+            ] = float("nan")
 
         # Update only the single color value that changed
         self.update_single_color(labels_layer, label)
@@ -544,7 +546,7 @@ class LabelAnnotator(Container):
 
     @staticmethod
     def get_scaled_position(
-        position: tuple, translate: np.array, scale: np.array
+        position: tuple, translate: np.ndarray, scale: np.ndarray
     ) -> tuple:
         """
         Get the position of a click after translation & scaling
@@ -576,9 +578,9 @@ class LabelAnnotator(Container):
         """
         label_layer.editable = False
         if "annotations" not in label_layer.features:
-            unique_labels = np.unique(label_layer.data)[1:]
+            unique_labels = np.unique(np.asarray(label_layer.data))[1:]
             annotation_df = pd.DataFrame(
-                {self._label_column: unique_labels, "annotations": np.NaN}
+                {self._label_column: unique_labels, "annotations": float("nan")}
             )
             if self._label_column in label_layer.features.columns:
                 label_layer.features = label_layer.features.merge(
@@ -604,9 +606,9 @@ class LabelAnnotator(Container):
             label_layer.mouse_drag_callbacks.append(self.toggle_label)
 
         # keybindings for the available classes (0 = deselect)
-        for i in range(len(self.ClassSelection)):
+        for i in range(len(self.ClassSelection)):  # type: ignore[arg-type]
             set_class = partial(self.set_class_n, n=i)
-            set_class.__name__ = f"set_class_{i}"
+            set_class.__name__ = f"set_class_{i}"  # type: ignore[attr-defined]
             label_layer.bind_key(str(i), set_class, overwrite=True)
 
     def _update_save_destination(self, label_layer: napari.layers.Labels):
@@ -638,7 +640,7 @@ class LabelAnnotator(Container):
             color = (0.0, 0.0, 0.0, 0.0)
         else:
             color = self._class_selector.get_color(int(annotation_val))
-        colordict = self._annotations_layer.colormap.color_dict
+        colordict = self._annotations_layer.colormap.color_dict  # type: ignore[attr-defined]
         colordict[label] = color
         self._annotations_layer.colormap = DirectLabelColormap(color_dict=colordict)
         self._annotations_layer.opacity = 1.0
@@ -649,7 +651,7 @@ class LabelAnnotator(Container):
         """
         from qtpy.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getSaveFileName(
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
             None,
             "Save Annotations",
             str(self._save_path),

@@ -185,8 +185,8 @@ def test_panel_on_row_name_changed_rebuilds_enum():
     """After a rename the ClassSelection enum uses the new name."""
     panel = make_panel()
     panel._on_row_name_changed(2, "NewBeta")
-    assert "NewBeta" in panel.ClassSelection.__members__
-    assert "Beta" not in panel.ClassSelection.__members__
+    assert "NewBeta" in panel.ClassSelection.__members__  # type: ignore[attr-defined]
+    assert "Beta" not in panel.ClassSelection.__members__  # type: ignore[attr-defined]
 
 
 def test_panel_on_row_name_changed_duplicate_ignored():

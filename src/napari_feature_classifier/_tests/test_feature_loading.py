@@ -28,7 +28,7 @@ def test_feature_loading_csv(make_napari_viewer, capsys):
     loading_widget.layer.value = labels_layer
     loading_widget.path.value = csv_path
     features = pd.read_csv(csv_path)
-    loading_widget.__call__()
+    loading_widget.__call__()  # type: ignore[call-arg]
     assert (labels_layer.features == features).all().all()
 
     # Assert that this message is logged

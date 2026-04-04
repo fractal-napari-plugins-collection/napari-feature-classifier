@@ -54,6 +54,7 @@ def test_classifier_widgets_initialization_no_features_selected(make_napari_view
 def test_classifier_initializtion_without_label_image(make_napari_viewer):
     viewer = make_napari_viewer()
     classifier_widget = ClassifierWidget(viewer)
+    assert classifier_widget._init_container is not None
     assert classifier_widget._init_container._last_selected_label_layer is None
 
 
@@ -79,6 +80,7 @@ def test_running_classification_through_widget(
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -122,6 +124,7 @@ def test_prediction_export(make_napari_viewer, qtbot, capsys, tmp_path, monkeypa
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -175,6 +178,7 @@ def test_classifier_fails_running_without_annotation(
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -184,6 +188,7 @@ def test_classifier_fails_running_without_annotation(
     classifier_widget.initialize_run_widget()
 
     # Run the classifier and wait for the background worker to finish
+    assert classifier_widget._run_container is not None
     run_and_wait(classifier_widget._run_container, qtbot)
 
     expected_message = (
@@ -210,6 +215,7 @@ def test_layer_selection_changes(make_napari_viewer):
     classifier_widget = ClassifierWidget(viewer)
 
     # Select relevant features
+    assert classifier_widget._init_container is not None
     classifier_widget._init_container._feature_combobox.value = [
         "feature_1",
         "feature_2",
@@ -218,6 +224,7 @@ def test_layer_selection_changes(make_napari_viewer):
 
     classifier_widget.initialize_run_widget()
 
+    assert classifier_widget._run_container is not None
     assert (
         classifier_widget._run_container._last_selected_label_layer.name
         == "test_labels_2"
@@ -255,6 +262,7 @@ def test_load_classifier_widget(make_napari_viewer, capsys):
     loading_widget.load()
 
     # Some basic checks that loading looks to have worked
+    assert loading_widget._run_container is not None
     assert loading_widget._run_container._prediction_manager.prediction_layer.visible
     assert "prediction" in label_layer.features.columns
 

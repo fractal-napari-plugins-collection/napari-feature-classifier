@@ -43,7 +43,10 @@ def load_features_csv(
 
 @pa.check_types
 def make_features(
-    labels: Sequence[int], roi_id: str = "id", n_features: int = 10, seed: int = 42
+    labels: Sequence[int] | np.ndarray,
+    roi_id: str = "id",
+    n_features: int = 10,
+    seed: int = 42,
 ) -> DataFrame[LabelFeatureSchema]:
     columns = [f"feature_{i}" for i in range(n_features)]
     rng = np.random.default_rng(seed=seed)
@@ -66,7 +69,7 @@ def load_features_factory(
     layer: Labels, path: Path, loader: FeatureLoaderFn = load_features_csv
 ) -> LayerDataTuple:
     df = loader(path)  # pylint: disable=C0103
-    image_labels = np.unique(layer.data)[1:]
+    image_labels = np.unique(np.asarray(layer.data))[1:]
     feature_labels = df["label"].values
     if len(set(image_labels).symmetric_difference(feature_labels)) != 0:
         warn_str = "Label image labels do not match with feature table.\n"
@@ -77,4 +80,4 @@ def load_features_factory(
         napari_info(warn_str)
         warnings.warn(warn_str, stacklevel=2)
     napari_info(f'Loaded features and attached them to "{layer}" layer')
-    return (layer.data, {"name": layer.name, "features": df}, "labels")
+    return (layer.data, {"name": layer.name, "features": df}, "labels")  # type: ignore[return-value]

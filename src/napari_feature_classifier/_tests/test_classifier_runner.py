@@ -165,7 +165,7 @@ def test_get_relevant_features_filter_annotations_drops_unannotated(viewer):
     labels.features = df
     runner = ClassifierRunner(viewer, make_classifier())
     result = runner.get_relevant_features(labels.features, filter_annotations=True)
-    assert result["annotations"].notna().all()
+    assert result["annotations"].notna().all()  # type: ignore[union-attr]
     assert len(result) == N_LABELS - 5
 
 

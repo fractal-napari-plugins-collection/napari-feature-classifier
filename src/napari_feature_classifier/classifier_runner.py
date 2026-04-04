@@ -185,7 +185,7 @@ class ClassifierRunner:
             df_relevant = df_relevant.set_index(
                 [self._roi_id_column, self._label_column]
             )
-        return df_relevant
+        return df_relevant  # type: ignore[return-value]
 
     def restore_annotations_to_layer(self, label_layer: napari.layers.Labels) -> bool:
         """
@@ -205,7 +205,7 @@ class ClassifierRunner:
         # Determine roi_id for this layer
         if self._roi_id_column not in label_layer.features.columns:
             return False
-        roi_col: pd.Series = label_layer.features[self._roi_id_column]
+        roi_col: pd.Series = label_layer.features[self._roi_id_column]  # type: ignore[assignment]
         unique_ids = roi_col.dropna().unique()
         if len(unique_ids) != 1:
             return False
@@ -217,11 +217,12 @@ class ClassifierRunner:
             return False
 
         # Extract stored annotations for this roi_id (drop NaN / NoClass rows)
-        stored = self._classifier._data.loc[
+        stored: pd.Series = self._classifier._data.loc[  # type: ignore[assignment]
             self._classifier._data.index.get_level_values(self._roi_id_column)
             == roi_id,
             "annotations",
-        ].dropna()
+        ]
+        stored = stored.dropna()
         stored = stored[stored != -1]
         if stored.empty:
             return False
@@ -333,9 +334,9 @@ class PredictionLayerManager:
     def _ensure_prediction_column(self, label_layer: napari.layers.Labels) -> None:
         """Add a NaN-filled 'prediction' column to layer.features if absent."""
         if "prediction" not in label_layer.features:
-            unique_labels = np.unique(label_layer.data)[1:]
+            unique_labels = np.unique(np.asarray(label_layer.data))[1:]
             predict_df = pd.DataFrame(
-                {self._label_column: unique_labels, "prediction": np.NaN}
+                {self._label_column: unique_labels, "prediction": float("nan")}
             )
             if self._label_column in label_layer.features.columns:
                 label_layer.features = label_layer.features.merge(
