@@ -422,6 +422,7 @@ class LabelAnnotator(Container):
             on_names_changed=self._on_class_names_changed_internal(on_names_changed),
             on_colors_changed=self._on_class_colors_changed_internal(on_colors_changed),
         )
+        self._annotated_layer: napari.layers.Labels | None = None
         self._init_annotation(self._last_selected_label_layer)
         self._save_path = Path("annotation.csv")
         self._save_annotation = PushButton(text="Save Annotations…")
@@ -441,6 +442,7 @@ class LabelAnnotator(Container):
         self._save_annotation.clicked.connect(self._on_save_clicked)
         # Connect to label layer change, potentially call init
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
+        self.native.destroyed.connect(self.close)
 
     def _on_class_names_changed_internal(
         self, external_cb: Callable[[list[str]], None] | None
@@ -572,10 +574,30 @@ class LabelAnnotator(Container):
     def set_class_n(self, event, n: int):  # pylint: disable=C0103
         self._class_selector.set_selected(n)
 
+    def _cleanup_layer_callbacks(self) -> None:
+        """Remove toggle_label from the previously annotated layer's mouse drag callbacks."""
+        if self._annotated_layer is None:
+            return
+        if self.toggle_label in self._annotated_layer.mouse_drag_callbacks:
+            self._annotated_layer.mouse_drag_callbacks.remove(self.toggle_label)
+        self._annotated_layer = None
+
+    def close(self) -> None:
+        """Disconnect viewer events and clean up layer callbacks."""
+        self._cleanup_layer_callbacks()
+        try:
+            self._viewer.layers.selection.events.changed.disconnect(
+                self.selection_changed
+            )
+        except (ValueError, RuntimeError):
+            pass  # already disconnected
+
     def _init_annotation(self, label_layer: napari.layers.Labels):
         """
         Initializes the annotation layer for the given label layer.
         """
+        self._cleanup_layer_callbacks()
+        self._annotated_layer = label_layer
         label_layer.editable = False
         if "annotations" not in label_layer.features:
             unique_labels = np.unique(np.asarray(label_layer.data))[1:]

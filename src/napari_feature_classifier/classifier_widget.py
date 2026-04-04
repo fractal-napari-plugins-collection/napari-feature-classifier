@@ -109,6 +109,15 @@ class ClassifierInitContainer(Container):
         self._viewer.layers.selection.events.changed.connect(
             self.update_layer_selection
         )
+        self.native.destroyed.connect(self.close)
+
+    def close(self) -> None:
+        try:
+            self._viewer.layers.selection.events.changed.disconnect(
+                self.update_layer_selection
+            )
+        except (ValueError, RuntimeError):
+            pass
 
     def get_selected_features(self):
         """
@@ -405,8 +414,17 @@ class ClassifierRunContainer(Container):
         self._viewer.layers.selection.active = self._last_selected_label_layer
         self._run_button.clicked.connect(self.run)
         self._viewer.layers.selection.events.changed.connect(self.selection_changed)
+        self.native.destroyed.connect(self.close)
         # Initialise counts now that the panel is fully wired
         self._update_counts()
+
+    def close(self) -> None:
+        try:
+            self._viewer.layers.selection.events.changed.disconnect(
+                self.selection_changed
+            )
+        except (ValueError, RuntimeError):
+            pass
 
     def run(self):
         """

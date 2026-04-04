@@ -245,3 +245,39 @@ def test_count_updates_on_layer_selection_change(viewer):
     # Both layers are open, so both annotations should be visible
     assert counts_after_switch["Class_1"] == 1
     assert counts_after_switch["Class_2"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Callback cleanup tests
+# ---------------------------------------------------------------------------
+
+
+def test_layer_switch_removes_mouse_drag_callback(viewer):
+    """Switching label layers removes toggle_label from the old layer's callbacks."""
+    layer_a = make_label_layer(viewer, name="LayerA", roi_id="a")
+    layer_b = make_label_layer(viewer, name="LayerB", roi_id="b")
+
+    container = make_run_container(viewer)
+    annotator = container._annotator
+
+    # Activate layer A — this triggers _init_annotation on layer A
+    viewer.layers.selection.active = layer_a
+    assert annotator.toggle_label in layer_a.mouse_drag_callbacks
+
+    # Switch to layer B — toggle_label should be removed from layer A
+    viewer.layers.selection.active = layer_b
+    assert annotator.toggle_label not in layer_a.mouse_drag_callbacks
+    assert annotator.toggle_label in layer_b.mouse_drag_callbacks
+
+
+def test_close_removes_mouse_drag_callback(viewer):
+    """Calling annotator.close() removes toggle_label from the current layer's callbacks."""
+    layer = make_label_layer(viewer, name="Labels", roi_id="site1")
+    container = make_run_container(viewer)
+    annotator = container._annotator
+
+    viewer.layers.selection.active = layer
+    assert annotator.toggle_label in layer.mouse_drag_callbacks
+
+    annotator.close()
+    assert annotator.toggle_label not in layer.mouse_drag_callbacks

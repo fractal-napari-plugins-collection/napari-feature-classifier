@@ -223,7 +223,7 @@ class ClassifierRunner:
             "annotations",
         ]
         stored = stored.dropna()
-        stored = stored[stored != -1]
+        stored = stored[stored != -1]  # type: ignore[operator]
         if stored.empty:
             return False
 
@@ -234,7 +234,7 @@ class ClassifierRunner:
         # Only fill rows that are currently NaN — live annotations take precedence
         features = label_layer.features
         nan_mask = features["annotations"].isna() & features[self._label_column].isin(
-            stored_labels
+            stored_labels  # type: ignore[arg-type]
         )
         features.loc[nan_mask, "annotations"] = features.loc[
             nan_mask, self._label_column
