@@ -39,7 +39,7 @@ Your feature table must have:
 
 Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
-<img width="1694" height="1088" alt="classifier_init" src="https://github.com/user-attachments/assets/05a2495a-b7fd-40be-bd9c-607177c0aa68" />
+<img width="1000" alt="classifier_init" src="https://github.com/user-attachments/assets/05a2495a-b7fd-40be-bd9c-607177c0aa68" />
 
 
 - Select the features to use for training. Hold Cmd/Ctrl to select multiple. The feature list reflects the currently selected label layer.
@@ -50,7 +50,7 @@ Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
 ### 3. Annotate and train
 
-<img width="1694" height="1088" alt="classifier_annotation" src="https://github.com/user-attachments/assets/25a9c90a-0d58-4fc2-92df-9006cdae00aa" />
+<img width="1000" alt="classifier_annotation" src="https://github.com/user-attachments/assets/25a9c90a-0d58-4fc2-92df-9006cdae00aa" />
 
 
 - Select your label layer in the napari layer list.
@@ -61,7 +61,7 @@ Go to `Plugins → napari-feature-classifier → Initialize a Classifier`.
 
 The classifier splits your annotations 80/20 into training and test sets, trains a random forest, and applies it to all objects. Predictions appear as a color-coded **Predictions** layer.
 
-<img width="1694" height="1088" alt="classifier-predict" src="https://github.com/user-attachments/assets/273d696f-669f-4d01-88e4-e74e204a066d" />
+<img width="1000" alt="classifier-predict" src="https://github.com/user-attachments/assets/273d696f-669f-4d01-88e4-e74e204a066d" />
 
 Correct mistakes the classifier made and click Run Classifier again to improve it. Iterative annotation is the intended workflow.
 
