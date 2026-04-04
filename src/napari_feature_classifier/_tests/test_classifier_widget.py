@@ -15,11 +15,14 @@ from napari_feature_classifier.feature_loader_widget import make_features
 
 
 def run_and_wait(container, qtbot, timeout=30_000):
-    """Trigger container.run() and block until the background worker finishes."""
+    """Trigger container.run() and block until the background worker finishes.
+
+    Waits for the run button to be re-enabled, which is the last action in
+    both _on_run_done and _on_run_error — guaranteeing those callbacks have
+    fully completed regardless of which thread they ran in.
+    """
     container.run()
-    qtbot.waitSignal(container._run_worker.signals.finished, timeout=timeout)
-    # Drain any queued callbacks (e.g. _on_run_done) before returning
-    qtbot.wait(100)
+    qtbot.waitUntil(lambda: container._run_button.enabled, timeout=timeout)
 
 
 lbl_img_np = imageio.v2.imread(

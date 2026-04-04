@@ -216,7 +216,7 @@ def test_count_label_still_correct_after_run(viewer, qtbot, tmp_path, monkeypatc
 
     container = make_run_container(viewer)
     container.run()
-    qtbot.waitSignal(container._run_worker.signals.finished, timeout=30_000)
+    qtbot.waitUntil(lambda: container._run_button.enabled, timeout=30_000)
 
     counts = panel_counts(container)
     assert counts["Class_1"] == 4
