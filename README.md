@@ -129,7 +129,7 @@ pip install napari-feature-classifier
 
 ## Similar napari plugins
 
-- [napari-convpaint](https://github.com/guiwitz/napari-convpaint) — deep feature-based pixel and object classifier by Guillaume Witz
+- [napari-convpaint](https://github.com/guiwitz/napari-convpaint) — deep feature-based pixel and object classifier by Guillaume Witz, @quasar1357 & others
 - [napari-accelerated-pixel-and-object-classification (APOC)](https://github.com/haesleinhuepf/napari-accelerated-pixel-and-object-classification) — pixel and object classifier by Robert Haase
 - [napari-svetlana](https://www.napari-hub.org/plugins/napari-svetlana) — deep learning based classifier by Clément Cazorla
 
