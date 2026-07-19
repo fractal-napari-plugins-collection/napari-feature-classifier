@@ -14,20 +14,24 @@ except ImportError:
 from feature_classifier_core.classifier import (
     BUNDLE_FORMAT_VERSION,
     Classifier,
+    check_bundle_version,
     get_input_internal_and_predict_schemas,
     get_normalized_hash_column,
     get_random_object_id,
     hash_single_object_id,
     join_index_columns,
+    load_bundle,
 )
 
 __all__ = [
     "BUNDLE_FORMAT_VERSION",
     "Classifier",
+    "check_bundle_version",
     "get_input_internal_and_predict_schemas",
     "get_normalized_hash_column",
     "get_random_object_id",
     "hash_single_object_id",
     "join_index_columns",
+    "load_bundle",
     "__version__",
 ]

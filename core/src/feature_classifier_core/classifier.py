@@ -19,6 +19,37 @@ from sklearn.metrics import f1_score
 BUNDLE_FORMAT_VERSION = 1
 
 
+def check_bundle_version(bundle: dict) -> int:
+    """Validate a model bundle's format version and return it.
+
+    Raises ``ValueError`` if the bundle was written by a newer, incompatible
+    bundle format than this package understands. Shared by the loaders here
+    and by downstream consumers so the compatibility rule lives in one place.
+    """
+    version = bundle.get("format_version", 1)
+    if version > BUNDLE_FORMAT_VERSION:
+        raise ValueError(
+            f"Model bundle format version {version} is newer than the supported "
+            f"version {BUNDLE_FORMAT_VERSION}; please upgrade feature-classifier-core."
+        )
+    return version
+
+
+def load_bundle(path) -> dict:
+    """Load and validate a neutral model bundle, returning its dict.
+
+    Returns the ``{format_version, estimator, feature_names, class_names}``
+    dict written by :meth:`Classifier.export_bundle`. This is the headless
+    entry point for consumers that only need the fitted estimator and its
+    metadata, without reconstructing a full :class:`Classifier`.
+    """
+    bundle = joblib.load(path)
+    if not (isinstance(bundle, dict) and "estimator" in bundle):
+        raise ValueError(f"Not a recognized model bundle: {path!r}")
+    check_bundle_version(bundle)
+    return bundle
+
+
 # TODO: define an interface for compatible classifiers (m.b. a subset of
 # sklearn Estimators?)
 class Classifier:
@@ -225,6 +256,10 @@ class Classifier:
     def get_feature_names(self):
         return self._feature_names
 
+    def get_estimator(self):
+        """Return the fitted scikit-learn estimator backing this classifier."""
+        return self._classifier
+
     def save(self, output_path):
         """Persist the full classifier state (training data, colors, schemas).
 
@@ -281,12 +316,7 @@ class Classifier:
     @classmethod
     def _from_bundle(cls, bundle: dict) -> "Classifier":
         """Reconstruct a headless ``Classifier`` from a neutral bundle dict."""
-        version = bundle.get("format_version", 1)
-        if version > BUNDLE_FORMAT_VERSION:
-            raise ValueError(
-                f"Bundle format version {version} is newer than the supported "
-                f"version {BUNDLE_FORMAT_VERSION}; upgrade napari-feature-classifier."
-            )
+        check_bundle_version(bundle)
         return cls(
             feature_names=bundle["feature_names"],
             class_names=bundle["class_names"],
