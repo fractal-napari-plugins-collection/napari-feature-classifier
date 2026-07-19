@@ -1,6 +1,7 @@
 """Classifier container widget for napari"""
 
 import logging
+import warnings
 from pathlib import Path
 
 import napari
@@ -662,7 +663,11 @@ class LoadClassifierContainer(Container):
         correct options(already set classifier_save_path and turn on auto_save)
         """
         clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
-        clf = Classifier.load(clf_path)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            clf = Classifier.load(clf_path)
+        for message in dict.fromkeys(str(w.message) for w in caught):
+            napari_info(message)
 
         try:
             self._run_container = ClassifierRunContainer(
