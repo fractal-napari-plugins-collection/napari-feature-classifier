@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "napari-feature-classifier"
-dynamic = ["version"]
+dynamic = ["version", "dependencies"]
 description = "An interactive classifier plugin to use with label images and feature measurements"
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -25,17 +25,14 @@ classifiers = [
     "Operating System :: OS Independent",
     "License :: OSI Approved :: BSD License",
 ]
-dependencies = [
-    "numpy",
-    "napari>=0.6.0",
-    "matplotlib",
-    "magicgui",
-    "pandas>=2.2.0, <3.0.0",
-    "scikit-learn>=1.2.2",
-    "pandera",
-    "xxhash",
-    "hypothesis",
-]
+# The interactive napari plugin. The headless Classifier lives in
+# `feature-classifier-core`; this distribution adds the napari/Qt GUI.
+# A plain `pip install napari-feature-classifier` yields a fully working plugin. 
+# For headless/pipeline use, depend on `feature-classifier-core` instead.
+#
+# `dependencies` is dynamic: the runtime deps live in hatch_build.py, which also
+# pins `feature-classifier-core` to this build's exact version so the two
+# lockstep packages always match (see that file for the rationale).
 
 [project.optional-dependencies]
 testing = [
@@ -61,8 +58,14 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/napari_feature_classifier/_version.py"
 
+[tool.hatch.metadata.hooks.custom]
+path = "hatch_build.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/napari_feature_classifier"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["core", "playground", "docs", "examples"]
 
 [tool.ruff]
 line-length = 88

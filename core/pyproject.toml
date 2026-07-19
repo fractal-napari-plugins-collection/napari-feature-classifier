@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "feature-classifier-core"
+dynamic = ["version"]
+description = "Headless core (Classifier + model bundles) of napari-feature-classifier"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "Joel Luethi and Max Hess", email = "joel.luethi@uzh.ch" }
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+]
+# No napari/Qt/magicgui: the Classifier trains, predicts and (de)serializes
+# model bundles on scikit-learn/pandas/pandera alone.
+dependencies = [
+    "pandas>=2.2.0, <3.0.0",
+    "scikit-learn>=1.2.2",
+    "joblib",
+    "pandera",
+    "xxhash",
+    "hypothesis",
+]
+
+[project.optional-dependencies]
+testing = [
+    "pytest",
+    "pytest-cov",
+    "numpy",
+]
+
+[project.urls]
+"Source Code" = "https://github.com/fractal-napari-plugins-collection/napari-feature-classifier"
+
+# Version is derived from the shared repository git tag (one tag drives both the
+# core and the plugin distributions), so ``root`` points at the repo root.
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
+raw-options = { root = ".." }
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/feature_classifier_core/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/feature_classifier_core"]
+
+[tool.pytest.ini_options]
+addopts = "--color=yes"
+testpaths = ["tests"]
