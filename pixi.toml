@@ -13,6 +13,7 @@ pandas = "<3.0.0"
 zarr = "<3.0.0" # Remove once napari-ome-zarr-navigator adopts ngio 0.5
 
 [pypi-dependencies]
+feature-classifier-core = { path = "core", editable = true, extras = ["testing"] }
 napari-feature-classifier = { path = ".", editable = true, extras = ["testing"] }
 
 [feature.local-dev.pypi-dependencies]
@@ -25,6 +26,7 @@ local-dev = ["local-dev"]
 
 [tasks]
 test = "pytest -v --color=yes --cov=napari_feature_classifier --cov-report=xml"
+test-core = "pytest -v --color=yes core/tests"
 napari = "napari"
 lint = "ruff check src"
 format = "ruff format src"

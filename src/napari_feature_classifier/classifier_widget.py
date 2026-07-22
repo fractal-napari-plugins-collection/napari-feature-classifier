@@ -1,7 +1,7 @@
 """Classifier container widget for napari"""
 
 import logging
-import pickle
+import warnings
 from pathlib import Path
 
 import napari
@@ -200,13 +200,31 @@ class ClassifierExportPanel(Container):
             classifier_save_path or f"{initial_layer}_classifier.clf"
         )
         self._export_path = Path(f"{initial_layer}_predictions.csv")
+        self._export_model_path = Path(f"{initial_layer}_model.joblib")
 
-        self._save_button = PushButton(text="Save Classifier As…")
-        self._export_button = PushButton(text="Export Results As…")
+        self._save_button = PushButton(
+            text="Save Classifier As…",
+            tooltip=(
+                "Save the full classifier session (training data and settings) "
+                "as a .clf file so you can reload it here and keep annotating."
+            ),
+        )
+        self._export_button = PushButton(
+            text="Export Results As…",
+            tooltip="Export the predictions for the selected layer as a CSV file.",
+        )
+        self._export_model_button = PushButton(
+            text="Export Model As…",
+            tooltip=(
+                "Export just the trained model as a portable .joblib bundle "
+                "(estimator + feature and class names) for headless prediction "
+                "in pipelines. Requires scikit-learn only."
+            ),
+        )
 
         self._saving_section = CollapsibleSection(
             "Saving & Export",
-            [self._save_button, self._export_button],
+            [self._save_button, self._export_button, self._export_model_button],
             collapsed=True,
         )
 
@@ -214,6 +232,7 @@ class ClassifierExportPanel(Container):
         self.native.layout().setContentsMargins(0, 0, 0, 0)
         self._save_button.clicked.connect(self._on_save_as_clicked)
         self._export_button.clicked.connect(self._on_export_clicked)
+        self._export_model_button.clicked.connect(self._on_export_model_clicked)
 
     def update_selected_layer(self, label_layer: napari.layers.Labels) -> None:
         """Update the tracked layer and refresh the export path."""
@@ -261,6 +280,11 @@ class ClassifierExportPanel(Container):
         self._classifier.save(self._save_path)
         napari_info(f"Classifier saved at {self._save_path}")
 
+    def export_model(self) -> None:
+        """Export the trained model as a portable, headless-loadable bundle."""
+        self._classifier.export_bundle(self._export_model_path)
+        napari_info(f"Model exported at {self._export_model_path}")
+
     def _on_export_clicked(self) -> None:
         """Open a Save As dialog and export predictions to the chosen path."""
         from qtpy.QtWidgets import QFileDialog
@@ -276,10 +300,27 @@ class ClassifierExportPanel(Container):
         self._export_path = Path(path)
         self.export_results()
 
+    def _on_export_model_clicked(self) -> None:
+        """Open a Save As dialog and export the model bundle to the chosen path."""
+        from qtpy.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(  # type: ignore[misc]
+            None,
+            "Export Model",
+            str(self._export_model_path),
+            "Model bundles (*.joblib);;All files (*)",
+        )
+        if not path:
+            return
+        self._export_model_path = Path(path)
+        self.export_model()
+
     def _update_export_destination(self, label_layer: napari.layers.Labels) -> None:
-        """Update the default export path to match the selected layer name."""
+        """Update the default export paths to match the selected layer name."""
         base_path = self._export_path.parent
         self._export_path = base_path / f"{label_layer.name}_predictions.csv"
+        model_base = self._export_model_path.parent
+        self._export_model_path = model_base / f"{label_layer.name}_model.joblib"
 
 
 class ClassifierRunContainer(Container):
@@ -622,8 +663,11 @@ class LoadClassifierContainer(Container):
         correct options(already set classifier_save_path and turn on auto_save)
         """
         clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
-        with open(clf_path, "rb") as f:  # pylint: disable=C0103
-            clf = pickle.load(f)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            clf = Classifier.load(clf_path)
+        for message in dict.fromkeys(str(w.message) for w in caught):
+            napari_info(message)
 
         try:
             self._run_container = ClassifierRunContainer(

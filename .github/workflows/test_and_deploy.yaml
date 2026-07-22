@@ -12,8 +12,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Headless core: no napari/Qt, no xvfb. Also asserts napari cannot be imported,
+  # so a stray napari import in the core package fails CI.
+  test-core:
+    name: core (headless) py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for hatch-vcs to read git tags
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install core only
+        run: pip install -e "./core[testing]"
+
+      - name: Assert core is headless (no napari)
+        run: |
+          python -c "import feature_classifier_core; import importlib.util as u; \
+          assert u.find_spec('napari') is None, 'napari leaked into the core env'; \
+          print('feature_classifier_core imports without napari')"
+
+      - name: Run core tests
+        run: pytest core/tests
+
   test:
-    name: ${{ matrix.platform }} py${{ matrix.python-version }}
+    name: plugin ${{ matrix.platform }} py${{ matrix.python-version }}
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
@@ -22,6 +52,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for hatch-vcs to read git tags
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -38,8 +70,10 @@ jobs:
           git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
           powershell gl-ci-helpers/appveyor/install_opengl.ps1
 
+      # Install the core (editable) alongside the plugin so the plugin's exact
+      # feature-classifier-core== pin resolves to this checkout, not PyPI.
       - name: Install dependencies
-        run: pip install -e ".[testing]" pyqt6
+        run: pip install -e "./core[testing]" -e ".[testing]" pyqt6
 
       - name: Run tests
         uses: GabrielBB/xvfb-action@v1
@@ -57,7 +91,7 @@ jobs:
     # this will run when you have tagged a commit, starting with "v*"
     # and requires that you have put your twine API key in your
     # github secrets (see readme for details)
-    needs: [test]
+    needs: [test-core, test]
     runs-on: ubuntu-latest
     if: contains(github.ref, 'tags')
     steps:
@@ -78,5 +112,8 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.TWINE_API_KEY }}
         run: |
           git tag
-          python -m build .
+          # Build the core first, then the plugin. Both derive the same version
+          # from the tag, so the plugin's feature-classifier-core== pin matches.
+          python -m build --outdir dist ./core
+          python -m build --outdir dist .
           twine upload dist/*

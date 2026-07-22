@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from napari_feature_classifier.classifier import Classifier
+from feature_classifier_core.classifier import Classifier
 
 # pylint: disable=C0103
 CLASSIFIER_FEATURE_NAMES = ["feature1", "feature2", "feature3"]

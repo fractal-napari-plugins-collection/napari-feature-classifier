@@ -1,14 +1,17 @@
-"""Back-compatibility shim.
+"""Headless core of the feature classifier.
 
-The classifier is part of the headless :mod:`feature_classifier_core` package.
-This module re-exports it so that ``from napari_feature_classifier.classifier
-import Classifier`` keeps working, and that ``.clf`` files which
-referencing ``napari_feature_classifier.classifier.Classifier`` still unpickle.
-
-New code should import from :mod:`feature_classifier_core` directly.
+Contains the :class:`Classifier` (training, prediction, and neutral model
+bundles) and its helper functions, with no napari/Qt/magicgui dependency. The
+interactive napari plugin ``napari-feature-classifier`` builds its widgets on
+top of this package.
 """
 
-from feature_classifier_core.classifier import (  # noqa: F401
+try:
+    from feature_classifier_core._version import __version__
+except ImportError:
+    __version__ = "unknown"
+
+from feature_classifier_core.classifier import (
     BUNDLE_FORMAT_VERSION,
     Classifier,
     check_bundle_version,
@@ -30,4 +33,5 @@ __all__ = [
     "hash_single_object_id",
     "join_index_columns",
     "load_bundle",
+    "__version__",
 ]
