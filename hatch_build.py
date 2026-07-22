@@ -11,16 +11,6 @@ from pathlib import Path
 
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
-# Single source of truth for the plugin's runtime dependencies (except the
-# lockstep-pinned core, which is injected below). Keep in sync with the README.
-BASE_DEPENDENCIES = [
-    "numpy",
-    "pandas>=2.2.0, <3.0.0",
-    "napari>=0.6.0",
-    "matplotlib",
-    "magicgui",
-]
-
 
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata: dict) -> None:
@@ -30,7 +20,7 @@ class CustomMetadataHook(MetadataHookInterface):
             if version
             else "feature-classifier-core"
         )
-        metadata["dependencies"] = [core, *BASE_DEPENDENCIES]
+        metadata["dependencies"] = [core, *self.config["base-dependencies"]]
 
 
 def _resolve_version(root: Path) -> str | None:

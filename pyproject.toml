@@ -58,8 +58,17 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/napari_feature_classifier/_version.py"
 
+# Runtime dependencies. The hook prepends
+# `feature-classifier-core==<this build's version>` to the list below.
 [tool.hatch.metadata.hooks.custom]
 path = "hatch_build.py"
+base-dependencies = [
+    "numpy",
+    "pandas>=2.2.0, <3.0.0",
+    "napari>=0.6.0",
+    "matplotlib",
+    "magicgui",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/napari_feature_classifier"]
