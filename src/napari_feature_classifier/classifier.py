@@ -524,7 +524,10 @@ def join_index_columns(df: pd.DataFrame, index_columns: Sequence[str]) -> pd.Ser
 
 def hash_single_object_id(object_id: str) -> float:
     max_value = 2**32
-    return xxhash.xxh32(object_id).intdigest() / max_value
+    # xxhash >= 4 only accepts bytes. xxhash 3.x hashed str as its UTF-8
+    # bytes, so encoding explicitly keeps the train/test split of existing
+    # classifiers identical.
+    return xxhash.xxh32(object_id.encode("utf-8")).intdigest() / max_value
 
 
 def get_normalized_hash_column(

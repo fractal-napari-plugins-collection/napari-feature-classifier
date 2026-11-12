@@ -753,3 +753,13 @@ def test_get_counts_per_class_returns_plain_ints_in_class_order():
     assert list(counts) == ["s", "m"]
     assert counts == {"s": 1, "m": 3}
     assert all(type(v) is int for v in counts.values())
+
+
+def test_object_id_hash_is_stable():
+    """The train/test split is derived from this hash and stored in saved
+    classifiers: its values must not change (e.g. across xxhash versions;
+    xxhash >= 4 rejects str input, 3.x hashed str as UTF-8 bytes)."""
+    from napari_feature_classifier.classifier import hash_single_object_id
+
+    assert hash_single_object_id("site1_5") == 2212825421 / 2**32
+    assert 0.0 <= hash_single_object_id("Zürich_µm_細胞_3") < 1.0
