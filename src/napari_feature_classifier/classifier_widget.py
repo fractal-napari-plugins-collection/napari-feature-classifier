@@ -443,8 +443,12 @@ class ClassifierRunContainer(Container):
         @thread_worker(ignore_errors=True)
         def _train():
             self._runner.add_features_to_classifier()
-            f1 = self._classifier.train()  # raises ValueError on bad input
-            return f1
+            # Retrains only if the annotations/features changed since the
+            # model was last fitted; otherwise predicts with the existing
+            # model. Raises ValueError on bad input.
+            retrained = self._classifier.needs_training()
+            f1 = self._classifier.train_if_needed()
+            return retrained, f1
 
         self._run_worker = _train()
         # Connect to self methods (QObject) so PyQt uses QueuedConnection for
@@ -453,13 +457,20 @@ class ClassifierRunContainer(Container):
         self._run_worker.errored.connect(self._on_run_error)
         self._run_worker.start()
 
-    def _on_run_done(self, _f1) -> None:
+    def _on_run_done(self, result: tuple[bool, float | None]) -> None:
         """Called in the main thread when background training succeeds."""
+        retrained, _f1 = result
         assert isinstance(self._last_selected_label_layer, napari.layers.Labels)
         self._runner.make_predictions()
         self._prediction_manager.setup(self._last_selected_label_layer)
         self._prediction_manager.set_visible(True)
-        self._export_panel.save()
+        if retrained:
+            self._export_panel.save()
+        else:
+            napari_info(
+                "No annotation changes since the last training: predictions use "
+                "the existing model (not retrained, classifier file unchanged)."
+            )
         self._update_counts()
         self._run_button.text = "Run Classifier"
         self._run_button.enabled = True

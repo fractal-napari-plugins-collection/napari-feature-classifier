@@ -1,5 +1,6 @@
 """Core classifier class and helper functions."""
 
+import hashlib
 import logging
 import pickle
 import random
@@ -11,7 +12,9 @@ import pandas as pd
 import pandera.pandas as pa
 import xxhash
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.exceptions import NotFittedError
 from sklearn.metrics import f1_score
+from sklearn.utils.validation import check_is_fitted
 
 # Seed for the default RandomForestClassifier. Without a fixed seed, every
 # retrain on identical annotations gives a different forest and borderline
@@ -118,12 +121,20 @@ class Classifier:
         # Per-class colors: keys are 1-based class indices, values are RGBA float tuples.
         # Empty dict means "use Set1 fallback". Persisted via pickle.
         self._class_colors: dict[int, tuple[float, float, float, float]] = {}
+        # Fingerprint of the training data the current model was fitted on.
+        # None = unknown / not trained -> the next train_if_needed() retrains.
+        self._trained_data_fingerprint: str | None = None
 
     def __setstate__(self, state: dict) -> None:
         """Restore state from pickle, adding defaults for attributes added in later versions."""
         self.__dict__.update(state)
         if "_class_colors" not in self.__dict__:
             self._class_colors = {}
+        # Classifiers saved before fingerprints were introduced: it can't be
+        # proven which data their model was fitted on, so they count as
+        # "needs training" (the first Run retrains once).
+        if "_trained_data_fingerprint" not in self.__dict__:
+            self._trained_data_fingerprint = None
         # Classifiers saved before seeding was introduced have random_state=None,
         # so every retrain produced a different model. Seed them on load. This
         # does not change the already fitted model or its predictions, only
@@ -142,12 +153,73 @@ class Classifier:
         except Exception:  # noqa: BLE001
             pass
 
-    # TODO: Add tests.
+    def training_data_fingerprint(self) -> str:
+        """
+        Fingerprint of everything that determines the trained model: all
+        stored objects (roi_id, label), their annotations and features, the
+        feature order and the train/test split fraction. Independent of row
+        order and of pandas dtypes, so re-adding identical annotations does not
+        change it.
+        """
+        data = self._data.sort_index()
+        h = hashlib.sha256()
+        h.update("\x1f".join(self._feature_names).encode())
+        h.update(repr(float(self._training_data_perc)).encode())
+        roi_ids = data.index.get_level_values(self._index_columns[0])
+        labels = data.index.get_level_values(self._index_columns[1])
+        h.update("\x1f".join(map(str, roi_ids)).encode())
+        h.update(np.asarray(labels, dtype=np.uint64).tobytes())
+        annotations = pd.Series(data["annotations"]).fillna(-99)
+        h.update(annotations.to_numpy(dtype=np.int64).tobytes())
+        h.update(
+            data[self._feature_names]
+            .to_numpy(dtype=np.float32, na_value=np.nan)
+            .tobytes()
+        )
+        return h.hexdigest()
+
+    def _model_is_fitted(self) -> bool:
+        try:
+            check_is_fitted(self._classifier)
+        except NotFittedError:
+            return False
+        except TypeError:  # not an sklearn estimator: rely on the fingerprint
+            return True
+        return True
+
+    def needs_training(self) -> bool:
+        """
+        True unless it is certain that the current model was fitted on exactly
+        the current training data (same objects, annotations and features).
+        Classifiers without a fingerprint (never trained, training failed, or
+        saved by an older version) always need training.
+        """
+        if self._trained_data_fingerprint is None or not self._model_is_fitted():
+            return True
+        return self._trained_data_fingerprint != self.training_data_fingerprint()
+
+    def train_if_needed(self) -> float | None:
+        """
+        Retrain only if the training data changed since the model was last
+        fitted (see needs_training). Returns the F1 score if it retrained,
+        None if the existing model was kept.
+        """
+        if self.needs_training():
+            return self.train()
+        self.logger.info(
+            "Annotations unchanged since the last training: using the existing "
+            "model without retraining."
+        )
+        return None
+
     def train(self):
         """
         Train the classifier on the data it already has in self._data.
         """
         self.logger.info("Training classifier...")
+        # Invalidate first: if anything below fails, the next run retrains.
+        self._trained_data_fingerprint = None
+        fingerprint = self.training_data_fingerprint()
         train_data = self._data[self._data.hash < self._training_data_perc]
         test_data = self._data[self._data.hash >= self._training_data_perc]
 
@@ -169,6 +241,7 @@ class Classifier:
             f"Training set contains {self.get_counts_per_class(y_train)}. \n"  # type: ignore[arg-type]
             f"Test set contains {self.get_counts_per_class(y_test)}."  # type: ignore[arg-type]
         )
+        self._trained_data_fingerprint = fingerprint
         return f1
 
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:

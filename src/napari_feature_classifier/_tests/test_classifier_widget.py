@@ -275,3 +275,103 @@ def test_change_of_loader_filter(make_napari_viewer, capsys):
     loading_widget._filter.value = "*.pkl"
     assert loading_widget._clf_destination.filter == "*.pkl"
     assert loading_widget._filter.value == "*.pkl"
+
+
+def test_rerun_without_changes_does_not_retrain_or_resave(
+    make_napari_viewer, qtbot, tmp_path, monkeypatch
+):
+    """Run with unchanged annotations predicts with the existing model; any
+    annotation change retrains (and saves) again."""
+    monkeypatch.chdir(tmp_path)
+    viewer = make_napari_viewer()
+    label_layer = viewer.add_labels(lbl_img_np)
+    label_layer.features = features
+    classifier_widget = ClassifierWidget(viewer)
+    assert classifier_widget._init_container is not None
+    classifier_widget._init_container._feature_combobox.value = [
+        "feature_1",
+        "feature_2",
+        "feature_3",
+    ]
+    classifier_widget.initialize_run_widget()
+    container = classifier_widget._run_container
+    assert container is not None
+    for row, cls in [(0, 1.0), (1, 1.0), (3, 2.0), (4, 2.0)]:
+        label_layer.features.loc[row, "annotations"] = cls
+
+    clf = container._classifier
+    # Count fits via a class-level patch (an instance attribute would make the
+    # classifier unpicklable, and the widget saves it after training).
+    from sklearn.ensemble import RandomForestClassifier
+
+    fits = {"n": 0}
+    original_fit = RandomForestClassifier.fit
+
+    def counting_fit(self, *args, **kwargs):
+        fits["n"] += 1
+        return original_fit(self, *args, **kwargs)
+
+    monkeypatch.setattr(RandomForestClassifier, "fit", counting_fit)
+    clf_file = tmp_path / "lbl_img_np_classifier.clf"
+
+    run_and_wait(container, qtbot)
+    assert fits["n"] == 1
+    assert clf_file.exists()
+    mtime = clf_file.stat().st_mtime_ns
+    first_predictions = label_layer.features["prediction"].copy()
+
+    # Second run, nothing changed: no refit, file untouched, same predictions
+    run_and_wait(container, qtbot)
+    assert fits["n"] == 1
+    assert clf_file.stat().st_mtime_ns == mtime
+    pd.testing.assert_series_equal(
+        label_layer.features["prediction"], first_predictions
+    )
+
+    # Change of mind on one annotation: retrain + save
+    label_layer.features.loc[4, "annotations"] = 1.0
+    run_and_wait(container, qtbot)
+    assert fits["n"] == 2
+    assert clf._trained_data_fingerprint is not None
+    assert not clf.needs_training()
+
+
+def test_loaded_legacy_classifier_retrains_once(
+    make_napari_viewer, qtbot, tmp_path, monkeypatch
+):
+    """A classifier file without fingerprint (older version) retrains on the
+    first Run, and not on the next one."""
+    import pickle
+
+    from napari_feature_classifier.classifier import Classifier
+
+    # Build a classifier file as an older version would have saved it: trained
+    # on this layer's features, but without a training-data fingerprint.
+    feature_names = ["feature_1", "feature_2", "feature_3"]
+    legacy = Classifier(feature_names, ["Class_1", "Class_2"])
+    training = features.copy()
+    training["annotations"] = [1, 2] * (len(training) // 2) + [1] * (len(training) % 2)
+    legacy.add_features(training)
+    legacy.train()
+    del legacy.__dict__["_trained_data_fingerprint"]
+    legacy_copy = tmp_path / "legacy.clf"
+    legacy_copy.write_bytes(pickle.dumps(legacy))
+    monkeypatch.chdir(tmp_path)
+    viewer = make_napari_viewer()
+    label_layer = viewer.add_labels(lbl_img_np)
+    label_layer.features = features
+    loading_widget = LoadClassifierContainer(viewer)
+    loading_widget._clf_destination.value = legacy_copy
+    loading_widget.load()
+    container = loading_widget._run_container
+    assert container is not None
+    clf = container._classifier
+    assert clf._trained_data_fingerprint is None
+    assert clf.needs_training()
+
+    run_and_wait(container, qtbot)
+    assert not clf.needs_training()
+    mtime = legacy_copy.stat().st_mtime_ns
+
+    run_and_wait(container, qtbot)
+    assert legacy_copy.stat().st_mtime_ns == mtime

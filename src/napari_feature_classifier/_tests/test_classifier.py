@@ -498,3 +498,114 @@ def test_new_objects_do_not_warn(caplog):
         c.add_features(df2)
     assert _changed_object_warnings(caplog) == []
     assert len(c._data) == 100
+
+
+# ---------------------------------------------------------------------------
+# Retrain only when the training data changed (fingerprint)
+# ---------------------------------------------------------------------------
+
+
+def _trained_classifier():
+    df_train, df_predict = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+    return c, df_train, df_predict
+
+
+def _count_fits(monkeypatch, c):
+    calls = {"n": 0}
+    original_fit = c._classifier.fit
+
+    def counting_fit(*args, **kwargs):
+        calls["n"] += 1
+        return original_fit(*args, **kwargs)
+
+    monkeypatch.setattr(c._classifier, "fit", counting_fit)
+    return calls
+
+
+def test_new_classifier_needs_training():
+    c = get_classifier()
+    df_train, _ = get_train_predict_dfs()
+    c.add_features(df_train)
+    assert c.needs_training()
+
+
+def test_trained_classifier_does_not_need_training():
+    c, _, _ = _trained_classifier()
+    assert not c.needs_training()
+
+
+def test_train_if_needed_skips_fit_when_nothing_changed(monkeypatch):
+    c, df_train, df_predict = _trained_classifier()
+    before = c.predict(df_predict)
+    calls = _count_fits(monkeypatch, c)
+    c.add_features(df_train)  # re-adding identical (float64) annotations
+    assert not c.needs_training()
+    assert c.train_if_needed() is None
+    assert calls["n"] == 0
+    pd.testing.assert_series_equal(c.predict(df_predict), before)
+
+
+@pytest.mark.parametrize("change", ["relabel", "new_object", "delete", "feature"])
+def test_any_change_to_training_data_requires_retraining(monkeypatch, change):
+    c, df_train, _ = _trained_classifier()
+    df2 = df_train.iloc[[0]].copy()
+    if change == "relabel":
+        df2["annotations"] = 3 - df2["annotations"]
+    elif change == "new_object":
+        df2["label"] = 999
+    elif change == "delete":
+        df2["annotations"] = -1
+    elif change == "feature":
+        df2["feature1"] += 1.0
+    c.add_features(df2)
+    assert c.needs_training()
+    calls = _count_fits(monkeypatch, c)
+    assert c.train_if_needed() is not None
+    assert calls["n"] == 1
+    assert not c.needs_training()
+
+
+def test_failed_training_forces_retraining_next_time(monkeypatch):
+    c, df_train, _ = _trained_classifier()
+
+    def failing_fit(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(c._classifier, "fit", failing_fit)
+    with pytest.raises(ValueError):
+        c.train()
+    assert c._trained_data_fingerprint is None
+    assert c.needs_training()
+
+
+def test_fingerprint_survives_save_and_load():
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert not loaded.needs_training()
+
+
+def test_classifier_from_older_version_needs_training_once():
+    """Files without a fingerprint (saved before this feature) can't prove
+    which data their model was trained on: retrain once, then not again."""
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    del c.__dict__["_trained_data_fingerprint"]
+    legacy = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert legacy._trained_data_fingerprint is None
+    assert legacy.needs_training()
+    assert legacy.train_if_needed() is not None
+    assert not legacy.needs_training()
+
+
+def test_fingerprint_independent_of_row_order():
+    c, df_train, _ = _trained_classifier()
+    fp = c.training_data_fingerprint()
+    c2 = get_classifier()
+    c2.add_features(df_train.iloc[::-1])
+    assert c2.training_data_fingerprint() == fp
