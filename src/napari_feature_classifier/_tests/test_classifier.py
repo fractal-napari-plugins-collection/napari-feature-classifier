@@ -299,3 +299,117 @@ def test_setstate_adds_class_colors_default():
     data = pickle.dumps(c)  # noqa: S301
     c2 = pickle.loads(data)  # noqa: S301
     assert c2._class_colors == {}
+
+
+# ---------------------------------------------------------------------------
+# Seeding and per-instance default estimator
+# ---------------------------------------------------------------------------
+
+
+def test_default_estimator_is_not_shared_between_instances():
+    """Each Classifier gets its own estimator (no shared mutable default)."""
+    a, b = get_classifier(), get_classifier()
+    assert a._classifier is not b._classifier
+
+
+def test_training_one_classifier_does_not_affect_another():
+    df_train, df_predict = get_train_predict_dfs()
+    a = get_classifier()
+    a.add_features(df_train)
+    a.train()
+    before = a.predict(df_predict)
+
+    other_features = ["feature6", "feature7"]
+    b = Classifier(feature_names=other_features, class_names=CLASS_NAMES)
+    b.add_features(df_train)
+    b.train()
+
+    pd.testing.assert_series_equal(a.predict(df_predict), before)
+
+
+def test_default_estimator_is_seeded():
+    from napari_feature_classifier.classifier import DEFAULT_RANDOM_STATE
+
+    c = get_classifier()
+    assert c._classifier.get_params()["random_state"] == DEFAULT_RANDOM_STATE
+
+
+def test_retraining_on_same_annotations_is_reproducible():
+    df_train, df_predict = get_train_predict_dfs()
+    preds = []
+    for _ in range(3):
+        c = get_classifier()
+        c.add_features(df_train)
+        c.train()
+        preds.append(c.predict(df_predict))
+    # retraining the same instance as well
+    c.train()
+    preds.append(c.predict(df_predict))
+    for p in preds[1:]:
+        pd.testing.assert_series_equal(p, preds[0])
+
+
+def test_custom_estimator_is_used_as_is():
+    from sklearn.ensemble import RandomForestClassifier
+
+    est = RandomForestClassifier(n_estimators=7, random_state=123)
+    c = Classifier(CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=est)
+    assert c._classifier is est
+    assert c._classifier.get_params()["random_state"] == 123
+
+
+def test_setstate_seeds_old_unseeded_classifier_without_changing_predictions():
+    """Pickles from before seeding (random_state=None) get seeded on load; the
+    fitted model and its predictions are unchanged."""
+    import pickle
+
+    from sklearn.ensemble import RandomForestClassifier
+
+    from napari_feature_classifier.classifier import DEFAULT_RANDOM_STATE
+
+    df_train, df_predict = get_train_predict_dfs()
+    old = Classifier(
+        CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=RandomForestClassifier()
+    )
+    old.add_features(df_train)
+    old.train()
+    before = old.predict(df_predict)
+
+    loaded = pickle.loads(pickle.dumps(old))  # noqa: S301
+    assert loaded._classifier.get_params()["random_state"] == DEFAULT_RANDOM_STATE
+    pd.testing.assert_series_equal(loaded.predict(df_predict), before)
+
+
+def test_setstate_keeps_existing_seed():
+    import pickle
+
+    from sklearn.ensemble import RandomForestClassifier
+
+    c = Classifier(
+        CLASSIFIER_FEATURE_NAMES,
+        CLASS_NAMES,
+        classifier=RandomForestClassifier(random_state=42),
+    )
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert loaded._classifier.get_params()["random_state"] == 42
+
+
+class _EstimatorWithoutParams:
+    """Minimal non-sklearn estimator (no get_params/set_params)."""
+
+    def fit(self, X, y):
+        self.value_ = int(pd.Series(y).mode()[0])
+        return self
+
+    def predict(self, X):
+        return np.full(len(X), getattr(self, "value_", 1))
+
+
+def test_setstate_loads_classifier_with_non_sklearn_estimator():
+    import pickle
+
+    c = Classifier(
+        CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=_EstimatorWithoutParams()
+    )
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert isinstance(loaded._classifier, _EstimatorWithoutParams)

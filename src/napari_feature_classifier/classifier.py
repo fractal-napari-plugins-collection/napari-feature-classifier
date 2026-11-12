@@ -12,6 +12,11 @@ import xxhash
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 
+# Seed for the default RandomForestClassifier. Without a fixed seed, every
+# retrain on identical annotations gives a different forest and borderline
+# objects change class between runs.
+DEFAULT_RANDOM_STATE = 0
+
 
 # TODO: define an interface for compatible classifiers (m.b. a subset of
 # sklearn Estimators?)
@@ -25,9 +30,11 @@ class Classifier:
     class_names: Sequence[str]
         The names of the classes. It's an ordered list that is matched to
         annotations [1, 2, 3, ...]
-    classifier: sklearn classifier
-        The classifier that is used for classification. Default is a
-        RandomForestClassifier.
+    classifier: sklearn classifier, optional
+        The classifier that is used for classification. Default (None) creates
+        a new RandomForestClassifier with a fixed random_state for this
+        instance, so retraining on the same annotations is reproducible.
+        A classifier passed in is used as is.
 
     Attributes
     ----------
@@ -55,11 +62,15 @@ class Classifier:
         as well as feature measurements for all rows (annotated objects)
     """
 
-    def __init__(self, feature_names, class_names, classifier=RandomForestClassifier()):  # noqa: B008
+    def __init__(self, feature_names, class_names, classifier=None):
         self.logger = logging.getLogger("classifier")
         self.logger.setLevel(logging.INFO)
         self._feature_names: list[str] = list(feature_names)
         self._class_names: list[str] = list(class_names)
+        # Create the default estimator per instance: a default argument would be
+        # shared by every Classifier in the session (training one refits all).
+        if classifier is None:
+            classifier = RandomForestClassifier(random_state=DEFAULT_RANDOM_STATE)
         self._classifier = classifier
         self._training_data_perc: float = 0.8
         self._index_columns: list[str] = ["roi_id", "label"]
@@ -85,6 +96,23 @@ class Classifier:
         self.__dict__.update(state)
         if "_class_colors" not in self.__dict__:
             self._class_colors = {}
+        # Classifiers saved before seeding was introduced have random_state=None,
+        # so every retrain produced a different model. Seed them on load. This
+        # does not change the already fitted model or its predictions, only
+        # makes the next retrain reproducible.
+        # Best effort: never fail loading because of this (e.g. non-sklearn
+        # estimators without get_params/set_params).
+        estimator = self.__dict__.get("_classifier")
+        try:
+            params = estimator.get_params()  # type: ignore[union-attr]
+            if "random_state" in params and params["random_state"] is None:
+                estimator.set_params(random_state=DEFAULT_RANDOM_STATE)  # type: ignore[union-attr]
+                logging.getLogger("classifier").info(
+                    "Loaded classifier had no random_state; set it to "
+                    f"{DEFAULT_RANDOM_STATE} so retraining is reproducible."
+                )
+        except Exception:  # noqa: BLE001
+            pass
 
     # TODO: Add tests.
     def train(self):
@@ -165,7 +193,7 @@ class Classifier:
         df_no_nans = df.dropna(subset=self._feature_names)
         if len(df) != len(df_no_nans):
             self.logger.info(
-                f"Could not do predictions for {len(df)-len(df_no_nans)}/{len(df)} "
+                f"Could not do predictions for {len(df) - len(df_no_nans)}/{len(df)} "
                 "objects because of features that contained `NA`s."
             )
 
@@ -185,7 +213,7 @@ class Classifier:
         df_no_nans = df_annotated.dropna(subset=self._feature_names)
         if len(df_no_nans) != len(df_annotated):
             self.logger.info(
-                f"Dropped {len(df_annotated)-len(df_no_nans)}/{len(df_annotated)} "
+                f"Dropped {len(df_annotated) - len(df_no_nans)}/{len(df_annotated)} "
                 "objects because of features that contained `NA`s."
             )
 
