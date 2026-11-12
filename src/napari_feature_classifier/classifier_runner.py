@@ -4,7 +4,8 @@ These classes have no Qt dependency and can be unit-tested with a headless
 napari viewer.
 """
 
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Iterable
 
 import napari
 import napari.layers
@@ -12,7 +13,7 @@ import napari.viewer
 import numpy as np
 import pandas as pd
 
-from napari_feature_classifier.classifier import Classifier
+from napari_feature_classifier.classifier import Classifier, features_match
 
 
 class ClassifierRunner:
@@ -193,6 +194,14 @@ class ClassifierRunner:
         write them back into layer.features["annotations"] where the current
         value is NaN (live annotations always take precedence).
 
+        A stored annotation is only restored if the object it was made on is
+        still the same object: all classifier features stored for that
+        (roi_id, label) must match the layer's current features for that label.
+        If the label image or feature table was regenerated (e.g. segmentation
+        re-run), label ids can point to different objects; those annotations
+        are skipped and the user is warned. Skipped annotations stay in the
+        classifier's training data with their original features.
+
         Returns True if any annotations were restored, False otherwise.
 
         Prerequisites: the layer must already have an "annotations" column
@@ -216,14 +225,48 @@ class ClassifierRunner:
         if roi_id not in stored_rois:
             return False
 
-        # Extract stored annotations for this roi_id (drop NaN / NoClass rows)
-        stored: pd.Series = self._classifier._data.loc[  # type: ignore[assignment]
-            self._classifier._data.index.get_level_values(self._roi_id_column)
-            == roi_id,
-            "annotations",
-        ]
-        stored = stored.dropna()
-        stored = stored[stored != -1]  # type: ignore[operator]
+        # Extract stored annotations + features for this roi_id
+        # (drop NaN / NoClass rows)
+        feature_names = self.feature_names
+        roi_mask = (
+            self._classifier._data.index.get_level_values(self._roi_id_column) == roi_id
+        )
+        stored_rows = pd.DataFrame(
+            self._classifier._data.loc[roi_mask, ["annotations", *feature_names]]
+        )
+        stored_rows = pd.DataFrame(stored_rows[stored_rows["annotations"].notna()])
+        stored_rows = pd.DataFrame(stored_rows[stored_rows["annotations"] != -1])
+        if stored_rows.empty:
+            return False
+
+        # Only restore annotations whose object is unchanged (same features).
+        features = label_layer.features
+        missing_columns = [f for f in feature_names if f not in features.columns]
+        if missing_columns:
+            self._warn(
+                f"Not restoring {len(stored_rows)} stored annotations for "
+                f"{roi_id}: the layer is missing the classifier features "
+                f"{missing_columns}, so it cannot be verified that the label "
+                "ids still refer to the annotated objects."
+            )
+            return False
+        matches = self._stored_features_match_layer(
+            pd.DataFrame(stored_rows[feature_names]), features, feature_names
+        )
+        n_skipped = int((~matches).sum())
+        if n_skipped:
+            self._warn(
+                f"{n_skipped} of {len(stored_rows)} stored annotations for "
+                f"{roi_id} were not restored: the objects with these label ids "
+                "have different features than when they were annotated (were "
+                "the labels or the feature table regenerated?). They remain in "
+                "the classifier's training data with their original features. "
+                "But the old annotations may be overwritten by new annotations "
+                "made on this image now. "
+                "Skipped labels: "
+                f"{self._format_labels(idx for idx, ok in matches.items() if not ok)}"
+            )
+        stored = stored_rows.loc[matches.to_numpy(), "annotations"]
         if stored.empty:
             return False
 
@@ -232,7 +275,6 @@ class ClassifierRunner:
         label_map = dict(zip(stored_labels, stored.values, strict=False))
 
         # Only fill rows that are currently NaN — live annotations take precedence
-        features = label_layer.features
         nan_mask = features["annotations"].isna() & features[self._label_column].isin(
             stored_labels  # type: ignore[arg-type]
         )
@@ -241,6 +283,51 @@ class ClassifierRunner:
         ].map(label_map)
 
         return bool(nan_mask.any())
+
+    def _stored_features_match_layer(
+        self,
+        stored_features: pd.DataFrame,
+        layer_features: pd.DataFrame,
+        feature_names: list[str],
+    ) -> pd.Series:
+        """
+        For each stored row (MultiIndex roi_id, label), return True if the layer
+        has exactly one row with that label whose classifier features match the
+        stored ones.
+
+        The classifier stores features as float32 (see the pandera schema), so
+        both sides are cast to float32 before comparing. A tiny relative
+        tolerance absorbs harmless float noise; any real change of the object
+        (other segmentation, other measurement) fails the check. Labels that
+        are missing, duplicated or have NaN features in the layer don't match.
+        """
+        stored_labels = stored_features.index.get_level_values(self._label_column)
+        layer_labels = layer_features[self._label_column]
+        unique_layer = layer_features[~layer_labels.duplicated(keep=False)]
+        live = (
+            unique_layer.set_index(
+                unique_layer[self._label_column].astype("uint64")  # type: ignore[union-attr]
+            )[feature_names]
+            .reindex(stored_labels.astype("uint64"))
+            .to_numpy(dtype=np.float32, na_value=np.nan)
+        )
+        stored = stored_features.to_numpy(dtype=np.float32, na_value=np.nan)
+        return pd.Series(features_match(stored, live), index=stored_features.index)
+
+    @staticmethod
+    def _format_labels(index: Iterable, max_shown: int = 20) -> str:
+        """Comma-separated label ids from (roi_id, label) tuples or plain labels."""
+        labels = [str(x[-1]) if isinstance(x, tuple) else str(x) for x in index]
+        shown = ", ".join(labels[:max_shown])
+        return shown + (
+            f", ... (+{len(labels) - max_shown})" if len(labels) > max_shown else ""
+        )
+
+    @staticmethod
+    def _warn(message: str) -> None:
+        # Same channel as the Classifier's messages: the plugin widget shows
+        # them as napari notifications (see ClassifierWidget.setup_logging).
+        logging.getLogger("classifier").warning(message)
 
 
 class PredictionLayerManager:

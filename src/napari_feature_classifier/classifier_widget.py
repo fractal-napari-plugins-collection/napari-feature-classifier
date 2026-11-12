@@ -1,6 +1,5 @@
 """Classifier container widget for napari"""
 
-import logging
 import pickle
 from pathlib import Path
 
@@ -29,12 +28,12 @@ from napari_feature_classifier.classifier_runner import (
     PredictionLayerManager,
 )
 from napari_feature_classifier.utils import (
-    NapariHandler,
     add_annotation_names,
     get_selected_or_valid_label_layer,
     get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
+    setup_napari_logging,
 )
 
 
@@ -327,6 +326,9 @@ class ClassifierRunContainer(Container):
         auto_save: bool | None = False,
     ):
         self._viewer = viewer
+        # Both "Initialize" and "Load Classifier" end up here: make sure the
+        # classifier's messages (training summary, warnings) reach the user.
+        setup_napari_logging()
         self._last_selected_label_layer = get_selected_or_valid_label_layer(
             viewer=self._viewer
         )
@@ -443,8 +445,12 @@ class ClassifierRunContainer(Container):
         @thread_worker(ignore_errors=True)
         def _train():
             self._runner.add_features_to_classifier()
-            f1 = self._classifier.train()  # raises ValueError on bad input
-            return f1
+            # Retrains only if the annotations/features changed since the
+            # model was last fitted; otherwise predicts with the existing
+            # model. Raises ValueError on bad input.
+            retrained = self._classifier.needs_training()
+            f1 = self._classifier.train_if_needed()
+            return retrained, f1
 
         self._run_worker = _train()
         # Connect to self methods (QObject) so PyQt uses QueuedConnection for
@@ -453,13 +459,17 @@ class ClassifierRunContainer(Container):
         self._run_worker.errored.connect(self._on_run_error)
         self._run_worker.start()
 
-    def _on_run_done(self, _f1) -> None:
+    def _on_run_done(self, result: tuple[bool, float | None]) -> None:
         """Called in the main thread when background training succeeds."""
+        retrained, _f1 = result
         assert isinstance(self._last_selected_label_layer, napari.layers.Labels)
         self._runner.make_predictions()
         self._prediction_manager.setup(self._last_selected_label_layer)
         self._prediction_manager.set_visible(True)
-        self._export_panel.save()
+        # Only save when the model changed (the classifier logs that it reused
+        # the existing model otherwise).
+        if retrained:
+            self._export_panel.save()
         self._update_counts()
         self._run_button.text = "Run Classifier"
         self._run_button.enabled = True
@@ -624,6 +634,7 @@ class LoadClassifierContainer(Container):
         clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
         with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
+        napari_info(clf.provenance_summary())
 
         try:
             self._run_container = ClassifierRunContainer(
@@ -679,19 +690,8 @@ class ClassifierWidget(Container):
         self.initialize_init_widget()
 
     def setup_logging(self):
-        # Create a custom handler for napari
-        napari_handler = NapariHandler()
-        napari_handler.setLevel(logging.INFO)
-
-        # Optionally, set a formatter for the handler
-        # formatter = logging.Formatter(
-        #     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        # )
-        # napari_handler.setFormatter(formatter)
-
-        # Get the classifier's logger and add the napari handler to it
-        classifier_logger = logging.getLogger("classifier")
-        classifier_logger.addHandler(napari_handler)
+        """Show the classifier's log messages as napari notifications."""
+        setup_napari_logging()
 
     def initialize_init_widget(self):
         self._init_container = ClassifierInitContainer(self._viewer)

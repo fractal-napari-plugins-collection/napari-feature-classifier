@@ -1,6 +1,8 @@
 # pylint: disable=C0103
 """Tests for core classifier class"""
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -251,7 +253,7 @@ def test_get_counts_per_class():
     df_train, _ = get_train_predict_dfs()
     c = get_classifier()
     c.add_features(df_train)
-    counts = c.get_counts_per_class(c._data["annotations"])
+    counts = c.get_counts_per_class(pd.Series(c._data["annotations"]))
     assert set(counts.keys()) == set(CLASS_NAMES)
     assert counts["s"] == 30  # annotations=[1,2,1,1,2]*10 → class 1 ("s") = 30
     assert counts["m"] == 20
@@ -299,3 +301,465 @@ def test_setstate_adds_class_colors_default():
     data = pickle.dumps(c)  # noqa: S301
     c2 = pickle.loads(data)  # noqa: S301
     assert c2._class_colors == {}
+
+
+# ---------------------------------------------------------------------------
+# Seeding and per-instance default estimator
+# ---------------------------------------------------------------------------
+
+
+def test_default_estimator_is_not_shared_between_instances():
+    """Each Classifier gets its own estimator (no shared mutable default)."""
+    a, b = get_classifier(), get_classifier()
+    assert a._classifier is not b._classifier
+
+
+def test_training_one_classifier_does_not_affect_another():
+    df_train, df_predict = get_train_predict_dfs()
+    a = get_classifier()
+    a.add_features(df_train)
+    a.train()
+    before = a.predict(df_predict)
+
+    other_features = ["feature6", "feature7"]
+    b = Classifier(feature_names=other_features, class_names=CLASS_NAMES)
+    b.add_features(df_train)
+    b.train()
+
+    pd.testing.assert_series_equal(a.predict(df_predict), before)
+
+
+def test_default_estimator_is_seeded():
+    from napari_feature_classifier.classifier import DEFAULT_RANDOM_STATE
+
+    c = get_classifier()
+    assert c._classifier.get_params()["random_state"] == DEFAULT_RANDOM_STATE
+
+
+def test_retraining_on_same_annotations_is_reproducible():
+    df_train, df_predict = get_train_predict_dfs()
+    preds = []
+    classifiers = [get_classifier() for _ in range(3)]
+    for c in classifiers:
+        c.add_features(df_train)
+        c.train()
+        preds.append(c.predict(df_predict))
+    # retraining the same instance as well
+    classifiers[-1].train()
+    preds.append(classifiers[-1].predict(df_predict))
+    for p in preds[1:]:
+        pd.testing.assert_series_equal(p, preds[0])
+
+
+def test_custom_estimator_is_used_as_is():
+    from sklearn.ensemble import RandomForestClassifier
+
+    est = RandomForestClassifier(n_estimators=7, random_state=123)
+    c = Classifier(CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=est)
+    assert c._classifier is est
+    assert c._classifier.get_params()["random_state"] == 123
+
+
+def test_setstate_seeds_old_unseeded_classifier_without_changing_predictions():
+    """Pickles from before seeding (random_state=None) get seeded on load; the
+    fitted model and its predictions are unchanged."""
+    import pickle
+
+    from sklearn.ensemble import RandomForestClassifier
+
+    from napari_feature_classifier.classifier import DEFAULT_RANDOM_STATE
+
+    df_train, df_predict = get_train_predict_dfs()
+    old = Classifier(
+        CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=RandomForestClassifier()
+    )
+    old.add_features(df_train)
+    old.train()
+    before = old.predict(df_predict)
+
+    loaded = pickle.loads(pickle.dumps(old))  # noqa: S301
+    assert loaded._classifier.get_params()["random_state"] == DEFAULT_RANDOM_STATE
+    pd.testing.assert_series_equal(loaded.predict(df_predict), before)
+
+
+def test_setstate_keeps_existing_seed():
+    import pickle
+
+    from sklearn.ensemble import RandomForestClassifier
+
+    c = Classifier(
+        CLASSIFIER_FEATURE_NAMES,
+        CLASS_NAMES,
+        classifier=RandomForestClassifier(random_state=42),
+    )
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert loaded._classifier.get_params()["random_state"] == 42
+
+
+class _EstimatorWithoutParams:
+    """Minimal non-sklearn estimator (no get_params/set_params)."""
+
+    def fit(self, _, y):
+        self.value_ = int(pd.Series(y).mode()[0])
+        return self
+
+    def predict(self, X):
+        return np.full(len(X), getattr(self, "value_", 1))
+
+
+def test_setstate_loads_classifier_with_non_sklearn_estimator():
+    import pickle
+
+    c = Classifier(
+        CLASSIFIER_FEATURE_NAMES, CLASS_NAMES, classifier=_EstimatorWithoutParams()
+    )
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert isinstance(loaded._classifier, _EstimatorWithoutParams)
+
+
+# ---------------------------------------------------------------------------
+# Warnings when a stored (roi_id, label) now refers to a different object
+# ---------------------------------------------------------------------------
+
+
+def _stored_classifier():
+    """Classifier with 50 stored annotations (site1, labels 1..50)."""
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    return c, df_train
+
+
+def _changed_object_warnings(caplog):
+    return [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_reannotating_unchanged_object_does_not_warn(caplog):
+    """Users may change their mind about an object's class: no warning."""
+    c, df = _stored_classifier()
+    df2 = df.copy()
+    df2["annotations"] = 3 - df2["annotations"]  # swap classes 1 <-> 2
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert (c._data["annotations"].to_numpy() == df2["annotations"].to_numpy()).all()
+
+
+def test_re_adding_identical_float64_table_does_not_warn(caplog):
+    """Stored float32 vs incoming float64 of the same objects is not a change."""
+    c, df = _stored_classifier()
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df)
+    assert _changed_object_warnings(caplog) == []
+
+
+def test_replacing_row_of_changed_object_warns_and_still_replaces(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[3, 4]].copy()
+    df2.loc[df2.index[0], "feature1"] += 1.0  # label 4 is now another object
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    warnings_ = _changed_object_warnings(caplog)
+    assert len(warnings_) == 1
+    assert "1 stored annotation(s) were replaced" in warnings_[0].getMessage()
+    assert "site1:4" in warnings_[0].getMessage()
+    assert "site1:5" not in warnings_[0].getMessage()
+    assert len(c._data) == 50
+    stored_value = float(c._data.loc[("site1", 4), "feature1"])  # type: ignore[arg-type]
+    assert np.isclose(stored_value, np.float32(df2.iloc[0]["feature1"]))
+
+
+def test_noclass_on_changed_object_warns_and_still_deletes(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[5]].copy()
+    df2["annotations"] = -1
+    df2["feature2"] += 1.0
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    warnings_ = _changed_object_warnings(caplog)
+    assert len(warnings_) == 1
+    assert "were deleted (NoClass)" in warnings_[0].getMessage()
+    assert ("site1", 6) not in c._data.index
+
+
+def test_noclass_on_unchanged_object_does_not_warn(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[5]].copy()
+    df2["annotations"] = -1
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert ("site1", 6) not in c._data.index
+
+
+def test_new_objects_do_not_warn(caplog):
+    c, df = _stored_classifier()
+    df2 = df.copy()
+    df2["roi_id"] = "site2"
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert len(c._data) == 100
+
+
+# ---------------------------------------------------------------------------
+# Retrain only when the training data changed (fingerprint)
+# ---------------------------------------------------------------------------
+
+
+def _trained_classifier():
+    df_train, df_predict = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    c.train()
+    return c, df_train, df_predict
+
+
+def _count_fits(monkeypatch, c):
+    calls = {"n": 0}
+    original_fit = c._classifier.fit
+
+    def counting_fit(*args, **kwargs):
+        calls["n"] += 1
+        return original_fit(*args, **kwargs)
+
+    monkeypatch.setattr(c._classifier, "fit", counting_fit)
+    return calls
+
+
+def test_new_classifier_needs_training():
+    c = get_classifier()
+    df_train, _ = get_train_predict_dfs()
+    c.add_features(df_train)
+    assert c.needs_training()
+
+
+def test_trained_classifier_does_not_need_training():
+    c, _, _ = _trained_classifier()
+    assert not c.needs_training()
+
+
+def test_train_if_needed_skips_fit_when_nothing_changed(monkeypatch):
+    c, df_train, df_predict = _trained_classifier()
+    before = c.predict(df_predict)
+    calls = _count_fits(monkeypatch, c)
+    c.add_features(df_train)  # re-adding identical (float64) annotations
+    assert not c.needs_training()
+    assert c.train_if_needed() is None
+    assert calls["n"] == 0
+    pd.testing.assert_series_equal(c.predict(df_predict), before)
+
+
+@pytest.mark.parametrize("change", ["relabel", "new_object", "delete", "feature"])
+def test_any_change_to_training_data_requires_retraining(monkeypatch, change):
+    c, df_train, _ = _trained_classifier()
+    df2 = df_train.iloc[[0]].copy()
+    if change == "relabel":
+        df2["annotations"] = 3 - df2["annotations"]
+    elif change == "new_object":
+        df2["label"] = 999
+    elif change == "delete":
+        df2["annotations"] = -1
+    elif change == "feature":
+        df2["feature1"] += 1.0
+    c.add_features(df2)
+    assert c.needs_training()
+    calls = _count_fits(monkeypatch, c)
+    assert c.train_if_needed() is not None
+    assert calls["n"] == 1
+    assert not c.needs_training()
+
+
+def test_failed_training_forces_retraining_next_time(monkeypatch):
+    c, df_train, _ = _trained_classifier()
+
+    def failing_fit(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(c._classifier, "fit", failing_fit)
+    with pytest.raises(ValueError):
+        c.train()
+    assert c._trained_data_fingerprint is None
+    assert c.needs_training()
+
+
+def test_fingerprint_survives_save_and_load():
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert not loaded.needs_training()
+
+
+def test_classifier_from_older_version_needs_training_once():
+    """Files without a fingerprint (saved before this feature) can't prove
+    which data their model was trained on: retrain once, then not again."""
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    del c.__dict__["_trained_data_fingerprint"]
+    legacy = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert legacy._trained_data_fingerprint is None
+    assert legacy.needs_training()
+    assert legacy.train_if_needed() is not None
+    assert not legacy.needs_training()
+
+
+def test_fingerprint_independent_of_row_order():
+    c, df_train, _ = _trained_classifier()
+    fp = c.training_data_fingerprint()
+    c2 = get_classifier()
+    c2.add_features(df_train.iloc[::-1])
+    assert c2.training_data_fingerprint() == fp
+
+
+# ---------------------------------------------------------------------------
+# Provenance (versions, timestamps, events) stored in the classifier
+# ---------------------------------------------------------------------------
+
+
+def _only_builtin_types(obj) -> bool:
+    """Provenance must only contain plain Python types so that older plugin
+    versions (without the code that wrote it) can still unpickle the file."""
+    if isinstance(obj, dict):
+        return all(
+            isinstance(k, str) and _only_builtin_types(v) for k, v in obj.items()
+        )
+    if isinstance(obj, list):
+        return all(_only_builtin_types(v) for v in obj)
+    return obj is None or type(obj) in (str, int, float, bool)
+
+
+def test_new_classifier_records_creation_versions():
+    from datetime import datetime
+
+    c = get_classifier()
+    created = c.get_provenance()["created"]
+    assert datetime.fromisoformat(created["timestamp"]).tzinfo is not None
+    versions = created["versions"]
+    for package in ["python", "napari-feature-classifier", "scikit-learn", "numpy"]:
+        assert versions[package]
+    assert c.get_provenance()["history"] == []
+
+
+def test_training_and_saving_are_recorded(tmp_path):
+    import pickle
+
+    c, df_train, _ = _trained_classifier()
+    path = tmp_path / "c.clf"
+    c.save(path)
+    loaded = pickle.loads(path.read_bytes())  # noqa: S301
+    history = loaded.get_provenance()["history"]
+    assert [e["event"] for e in history] == ["trained", "saved"]
+    trained = history[0]
+    assert trained["n_annotations"] == len(df_train)
+    assert trained["n_train"] + trained["n_test"] == len(df_train)
+    assert 0.0 <= trained["f1"] <= 1.0
+    assert history[1]["path"] == str(path)
+    assert trained["versions"]["scikit-learn"]
+
+
+def test_skipped_training_is_not_recorded():
+    c, df_train, _ = _trained_classifier()
+    c.add_features(df_train)
+    c.train_if_needed()
+    assert [e["event"] for e in c.get_provenance()["history"]] == ["trained"]
+
+
+def test_provenance_contains_only_builtin_types(tmp_path):
+    c, _, _ = _trained_classifier()
+    c.save(tmp_path / "c.clf")
+    assert _only_builtin_types(c._provenance)
+
+
+def test_provenance_history_is_capped():
+    from napari_feature_classifier.classifier import PROVENANCE_HISTORY_MAX
+
+    c = get_classifier()
+    for i in range(PROVENANCE_HISTORY_MAX + 25):
+        c._record_event("trained", n_annotations=i)
+    history = c.get_provenance()["history"]
+    assert len(history) == PROVENANCE_HISTORY_MAX
+    assert history[-1]["n_annotations"] == PROVENANCE_HISTORY_MAX + 24
+
+
+def test_get_provenance_returns_a_copy():
+    c = get_classifier()
+    c.get_provenance()["history"].append({"event": "fake"})
+    assert c.get_provenance()["history"] == []
+
+
+def test_classifier_from_older_version_has_unknown_provenance():
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    del c.__dict__["_provenance"]
+    legacy = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert legacy.get_provenance() == {"created": None, "history": []}
+    assert "before 0.5" in legacy.provenance_summary()
+    legacy.train()
+    assert [e["event"] for e in legacy.get_provenance()["history"]] == ["trained"]
+
+
+def test_provenance_summary_mentions_versions():
+    c, _, _ = _trained_classifier()
+    summary = c.provenance_summary()
+    assert "scikit-learn" in summary
+    assert "last trained" in summary
+
+
+# ---------------------------------------------------------------------------
+# Logging: one concise message per user-relevant event
+# ---------------------------------------------------------------------------
+
+
+def _info_messages(caplog):
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "classifier" and r.levelno == logging.INFO
+    ]
+
+
+def test_training_logs_a_single_concise_summary(caplog, tmp_path):
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    with caplog.at_level(logging.INFO, logger="classifier"):
+        c.add_dict_of_features({"site1": df_train})
+        c.train()
+        c.save(tmp_path / "c.clf")
+    messages = _info_messages(caplog)
+    assert len(messages) == 1
+    assert messages[0].startswith("Trained on ")
+    assert "np.int64" not in messages[0]
+    # classes listed in class order
+    assert messages[0].index("s: ") < messages[0].index("m: ")
+
+
+def test_skipped_training_logs_one_message(caplog):
+    c, df_train, _ = _trained_classifier()
+    c.add_features(df_train)
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="classifier"):
+        c.train_if_needed()
+    messages = _info_messages(caplog)
+    assert len(messages) == 1
+    assert "not retrained" in messages[0]
+
+
+def test_get_counts_per_class_returns_plain_ints_in_class_order():
+    c, _, _ = _trained_classifier()
+    counts = c.get_counts_per_class(pd.Series([2, 1, 2, 2]))
+    assert list(counts) == ["s", "m"]
+    assert counts == {"s": 1, "m": 3}
+    assert all(type(v) is int for v in counts.values())
+
+
+def test_object_id_hash_is_stable():
+    """The train/test split is derived from this hash and stored in saved
+    classifiers: its values must not change (e.g. across xxhash versions;
+    xxhash >= 4 rejects str input, 3.x hashed str as UTF-8 bytes)."""
+    from napari_feature_classifier.classifier import hash_single_object_id
+
+    assert hash_single_object_id("site1_5") == 2212825421 / 2**32
+    assert 0.0 <= hash_single_object_id("Zürich_µm_細胞_3") < 1.0
