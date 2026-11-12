@@ -391,3 +391,122 @@ def test_restore_returns_false_when_no_roi_id_column(viewer):
     clf = make_classifier()
     runner = ClassifierRunner(viewer, clf)
     assert runner.restore_annotations_to_layer(layer) is False
+
+
+# ---------------------------------------------------------------------------
+# restore_annotations_to_layer: feature verification (labels may be regenerated)
+# ---------------------------------------------------------------------------
+
+
+def _store_annotations(viewer, layer, annotations: dict[int, float]):
+    """Annotate rows (by position) and push them into a fresh classifier."""
+    runner = ClassifierRunner(viewer, make_classifier())
+    for pos, cls in annotations.items():
+        layer.features.loc[pos, "annotations"] = cls
+    runner.add_features_to_classifier()
+    layer.features["annotations"] = float("nan")  # simulate reopening the layer
+    return runner
+
+
+def test_restore_skips_annotations_whose_object_changed(viewer, caplog):
+    """If a label id now has different features (e.g. re-segmentation), its
+    stored annotation is not painted onto the new object."""
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0, 1: 2.0})
+
+    # Label of row 0 now refers to a different object
+    layer.features.loc[0, "feature_0"] = layer.features.loc[0, "feature_0"] + 0.5
+
+    with caplog.at_level("WARNING"):
+        restored = runner.restore_annotations_to_layer(layer)
+    assert restored is True
+    assert np.isnan(layer.features.loc[0, "annotations"])
+    assert layer.features.loc[1, "annotations"] == 2.0
+    assert "1 of 2 stored annotations" in caplog.text
+
+
+def test_restore_returns_false_when_all_objects_changed(viewer):
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0, 1: 2.0})
+    layer.features[FEATURE_NAMES] = layer.features[FEATURE_NAMES] + 1.0
+
+    assert runner.restore_annotations_to_layer(layer) is False
+    assert layer.features["annotations"].isna().all()
+
+
+def test_restore_skips_when_layer_lacks_classifier_features(viewer, caplog):
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0})
+    layer.features = layer.features.drop(columns=["feature_2"])
+
+    with caplog.at_level("WARNING"):
+        assert runner.restore_annotations_to_layer(layer) is False
+    assert layer.features["annotations"].isna().all()
+    assert "missing the classifier features" in caplog.text
+
+
+def test_restore_skips_label_with_nan_features(viewer):
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0, 1: 2.0})
+    layer.features.loc[0, "feature_1"] = float("nan")
+
+    runner.restore_annotations_to_layer(layer)
+    assert np.isnan(layer.features.loc[0, "annotations"])
+    assert layer.features.loc[1, "annotations"] == 2.0
+
+
+def test_restore_matches_float64_layer_against_float32_storage(viewer):
+    """Stored features are float32; unchanged float64 layer features must match."""
+    layer = _make_layer_with_annotation_column(viewer)
+    assert layer.features["feature_0"].dtype == np.float64
+    runner = _store_annotations(viewer, layer, {3: 1.0, 4: 2.0})
+
+    assert runner.restore_annotations_to_layer(layer) is True
+    assert layer.features.loc[3, "annotations"] == 1.0
+    assert layer.features.loc[4, "annotations"] == 2.0
+
+
+def test_skipped_annotations_keep_original_training_data_after_run(viewer):
+    """Run after a partial restore must not overwrite the stale training row
+    with the features of the object that now carries that label id."""
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0, 1: 2.0})
+    label0 = layer.features.loc[0, "label"]
+    original = runner._classifier._data.loc[(ROI_ID, label0), FEATURE_NAMES].copy()
+
+    layer.features.loc[0, "feature_0"] = layer.features.loc[0, "feature_0"] + 0.5
+    runner.restore_annotations_to_layer(layer)
+    runner.add_features_to_classifier()
+
+    data = runner._classifier._data
+    assert len(data) == 2
+    assert data.loc[(ROI_ID, label0), "annotations"] == 1
+    np.testing.assert_array_equal(
+        data.loc[(ROI_ID, label0), FEATURE_NAMES].to_numpy(), original.to_numpy()
+    )
+
+
+def test_reannotating_a_skipped_label_replaces_stale_row_without_duplicates(viewer):
+    """A stale (skipped) row and a new annotation share the (roi_id, label) key.
+    add_features replaces the stale row: the index stays unique and the
+    training row now holds the current object's features and annotation."""
+    layer = _make_layer_with_annotation_column(viewer)
+    runner = _store_annotations(viewer, layer, {0: 1.0, 1: 2.0})
+    label0 = layer.features.loc[0, "label"]
+
+    layer.features.loc[0, "feature_0"] = layer.features.loc[0, "feature_0"] + 0.5
+    runner.restore_annotations_to_layer(layer)
+    assert np.isnan(layer.features.loc[0, "annotations"])
+
+    # User annotates the object that now carries label0
+    layer.features.loc[0, "annotations"] = 2.0
+    runner.add_features_to_classifier()
+
+    data = runner._classifier._data
+    assert data.index.is_unique
+    assert len(data) == 2
+    assert data.loc[(ROI_ID, label0), "annotations"] == 2
+    np.testing.assert_allclose(
+        data.loc[(ROI_ID, label0), "feature_0"],
+        np.float32(layer.features.loc[0, "feature_0"]),
+    )
