@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import ListedColormap
 from napari.utils.colormaps import DirectLabelColormap
-from napari.utils.notifications import show_info
+from napari.utils.notifications import show_debug, show_info, show_warning
 from qtpy.QtWidgets import QMessageBox  # pylint: disable=E0611
 
 
@@ -134,9 +134,52 @@ def napari_info(message):
 
 
 class NapariHandler(logging.Handler):
+    """
+    Forward log records to napari notifications: warnings as warnings, info as
+    info, debug as debug notifications (napari shows those in the terminal
+    only, not as pop-ups).
+    """
+
     def emit(self, record):
         log_entry = self.format(record)
-        napari_info(log_entry)
+        if record.levelno >= logging.WARNING:
+            napari_warning(log_entry)
+        elif record.levelno >= logging.INFO:
+            napari_info(log_entry)
+        else:
+            try:
+                show_debug(log_entry)
+            except:  # pylint: disable=bare-except # noqa #E722
+                pass
+
+
+def setup_napari_logging() -> None:
+    """
+    Show the "classifier" logger's messages as napari notifications.
+
+    Called by every widget that runs a classifier (initialized or loaded), so
+    messages appear no matter how the classifier was opened. Idempotent: only
+    one NapariHandler is attached. Sets the level to INFO only if none was set
+    (a level chosen by the user, e.g. DEBUG, is kept). Propagation to the root
+    logger is turned off because napari already echoes notifications to the
+    terminal; otherwise every message would be printed twice.
+    """
+    classifier_logger = logging.getLogger("classifier")
+    if classifier_logger.level == logging.NOTSET:
+        classifier_logger.setLevel(logging.INFO)
+    if not any(isinstance(h, NapariHandler) for h in classifier_logger.handlers):
+        classifier_logger.addHandler(NapariHandler())
+    classifier_logger.propagate = False
+
+
+def napari_warning(message):
+    """Like napari_info, but shown as a napari warning notification."""
+    try:
+        show_warning(message)
+    except:  # pylint: disable=bare-except # noqa #E722
+        print(message)
+    if in_notebook():
+        print(message)
 
 
 def get_valid_label_layers(viewer) -> list[napari.layers.Labels]:

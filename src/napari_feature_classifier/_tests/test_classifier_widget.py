@@ -375,3 +375,77 @@ def test_loaded_legacy_classifier_retrains_once(
 
     run_and_wait(container, qtbot)
     assert legacy_copy.stat().st_mtime_ns == mtime
+
+
+def test_setup_logging_attaches_one_napari_handler(make_napari_viewer):
+    """Opening the widget several times must not duplicate notifications."""
+    import logging
+
+    from napari_feature_classifier.utils import NapariHandler
+
+    viewer = make_napari_viewer()
+    viewer.add_labels(lbl_img_np).features = features
+    ClassifierWidget(viewer)
+    ClassifierWidget(viewer)
+    logger = logging.getLogger("classifier")
+    assert sum(isinstance(h, NapariHandler) for h in logger.handlers) == 1
+    # napari echoes notifications to the terminal; no second copy via root
+    assert logger.propagate is False
+
+
+def test_napari_handler_shows_warnings_as_warnings(monkeypatch):
+    import logging
+
+    from napari_feature_classifier import utils
+
+    shown = []
+    monkeypatch.setattr(utils, "show_info", lambda m: shown.append(("info", m)))
+    monkeypatch.setattr(utils, "show_warning", lambda m: shown.append(("warning", m)))
+    handler = utils.NapariHandler()
+    for level, msg in [(logging.INFO, "hello"), (logging.WARNING, "careful")]:
+        handler.emit(logging.LogRecord("classifier", level, "", 0, msg, None, None))
+    assert shown == [("info", "hello"), ("warning", "careful")]
+
+
+def test_loaded_classifier_reports_training_and_skips(
+    make_napari_viewer, qtbot, tmp_path, monkeypatch
+):
+    """Classifiers opened via "Load Classifier" (no ClassifierWidget, no
+    Classifier.__init__) must still show the training summary and the
+    "not retrained" message."""
+    import logging
+    import pickle
+
+    from napari.utils.notifications import notification_manager
+
+    from napari_feature_classifier.classifier import Classifier
+
+    logger = logging.getLogger("classifier")
+    logger.setLevel(logging.NOTSET)  # as in a fresh napari session
+    clf = Classifier(["feature_1", "feature_2", "feature_3"], ["Class_1", "Class_2"])
+    logger.setLevel(logging.NOTSET)
+    path = tmp_path / "saved.clf"
+    path.write_bytes(pickle.dumps(clf))
+    monkeypatch.chdir(tmp_path)
+
+    viewer = make_napari_viewer()
+    label_layer = viewer.add_labels(lbl_img_np)
+    label_layer.features = features
+    loading_widget = LoadClassifierContainer(viewer)
+    loading_widget._clf_destination.value = path
+    loading_widget.load()
+    container = loading_widget._run_container
+    assert container is not None
+    for row, cls in [(0, 1.0), (1, 1.0), (2, 1.0), (3, 2.0), (4, 2.0), (5, 2.0)]:
+        label_layer.features.loc[row, "annotations"] = cls
+
+    def messages_during_run():
+        n0 = len(notification_manager.records)
+        run_and_wait(container, qtbot)
+        return [str(n.message) for n in notification_manager.records[n0:]]
+
+    first = messages_during_run()
+    assert any(m.startswith("Trained on ") for m in first)
+    assert any(m.startswith("Classifier saved at") for m in first)
+    second = messages_during_run()
+    assert any("not retrained" in m for m in second)

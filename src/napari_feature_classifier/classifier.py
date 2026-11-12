@@ -142,7 +142,9 @@ class Classifier:
 
     def __init__(self, feature_names, class_names, classifier=None):
         self.logger = logging.getLogger("classifier")
-        self.logger.setLevel(logging.INFO)
+        # Default to INFO, but keep a level the user chose (e.g. DEBUG).
+        if self.logger.level == logging.NOTSET:
+            self.logger.setLevel(logging.INFO)
         self._feature_names: list[str] = list(feature_names)
         self._class_names: list[str] = list(class_names)
         # Create the default estimator per instance: a default argument would be
@@ -201,7 +203,7 @@ class Classifier:
             params = estimator.get_params()  # type: ignore[union-attr]
             if "random_state" in params and params["random_state"] is None:
                 estimator.set_params(random_state=DEFAULT_RANDOM_STATE)  # type: ignore[union-attr]
-                logging.getLogger("classifier").info(
+                logging.getLogger("classifier").debug(
                     "Loaded classifier had no random_state; set it to "
                     f"{DEFAULT_RANDOM_STATE} so retraining is reproducible."
                 )
@@ -262,16 +264,17 @@ class Classifier:
         if self.needs_training():
             return self.train()
         self.logger.info(
-            "Annotations unchanged since the last training: using the existing "
-            "model without retraining."
+            "No annotation changes since the last training: predicting with the "
+            "existing model (not retrained)."
         )
         return None
 
-    def train(self):
+    def train(self) -> float:
         """
         Train the classifier on the data it already has in self._data.
+        Returns the macro F1 score on the held-out annotations.
         """
-        self.logger.info("Training classifier...")
+        self.logger.debug("Training classifier...")
         # Invalidate first: if anything below fails, the next run retrains.
         self._trained_data_fingerprint = None
         fingerprint = self.training_data_fingerprint()
@@ -288,13 +291,11 @@ class Classifier:
 
         self._classifier.fit(X_train, y_train)
 
-        f1 = f1_score(y_test, self._classifier.predict(X_test), average="macro")
+        f1 = float(f1_score(y_test, self._classifier.predict(X_test), average="macro"))
         self.logger.info(
-            f"F1 score on test set: {f1} \n"
-            f"Annotations split into {len(X_train)} training and {len(X_test)} "
-            "test samples. \n"
-            f"Training set contains {self.get_counts_per_class(y_train)}. \n"  # type: ignore[arg-type]
-            f"Test set contains {self.get_counts_per_class(y_test)}."  # type: ignore[arg-type]
+            f"Trained on {len(X_train)} annotations "
+            f"({self._format_counts(y_train)}). F1 score on {len(X_test)} "  # type: ignore[arg-type]
+            f"held-out annotations ({self._format_counts(y_test)}): {f1:.3f}"  # type: ignore[arg-type]
         )
         self._trained_data_fingerprint = fingerprint
         self._record_event(
@@ -351,7 +352,12 @@ class Classifier:
         return "Classifier " + ", ".join(parts) + "."
 
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
-        return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}  # type: ignore[arg-type]
+        """Number of annotations per class name, in class order."""
+        counts = sorted(y.value_counts().items(), key=lambda kv: int(kv[0]))  # type: ignore[arg-type]
+        return {self._class_names[int(k) - 1]: int(v) for k, v in counts}  # type: ignore[arg-type]
+
+    def _format_counts(self, y: pd.Series) -> str:
+        return ", ".join(f"{k}: {v}" for k, v in self.get_counts_per_class(y).items())
 
     def predict(self, df):
         """
@@ -485,7 +491,7 @@ class Classifier:
             if "roi_id" not in dict_of_features[roi]:
                 dict_of_features[roi]["roi_id"] = roi
             df = dict_of_features[roi]
-            self.logger.info(f"Adding features for {roi=}...")
+            self.logger.debug(f"Adding features for {roi=}...")
             self.add_features(df)
 
     def get_class_names(self):
@@ -495,7 +501,7 @@ class Classifier:
         return self._feature_names
 
     def save(self, output_path):
-        self.logger.info(f"Saving classifier at {output_path}...")
+        self.logger.debug(f"Saving classifier at {output_path}...")
         self._record_event("saved", path=str(output_path))
         with open(output_path, "wb") as f:
             f.write(pickle.dumps(self))

@@ -1,6 +1,8 @@
 # pylint: disable=C0103
 """Tests for core classifier class"""
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -704,3 +706,50 @@ def test_provenance_summary_mentions_versions():
     summary = c.provenance_summary()
     assert "scikit-learn" in summary
     assert "last trained" in summary
+
+
+# ---------------------------------------------------------------------------
+# Logging: one concise message per user-relevant event
+# ---------------------------------------------------------------------------
+
+
+def _info_messages(caplog):
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "classifier" and r.levelno == logging.INFO
+    ]
+
+
+def test_training_logs_a_single_concise_summary(caplog, tmp_path):
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    with caplog.at_level(logging.INFO, logger="classifier"):
+        c.add_dict_of_features({"site1": df_train})
+        c.train()
+        c.save(tmp_path / "c.clf")
+    messages = _info_messages(caplog)
+    assert len(messages) == 1
+    assert messages[0].startswith("Trained on ")
+    assert "np.int64" not in messages[0]
+    # classes listed in class order
+    assert messages[0].index("s: ") < messages[0].index("m: ")
+
+
+def test_skipped_training_logs_one_message(caplog):
+    c, df_train, _ = _trained_classifier()
+    c.add_features(df_train)
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="classifier"):
+        c.train_if_needed()
+    messages = _info_messages(caplog)
+    assert len(messages) == 1
+    assert "not retrained" in messages[0]
+
+
+def test_get_counts_per_class_returns_plain_ints_in_class_order():
+    c, _, _ = _trained_classifier()
+    counts = c.get_counts_per_class(pd.Series([2, 1, 2, 2]))
+    assert list(counts) == ["s", "m"]
+    assert counts == {"s": 1, "m": 3}
+    assert all(type(v) is int for v in counts.values())

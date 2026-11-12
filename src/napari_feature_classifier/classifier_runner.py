@@ -12,11 +12,8 @@ import napari.layers
 import napari.viewer
 import numpy as np
 import pandas as pd
-from napari.utils.notifications import show_warning
 
 from napari_feature_classifier.classifier import Classifier, features_match
-
-logger = logging.getLogger(__name__)
 
 
 class ClassifierRunner:
@@ -328,11 +325,9 @@ class ClassifierRunner:
 
     @staticmethod
     def _warn(message: str) -> None:
-        logger.warning(message)
-        try:
-            show_warning(message)
-        except Exception:  # noqa: BLE001 - notifications are best effort
-            pass
+        # Same channel as the Classifier's messages: the plugin widget shows
+        # them as napari notifications (see ClassifierWidget.setup_logging).
+        logging.getLogger("classifier").warning(message)
 
 
 class PredictionLayerManager:

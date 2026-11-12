@@ -1,6 +1,5 @@
 """Classifier container widget for napari"""
 
-import logging
 import pickle
 from pathlib import Path
 
@@ -29,12 +28,12 @@ from napari_feature_classifier.classifier_runner import (
     PredictionLayerManager,
 )
 from napari_feature_classifier.utils import (
-    NapariHandler,
     add_annotation_names,
     get_selected_or_valid_label_layer,
     get_valid_label_layers,
     napari_info,
     overwrite_check_passed,
+    setup_napari_logging,
 )
 
 
@@ -327,6 +326,9 @@ class ClassifierRunContainer(Container):
         auto_save: bool | None = False,
     ):
         self._viewer = viewer
+        # Both "Initialize" and "Load Classifier" end up here: make sure the
+        # classifier's messages (training summary, warnings) reach the user.
+        setup_napari_logging()
         self._last_selected_label_layer = get_selected_or_valid_label_layer(
             viewer=self._viewer
         )
@@ -464,13 +466,10 @@ class ClassifierRunContainer(Container):
         self._runner.make_predictions()
         self._prediction_manager.setup(self._last_selected_label_layer)
         self._prediction_manager.set_visible(True)
+        # Only save when the model changed (the classifier logs that it reused
+        # the existing model otherwise).
         if retrained:
             self._export_panel.save()
-        else:
-            napari_info(
-                "No annotation changes since the last training: predictions use "
-                "the existing model (not retrained, classifier file unchanged)."
-            )
         self._update_counts()
         self._run_button.text = "Run Classifier"
         self._run_button.enabled = True
@@ -691,19 +690,8 @@ class ClassifierWidget(Container):
         self.initialize_init_widget()
 
     def setup_logging(self):
-        # Create a custom handler for napari
-        napari_handler = NapariHandler()
-        napari_handler.setLevel(logging.INFO)
-
-        # Optionally, set a formatter for the handler
-        # formatter = logging.Formatter(
-        #     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        # )
-        # napari_handler.setFormatter(formatter)
-
-        # Get the classifier's logger and add the napari handler to it
-        classifier_logger = logging.getLogger("classifier")
-        classifier_logger.addHandler(napari_handler)
+        """Show the classifier's log messages as napari notifications."""
+        setup_napari_logging()
 
     def initialize_init_widget(self):
         self._init_container = ClassifierInitContainer(self._viewer)
