@@ -251,7 +251,7 @@ def test_get_counts_per_class():
     df_train, _ = get_train_predict_dfs()
     c = get_classifier()
     c.add_features(df_train)
-    counts = c.get_counts_per_class(c._data["annotations"])
+    counts = c.get_counts_per_class(pd.Series(c._data["annotations"]))
     assert set(counts.keys()) == set(CLASS_NAMES)
     assert counts["s"] == 30  # annotations=[1,2,1,1,2]*10 → class 1 ("s") = 30
     assert counts["m"] == 20
@@ -337,14 +337,14 @@ def test_default_estimator_is_seeded():
 def test_retraining_on_same_annotations_is_reproducible():
     df_train, df_predict = get_train_predict_dfs()
     preds = []
-    for _ in range(3):
-        c = get_classifier()
+    classifiers = [get_classifier() for _ in range(3)]
+    for c in classifiers:
         c.add_features(df_train)
         c.train()
         preds.append(c.predict(df_predict))
     # retraining the same instance as well
-    c.train()
-    preds.append(c.predict(df_predict))
+    classifiers[-1].train()
+    preds.append(classifiers[-1].predict(df_predict))
     for p in preds[1:]:
         pd.testing.assert_series_equal(p, preds[0])
 
@@ -397,7 +397,7 @@ def test_setstate_keeps_existing_seed():
 class _EstimatorWithoutParams:
     """Minimal non-sklearn estimator (no get_params/set_params)."""
 
-    def fit(self, X, y):
+    def fit(self, _, y):
         self.value_ = int(pd.Series(y).mode()[0])
         return self
 
@@ -413,3 +413,88 @@ def test_setstate_loads_classifier_with_non_sklearn_estimator():
     )
     loaded = pickle.loads(pickle.dumps(c))  # noqa: S301
     assert isinstance(loaded._classifier, _EstimatorWithoutParams)
+
+
+# ---------------------------------------------------------------------------
+# Warnings when a stored (roi_id, label) now refers to a different object
+# ---------------------------------------------------------------------------
+
+
+def _stored_classifier():
+    """Classifier with 50 stored annotations (site1, labels 1..50)."""
+    df_train, _ = get_train_predict_dfs()
+    c = get_classifier()
+    c.add_features(df_train)
+    return c, df_train
+
+
+def _changed_object_warnings(caplog):
+    return [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_reannotating_unchanged_object_does_not_warn(caplog):
+    """Users may change their mind about an object's class: no warning."""
+    c, df = _stored_classifier()
+    df2 = df.copy()
+    df2["annotations"] = 3 - df2["annotations"]  # swap classes 1 <-> 2
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert (c._data["annotations"].to_numpy() == df2["annotations"].to_numpy()).all()
+
+
+def test_re_adding_identical_float64_table_does_not_warn(caplog):
+    """Stored float32 vs incoming float64 of the same objects is not a change."""
+    c, df = _stored_classifier()
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df)
+    assert _changed_object_warnings(caplog) == []
+
+
+def test_replacing_row_of_changed_object_warns_and_still_replaces(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[3, 4]].copy()
+    df2.loc[df2.index[0], "feature1"] += 1.0  # label 4 is now another object
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    warnings_ = _changed_object_warnings(caplog)
+    assert len(warnings_) == 1
+    assert "1 stored annotation(s) were replaced" in warnings_[0].getMessage()
+    assert "site1:4" in warnings_[0].getMessage()
+    assert "site1:5" not in warnings_[0].getMessage()
+    assert len(c._data) == 50
+    stored_value = float(c._data.loc[("site1", 4), "feature1"])  # type: ignore[arg-type]
+    assert np.isclose(stored_value, np.float32(df2.iloc[0]["feature1"]))
+
+
+def test_noclass_on_changed_object_warns_and_still_deletes(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[5]].copy()
+    df2["annotations"] = -1
+    df2["feature2"] += 1.0
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    warnings_ = _changed_object_warnings(caplog)
+    assert len(warnings_) == 1
+    assert "were deleted (NoClass)" in warnings_[0].getMessage()
+    assert ("site1", 6) not in c._data.index
+
+
+def test_noclass_on_unchanged_object_does_not_warn(caplog):
+    c, df = _stored_classifier()
+    df2 = df.iloc[[5]].copy()
+    df2["annotations"] = -1
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert ("site1", 6) not in c._data.index
+
+
+def test_new_objects_do_not_warn(caplog):
+    c, df = _stored_classifier()
+    df2 = df.copy()
+    df2["roi_id"] = "site2"
+    with caplog.at_level("WARNING", logger="classifier"):
+        c.add_features(df2)
+    assert _changed_object_warnings(caplog) == []
+    assert len(c._data) == 100

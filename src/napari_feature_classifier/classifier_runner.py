@@ -5,7 +5,7 @@ napari viewer.
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import napari
 import napari.layers
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from napari.utils.notifications import show_warning
 
-from napari_feature_classifier.classifier import Classifier
+from napari_feature_classifier.classifier import Classifier, features_match
 
 logger = logging.getLogger(__name__)
 
@@ -231,13 +231,14 @@ class ClassifierRunner:
         # Extract stored annotations + features for this roi_id
         # (drop NaN / NoClass rows)
         feature_names = self.feature_names
-        stored_rows: pd.DataFrame = self._classifier._data.loc[  # type: ignore[assignment]
-            self._classifier._data.index.get_level_values(self._roi_id_column)
-            == roi_id,
-            ["annotations", *feature_names],
-        ]
-        stored_rows = stored_rows[stored_rows["annotations"].notna()]
-        stored_rows = stored_rows[stored_rows["annotations"] != -1]
+        roi_mask = (
+            self._classifier._data.index.get_level_values(self._roi_id_column) == roi_id
+        )
+        stored_rows = pd.DataFrame(
+            self._classifier._data.loc[roi_mask, ["annotations", *feature_names]]
+        )
+        stored_rows = pd.DataFrame(stored_rows[stored_rows["annotations"].notna()])
+        stored_rows = pd.DataFrame(stored_rows[stored_rows["annotations"] != -1])
         if stored_rows.empty:
             return False
 
@@ -253,7 +254,7 @@ class ClassifierRunner:
             )
             return False
         matches = self._stored_features_match_layer(
-            stored_rows[feature_names], features, feature_names
+            pd.DataFrame(stored_rows[feature_names]), features, feature_names
         )
         n_skipped = int((~matches).sum())
         if n_skipped:
@@ -264,8 +265,9 @@ class ClassifierRunner:
                 "the labels or the feature table regenerated?). They remain in "
                 "the classifier's training data with their original features. "
                 "But the old annotations may be overwritten by new annotations "
-                "made on this image now."
-                f"Skipped labels: {self._format_labels(matches[~matches].index)}"
+                "made on this image now. "
+                "Skipped labels: "
+                f"{self._format_labels(idx for idx, ok in matches.items() if not ok)}"
             )
         stored = stored_rows.loc[matches.to_numpy(), "annotations"]
         if stored.empty:
@@ -313,12 +315,12 @@ class ClassifierRunner:
             .to_numpy(dtype=np.float32, na_value=np.nan)
         )
         stored = stored_features.to_numpy(dtype=np.float32, na_value=np.nan)
-        close = np.isclose(stored, live, rtol=1e-5, atol=1e-6, equal_nan=False)
-        return pd.Series(close.all(axis=1), index=stored_features.index)
+        return pd.Series(features_match(stored, live), index=stored_features.index)
 
     @staticmethod
-    def _format_labels(index: pd.Index, max_shown: int = 20) -> str:
-        labels = [str(x) for x in index.get_level_values(-1)]
+    def _format_labels(index: Iterable, max_shown: int = 20) -> str:
+        """Comma-separated label ids from (roi_id, label) tuples or plain labels."""
+        labels = [str(x[-1]) if isinstance(x, tuple) else str(x) for x in index]
         shown = ", ".join(labels[:max_shown])
         return shown + (
             f", ... (+{len(labels) - max_shown})" if len(labels) > max_shown else ""

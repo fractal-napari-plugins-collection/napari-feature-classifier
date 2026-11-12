@@ -4,8 +4,9 @@ import logging
 import pickle
 import random
 import string
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
+import numpy as np
 import pandas as pd
 import pandera.pandas as pa
 import xxhash
@@ -17,9 +18,36 @@ from sklearn.metrics import f1_score
 # objects change class between runs.
 DEFAULT_RANDOM_STATE = 0
 
+# Tolerance for deciding whether two feature vectors describe the same object.
+# Features are stored as float32, so values are compared after a float32 cast;
+# the tolerance only absorbs float noise, any real change of the object fails.
+FEATURE_MATCH_RTOL = 1e-5
+FEATURE_MATCH_ATOL = 1e-6
 
-# TODO: define an interface for compatible classifiers (m.b. a subset of
-# sklearn Estimators?)
+
+def features_match(a, b) -> np.ndarray:
+    """
+    Row-wise check whether two feature arrays (n_objects x n_features) describe
+    the same objects: True where all features are equal after a float32 cast
+    (within FEATURE_MATCH_RTOL/ATOL). NaN never matches.
+    """
+    a32 = np.asarray(a, dtype=np.float32)
+    b32 = np.asarray(b, dtype=np.float32)
+    close = np.isclose(
+        a32, b32, rtol=FEATURE_MATCH_RTOL, atol=FEATURE_MATCH_ATOL, equal_nan=False
+    )
+    return np.asarray(close.all(axis=1), dtype=bool)
+
+
+def format_object_ids(index: Iterable, max_shown: int = 20) -> str:
+    """Short, human-readable list of (roi_id, label) entries for messages."""
+    items = [":".join(map(str, x)) if isinstance(x, tuple) else str(x) for x in index]
+    shown = ", ".join(items[:max_shown])
+    if len(items) > max_shown:
+        shown += f", ... (+{len(items) - max_shown})"
+    return shown
+
+
 class Classifier:
     """Classifier class for napari-feature-classifier.
 
@@ -177,13 +205,53 @@ class Classifier:
         Add features to the classifier and validate them.
         """
         df_valid = self._validate_input_features(df_raw.reset_index())
+        self._warn_if_objects_changed(df_valid)
         # Select index of annotations to be removed
         index = self._data.index.difference(df_valid.index)
         merged_data = pd.concat([self._data.loc[index], df_valid]).sort_index()
 
         index_delete = df_valid[df_valid.annotations == -1].index
-        self._data = merged_data.drop(index=index_delete)
+        self._data = merged_data.drop(index=index_delete.tolist())
         return self
+
+    def _warn_if_objects_changed(self, df_new: pd.DataFrame) -> None:
+        """
+        Warn when incoming rows replace or delete stored rows (same roi_id and
+        label) whose features differ, i.e. the label id now refers to a
+        different object than the one originally annotated (labels or feature
+        table regenerated). Changing only the annotation of an unchanged
+        object is a normal re-annotation and does not warn.
+        """
+        common = df_new.index.intersection(self._data.index)
+        if len(common) == 0:
+            return
+        old = self._data.loc[common, self._feature_names].to_numpy(
+            dtype=np.float32, na_value=np.nan
+        )
+        new = df_new.loc[common, self._feature_names].to_numpy(
+            dtype=np.float32, na_value=np.nan
+        )
+        changed = common[~features_match(old, new)]
+        if len(changed) == 0:
+            return
+        is_delete = (df_new.loc[changed, "annotations"] == -1).to_numpy()
+        replaced, deleted = changed[~is_delete], changed[is_delete]
+        if len(replaced):
+            self.logger.warning(
+                f"{len(replaced)} stored annotation(s) were replaced by an "
+                "annotation of an object with different features under the same "
+                "roi_id and label. The label ids probably refer to different "
+                "objects than when they were first annotated (labels or feature "
+                "table regenerated?). The previous annotations of these objects "
+                f"are no longer used for training: {format_object_ids(replaced)}"
+            )
+        if len(deleted):
+            self.logger.warning(
+                f"{len(deleted)} stored annotation(s) were deleted (NoClass) for "
+                "label ids that now refer to objects with different features "
+                "than the ones originally annotated (labels or feature table "
+                f"regenerated?): {format_object_ids(deleted)}"
+            )
 
     def _validate_predict_features(self, df: pd.DataFrame) -> pd.Series:
         """
@@ -282,7 +350,7 @@ def get_normalized_hash_column(
 
 
 def get_random_object_id(n_chars=10):
-    return "".join(random.choice(string.ascii_lowercase) for i in range(n_chars))
+    return "".join(random.choice(string.ascii_lowercase) for _ in range(n_chars))
 
 
 # TODO: This is cursed, annotations is supposed to be a nullable pandas int type but

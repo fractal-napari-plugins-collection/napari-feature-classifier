@@ -486,7 +486,9 @@ def test_skipped_annotations_keep_original_training_data_after_run(viewer):
     )
 
 
-def test_reannotating_a_skipped_label_replaces_stale_row_without_duplicates(viewer):
+def test_reannotating_a_skipped_label_replaces_stale_row_without_duplicates(
+    viewer, caplog
+):
     """A stale (skipped) row and a new annotation share the (roi_id, label) key.
     add_features replaces the stale row: the index stays unique and the
     training row now holds the current object's features and annotation."""
@@ -500,7 +502,9 @@ def test_reannotating_a_skipped_label_replaces_stale_row_without_duplicates(view
 
     # User annotates the object that now carries label0
     layer.features.loc[0, "annotations"] = 2.0
-    runner.add_features_to_classifier()
+    with caplog.at_level("WARNING", logger="classifier"):
+        runner.add_features_to_classifier()
+    assert "1 stored annotation(s) were replaced" in caplog.text
 
     data = runner._classifier._data
     assert data.index.is_unique
