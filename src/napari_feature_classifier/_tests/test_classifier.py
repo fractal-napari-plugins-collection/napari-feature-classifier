@@ -609,3 +609,98 @@ def test_fingerprint_independent_of_row_order():
     c2 = get_classifier()
     c2.add_features(df_train.iloc[::-1])
     assert c2.training_data_fingerprint() == fp
+
+
+# ---------------------------------------------------------------------------
+# Provenance (versions, timestamps, events) stored in the classifier
+# ---------------------------------------------------------------------------
+
+
+def _only_builtin_types(obj) -> bool:
+    """Provenance must only contain plain Python types so that older plugin
+    versions (without the code that wrote it) can still unpickle the file."""
+    if isinstance(obj, dict):
+        return all(
+            isinstance(k, str) and _only_builtin_types(v) for k, v in obj.items()
+        )
+    if isinstance(obj, list):
+        return all(_only_builtin_types(v) for v in obj)
+    return obj is None or type(obj) in (str, int, float, bool)
+
+
+def test_new_classifier_records_creation_versions():
+    from datetime import datetime
+
+    c = get_classifier()
+    created = c.get_provenance()["created"]
+    assert datetime.fromisoformat(created["timestamp"]).tzinfo is not None
+    versions = created["versions"]
+    for package in ["python", "napari-feature-classifier", "scikit-learn", "numpy"]:
+        assert versions[package]
+    assert c.get_provenance()["history"] == []
+
+
+def test_training_and_saving_are_recorded(tmp_path):
+    import pickle
+
+    c, df_train, _ = _trained_classifier()
+    path = tmp_path / "c.clf"
+    c.save(path)
+    loaded = pickle.loads(path.read_bytes())  # noqa: S301
+    history = loaded.get_provenance()["history"]
+    assert [e["event"] for e in history] == ["trained", "saved"]
+    trained = history[0]
+    assert trained["n_annotations"] == len(df_train)
+    assert trained["n_train"] + trained["n_test"] == len(df_train)
+    assert 0.0 <= trained["f1"] <= 1.0
+    assert history[1]["path"] == str(path)
+    assert trained["versions"]["scikit-learn"]
+
+
+def test_skipped_training_is_not_recorded():
+    c, df_train, _ = _trained_classifier()
+    c.add_features(df_train)
+    c.train_if_needed()
+    assert [e["event"] for e in c.get_provenance()["history"]] == ["trained"]
+
+
+def test_provenance_contains_only_builtin_types(tmp_path):
+    c, _, _ = _trained_classifier()
+    c.save(tmp_path / "c.clf")
+    assert _only_builtin_types(c._provenance)
+
+
+def test_provenance_history_is_capped():
+    from napari_feature_classifier.classifier import PROVENANCE_HISTORY_MAX
+
+    c = get_classifier()
+    for i in range(PROVENANCE_HISTORY_MAX + 25):
+        c._record_event("trained", n_annotations=i)
+    history = c.get_provenance()["history"]
+    assert len(history) == PROVENANCE_HISTORY_MAX
+    assert history[-1]["n_annotations"] == PROVENANCE_HISTORY_MAX + 24
+
+
+def test_get_provenance_returns_a_copy():
+    c = get_classifier()
+    c.get_provenance()["history"].append({"event": "fake"})
+    assert c.get_provenance()["history"] == []
+
+
+def test_classifier_from_older_version_has_unknown_provenance():
+    import pickle
+
+    c, _, _ = _trained_classifier()
+    del c.__dict__["_provenance"]
+    legacy = pickle.loads(pickle.dumps(c))  # noqa: S301
+    assert legacy.get_provenance() == {"created": None, "history": []}
+    assert "before 0.5" in legacy.provenance_summary()
+    legacy.train()
+    assert [e["event"] for e in legacy.get_provenance()["history"]] == ["trained"]
+
+
+def test_provenance_summary_mentions_versions():
+    c, _, _ = _trained_classifier()
+    summary = c.provenance_summary()
+    assert "scikit-learn" in summary
+    assert "last trained" in summary

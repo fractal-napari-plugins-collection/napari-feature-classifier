@@ -635,6 +635,7 @@ class LoadClassifierContainer(Container):
         clf_path = Path(self._clf_destination.value)  # type: ignore[arg-type]
         with open(clf_path, "rb") as f:  # pylint: disable=C0103
             clf = pickle.load(f)
+        napari_info(clf.provenance_summary())
 
         try:
             self._run_container = ClassifierRunContainer(

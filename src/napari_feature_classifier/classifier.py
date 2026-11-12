@@ -1,11 +1,16 @@
 """Core classifier class and helper functions."""
 
+import copy
 import hashlib
+import importlib.metadata
 import logging
 import pickle
+import platform
 import random
 import string
 from collections.abc import Iterable, Sequence
+from datetime import datetime, timezone
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -20,6 +25,48 @@ from sklearn.utils.validation import check_is_fitted
 # retrain on identical annotations gives a different forest and borderline
 # objects change class between runs.
 DEFAULT_RANDOM_STATE = 0
+
+# Provenance (versions + events) is stored in the .clf as plain Python types
+# only (str/int/float/None/list/dict), so older plugin versions can still load
+# the file. The event history is capped to keep files small.
+PROVENANCE_PACKAGES = (
+    "napari-feature-classifier",
+    "scikit-learn",
+    "numpy",
+    "pandas",
+    "pandera",
+    "napari",
+)
+PROVENANCE_HISTORY_MAX = 200
+
+
+@lru_cache(maxsize=1)
+def _environment_versions() -> tuple[tuple[str, str | None], ...]:
+    versions: list[tuple[str, str | None]] = [("python", platform.python_version())]
+    for package in PROVENANCE_PACKAGES:
+        if package == "napari-feature-classifier":
+            # Version of the code actually imported (package metadata can be
+            # stale, e.g. leftover egg-info on sys.path in dev setups).
+            from napari_feature_classifier import __version__ as nfc_version
+
+            if nfc_version != "unknown":
+                versions.append((package, nfc_version))
+                continue
+        try:
+            versions.append((package, importlib.metadata.version(package)))
+        except importlib.metadata.PackageNotFoundError:
+            versions.append((package, None))
+    return tuple(versions)
+
+
+def environment_versions() -> dict[str, str | None]:
+    """Versions of the packages that determine how a classifier behaves."""
+    return dict(_environment_versions())
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
 
 # Tolerance for deciding whether two feature vectors describe the same object.
 # Features are stored as float32, so values are compared after a float32 cast;
@@ -124,6 +171,11 @@ class Classifier:
         # Fingerprint of the training data the current model was fitted on.
         # None = unknown / not trained -> the next train_if_needed() retrains.
         self._trained_data_fingerprint: str | None = None
+        # When/with which versions this classifier was created, trained, saved.
+        self._provenance: dict = {
+            "created": {"timestamp": _utc_now(), "versions": environment_versions()},
+            "history": [],
+        }
 
     def __setstate__(self, state: dict) -> None:
         """Restore state from pickle, adding defaults for attributes added in later versions."""
@@ -135,6 +187,9 @@ class Classifier:
         # "needs training" (the first Run retrains once).
         if "_trained_data_fingerprint" not in self.__dict__:
             self._trained_data_fingerprint = None
+        # Classifiers saved before provenance was recorded: origin unknown.
+        if "_provenance" not in self.__dict__:
+            self._provenance = {"created": None, "history": []}
         # Classifiers saved before seeding was introduced have random_state=None,
         # so every retrain produced a different model. Seed them on load. This
         # does not change the already fitted model or its predictions, only
@@ -242,7 +297,58 @@ class Classifier:
             f"Test set contains {self.get_counts_per_class(y_test)}."  # type: ignore[arg-type]
         )
         self._trained_data_fingerprint = fingerprint
+        self._record_event(
+            "trained",
+            n_annotations=len(self._data),
+            n_train=len(X_train),
+            n_test=len(X_test),
+            f1=float(f1),
+        )
         return f1
+
+    def _record_event(self, event: str, **details) -> None:
+        """Append an event (with timestamp and package versions) to the history."""
+        entry = {
+            "event": event,
+            "timestamp": _utc_now(),
+            "versions": environment_versions(),
+            **details,
+        }
+        history = self._provenance.setdefault("history", [])
+        history.append(entry)
+        del history[:-PROVENANCE_HISTORY_MAX]
+
+    def get_provenance(self) -> dict:
+        """
+        Copy of the provenance record: "created" (timestamp + package
+        versions, None for classifiers saved by versions before 0.5) and
+        "history" (trained / saved events with timestamp, versions, details).
+        """
+        return copy.deepcopy(self._provenance)
+
+    def provenance_summary(self) -> str:
+        """One-line, human-readable summary of where this classifier comes from."""
+
+        def describe(entry: dict) -> str:
+            v = entry.get("versions", {})
+            return (
+                f"{entry.get('timestamp', '?')} (napari-feature-classifier "
+                f"{v.get('napari-feature-classifier', '?')}, scikit-learn "
+                f"{v.get('scikit-learn', '?')})"
+            )
+
+        created = self._provenance.get("created")
+        parts = [
+            f"created {describe(created)}"
+            if created
+            else "created by a version before 0.5 (no version information stored)"
+        ]
+        trainings = [
+            e for e in self._provenance.get("history", []) if e["event"] == "trained"
+        ]
+        if trainings:
+            parts.append(f"last trained {describe(trainings[-1])}")
+        return "Classifier " + ", ".join(parts) + "."
 
     def get_counts_per_class(self, y: pd.Series) -> dict[str, int]:
         return {self._class_names[int(k) - 1]: v for k, v in y.value_counts().items()}  # type: ignore[arg-type]
@@ -390,6 +496,7 @@ class Classifier:
 
     def save(self, output_path):
         self.logger.info(f"Saving classifier at {output_path}...")
+        self._record_event("saved", path=str(output_path))
         with open(output_path, "wb") as f:
             f.write(pickle.dumps(self))
 
